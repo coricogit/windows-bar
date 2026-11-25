@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import actualizar, ajustes, arranque, atajos, cava, iconos, tiempo, bandeja, cielo, claudito, instalado, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import actualizar, ajustes, arranque, atajos, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -616,6 +616,77 @@ class IconosDelTema(unittest.TestCase):
             e = iconos.estilo(t, "tema")
             self.assertTrue(e.startswith("~"))
             self.assertNotEqual(iconos.adaptar(i, e[1:]), i)
+
+
+class Conectar(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.TemporaryDirectory()
+        self.antes = os.environ.get("CLAUDE_CONFIG_DIR")
+        os.environ["CLAUDE_CONFIG_DIR"] = self.d.name
+        self.ruta = os.path.join(self.d.name, "settings.json")
+
+    def tearDown(self):
+        os.environ.pop("CLAUDE_CONFIG_DIR")
+        if self.antes is not None:
+            os.environ["CLAUDE_CONFIG_DIR"] = self.antes
+        self.d.cleanup()
+
+    def poner(self, d):
+        with open(self.ruta, "w", encoding="utf-8") as f:
+            f.write(d if isinstance(d, str) else json.dumps(d))
+
+    def leer(self):
+        with open(self.ruta, encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_ida_y_vuelta(self):
+        mio = {"model": "opus", "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "mi-aviso"}]}]}}
+        self.poner(mio)
+        self.assertEqual(conectar.estado(), {"avisos": "no", "linea": "no"})
+        self.assertEqual(conectar.conectar(), "")
+        self.assertEqual(conectar.estado(), {"avisos": "nuestra", "linea": "claudito"})
+        d = self.leer()
+        self.assertEqual(d["model"], "opus")
+        self.assertIn("mi-aviso", json.dumps(d["hooks"]["Stop"]))
+        self.assertEqual(conectar.conectar(), "")                # otra vez: no se duplica
+        self.assertEqual(json.dumps(self.leer()).count("claudito_hook.py"), json.dumps(d).count("claudito_hook.py"))
+        conectar.desconectar()
+        self.assertEqual(self.leer(), mio)
+        self.assertTrue(os.path.exists(self.ruta + ".claudito-backup"))
+
+    def test_respeta_lo_ajeno(self):
+        self.poner({"statusLine": {"type": "command", "command": "mi-linea"}})
+        self.assertEqual(conectar.conectar(), "")
+        self.assertEqual((self.leer()["statusLine"]["command"], conectar.estado()["linea"]), ("mi-linea", "ajena"))
+        otro = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": '"py" "C:/Otro/windows/claudito_hook.py"'}]}]}}
+        self.poner(otro)
+        self.assertEqual(conectar.estado()["avisos"], "otra")
+        self.assertNotEqual(conectar.conectar(), "")
+        conectar.desconectar()
+        self.assertEqual(self.leer(), otro)
+
+    def test_settings_roto(self):
+        self.poner("{ roto")
+        self.assertNotEqual(conectar.conectar(), "")
+        conectar.desconectar()
+        with open(self.ruta) as f:
+            self.assertEqual(f.read(), "{ roto")
+
+    def test_copia_incluida(self):
+        self.assertTrue(os.path.exists(os.path.join(claudito.INCLUIDO, claudito._DIBUJO)))
+        for n in ("activity.py", "seasons.py", "compat.py", "limits.py", "install.py", "claudito_hook.py"):
+            self.assertTrue(os.path.exists(os.path.join(claudito.INCLUIDO, "windows", n)), n)
+
+    def test_textos(self):
+        u = {"hoy": 1500, "semana": 20000, "mensajes": 3, "limites": [], "cuenta": {"plan": "max", "correo": "a@b.c"},
+             "conexion": {"avisos": "no", "linea": "no"}}
+        self.assertEqual(panel_claude.linea_cuenta(u), "Plan Max · a@b.c")
+        self.assertEqual(panel_claude.linea_cuenta({"cuenta": {}}), "")
+        self.assertIn("Conectar", panel_claude.falta_por_que(u))
+        self.assertIn("terminal", panel_claude.falta_por_que({**u, "conexion": {"avisos": "nuestra", "linea": "claudito"}}))
+        self.assertEqual(panel_claude.lineas_uso(u), ["Hoy: 1.5 k tokens escritos · 3 mensajes", "7 días: 20.0 k tokens escritos"])
+        self.assertEqual(len(panel_claude.lineas_uso({"error": True})), 1)
+        self.assertEqual(panel_claude.lineas_uso(None), ["Calculando el uso…"])
 
 
 class Tiempo(unittest.TestCase):

@@ -21,12 +21,12 @@ import winreg
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
-from barra import arranque, vigilante, win  # noqa: E402
+from barra import arranque, conectar, vigilante, win  # noqa: E402
 from barra.win import GUID, method, ole32  # noqa: E402
 
 DESTINO = os.path.join(os.environ["LOCALAPPDATA"], "Programs", "Windows Bar")
-PARTES = ("python", "barra", "qml", "temas", "lib", "licenses", "barra.pyw", "version.txt", "windows-bar.ico",
-          "LICENSE", "README.md")
+PARTES = ("python", "barra", "claudito", "qml", "temas", "lib", "licenses", "barra.pyw", "version.txt", "windows-bar.ico",
+          "LICENSE", "README.md", "PRIVACIDAD.md")
 NECESARIAS = ("python/pythonw.exe", "barra/win.py", "qml/Barra.qml", "temas/tokyo/tema.json", "barra.pyw", "version.txt")
 NOMBRE = "Windows Bar"
 RESTAURAR = "Restaurar barra de Windows"
@@ -62,6 +62,7 @@ def quitar(raiz=RAIZ):
         parar()
     if arranque.guardado() == arranque.orden():
         arranque.poner(False)
+    conectar.desconectar(os.path.join(raiz, "claudito"))
     shutil.rmtree(os.path.join(vigilante.carpeta(), "actualizacion"), ignore_errors=True)
 
 

@@ -1,0 +1,121 @@
+name: Compilar
+
+# Prueba y construye el instalador y el .zip en cada cambio. Con una etiqueta v*
+# deja además un borrador del release, que se publica a mano: las copias
+# instaladas se actualizan solas a lo que se publique.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compilar-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  compilar:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read            # lo necesita SignPath
+      id-token: write          # para certificar de dónde sale lo construido
+      attestations: write
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: La etiqueta coincide con la versión
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $v = (Get-Content installer/version.txt -Raw).Trim()
+          if ("v$v" -ne $env:GITHUB_REF_NAME) { throw "Etiqueta $env:GITHUB_REF_NAME, version.txt $v" }
+
+      - name: Pruebas
+        run: |
+          python -m pip install --disable-pip-version-check -q PySide6_Essentials==6.12.0
+          python -m unittest discover -s tests
+
+      - name: Construir
+        run: python installer/build.py
+
+      - name: Guardar el instalador
+        id: sin_firmar
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: instalador-sin-firmar
+          path: installer/dist/Windows-Bar-Setup-*.exe
+          if-no-files-found: error
+
+      # Solo cuando el proyecto tenga firma (installer/FIRMA.md).
+      - name: Firmar
+        if: github.ref_type == 'tag' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: SignPath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # v3.2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.sin_firmar.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1500
+          output-artifact-directory: firmado
+
+      - name: Comprobar la firma y cambiar el instalador
+        if: github.ref_type == 'tag' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem firmado -Filter 'Windows-Bar-Setup-*.exe' -Recurse | Select-Object -First 1
+          $firma = Get-AuthenticodeSignature $exe.FullName
+          if ($firma.Status -ne 'Valid') { throw "Firma: $($firma.Status)" }
+          Copy-Item $exe.FullName installer/dist/ -Force
+
+      - name: Guardar lo que se publica
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publicar
+          path: installer/dist/Windows-Bar-*
+          if-no-files-found: error
+
+      - name: Certificar de dónde sale
+        if: github.ref_type == 'tag'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: installer/dist/Windows-Bar-*
+
+  borrador:
+    needs: compilar
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: publicar
+          path: publicar
+      - name: Borrador del release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "El release ya existe: no se toca."
+            exit 0
+          fi
+          cd publicar
+          { echo "SHA-256"; echo '```'; sha256sum Windows-Bar-*; echo '```'; } > ../notas.md
+          gh release create "$GITHUB_REF_NAME" Windows-Bar-* --draft --verify-tag --title "Windows Bar ${GITHUB_REF_NAME#v}" --notes-file ../notas.md

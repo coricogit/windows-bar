@@ -1,6 +1,6 @@
 """Claudito en la barra. Solo lee: usa su lógica de estados y su dibujo desde
-~/src/claudito o desde su instalación, sin cambiar nada allí. Si no está, la
-barra va sin él."""
+~/src/claudito, desde su instalación o, si no está, desde la copia que trae la
+barra (claudito/), sin cambiar nada allí. Sin Claude Code, la barra va sin él."""
 import importlib.util
 import json
 import os
@@ -17,8 +17,10 @@ def encontrar(sitios):
     return next((s for s in sitios if os.path.exists(os.path.join(s, _DIBUJO))), sitios[0])
 
 
+# Copia exacta de lo que hace falta de Claudito (installer/copiar_claudito.py).
+INCLUIDO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "claudito")
 RAIZ = encontrar([os.path.join(os.path.expanduser("~"), "src", "claudito"),
-                  os.path.join(os.environ["LOCALAPPDATA"], "Programs", "Claudito")])
+                  os.path.join(os.environ["LOCALAPPDATA"], "Programs", "Claudito"), INCLUIDO])
 PERSONAJE = os.path.join(RAIZ, _DIBUJO)
 
 NOMBRES = {"idle": "Descansando", "wake": "¡Hola!", "thinking": "Pensando…", "build": "Construyendo…",
@@ -109,7 +111,10 @@ class Claudito:
     def __init__(self):
         self._mod = _cargar("activity")
         self._estaciones = _cargar("seasons")
-        self._tracker = self._mod.Tracker() if self._mod else None
+        # La copia incluida no pinta nada en un equipo sin Claude Code.
+        sobra = RAIZ == INCLUIDO and not os.path.isdir(
+            os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude"))
+        self._tracker = self._mod.Tracker() if self._mod and not sobra else None
         self.sesiones, self.actual = [], ""
         self._estado = os.path.join(os.environ["LOCALAPPDATA"], "claudito", "state.json")
 

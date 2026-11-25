@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox  # noqa: E402
 
-from barra import (actualizar, ajustes as cfg, arranque, bandeja, cielo, claudito, iconos, musica, panel_claude, programas, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
+from barra import (actualizar, ajustes as cfg, arranque, bandeja, cielo, claudito, conectar, iconos, musica, panel_claude, programas, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -578,7 +578,7 @@ class Barra(QObject):
         self._pedir_uso()
 
     def _pedir_uso(self):
-        if time.monotonic() - self._uso_hora < 30 and self._uso_datos or self._uso_hilo and self._uso_hilo.is_alive():
+        if time.monotonic() - self._uso_hora < 30 and self._uso_datos or not self.claudito.disponible or self._uso_hilo and self._uso_hilo.is_alive():
             return
         self._uso_hilo = threading.Thread(target=self._calcular_uso, daemon=True)
         self._uso_hilo.start()
@@ -586,16 +586,53 @@ class Barra(QObject):
     def _calcular_uso(self):
         try:
             r = subprocess.run([sys.executable.replace("pythonw.exe", "python.exe"),
-                                os.path.join(AQUI, "barra", "uso.py")], capture_output=True, text=True, timeout=60,
-                               creationflags=SIN_CONSOLA)
+                                os.path.join(AQUI, "barra", "uso.py")], capture_output=True, text=True, timeout=180,
+                               stdin=subprocess.DEVNULL, creationflags=SIN_CONSOLA)
+            if r.returncode:
+                raise ValueError(r.stderr[-1500:])
             self._uso.emit(json.loads(r.stdout))
-        except (OSError, ValueError, subprocess.TimeoutExpired, RuntimeError):
-            pass                      # se queda el último dato
+        except (OSError, ValueError, subprocess.TimeoutExpired) as e:
+            if not self._uso_datos:             # si ya había un dato, se queda
+                registrar(f"uso de Claude: {e}")
+                self._uso.emit({"error": True})
+        except RuntimeError:
+            pass                                # la barra se está cerrando
 
     def _set_uso(self, d):
-        self._uso_datos, self._uso_hora = d, time.monotonic()
+        self._uso_datos, self._uso_hora = d, time.monotonic() - (25 if d.get("error") else 0)
         if self.panel_claude and self.panel_claude.isVisible():
             self.panel_claude.poner(self.claudito.sesiones, d)
+
+    def _boton_conectar(self):
+        """Solo si no está conectado: el Claudito completo ya lo conecta al instalarse."""
+        if not conectar.hay_claude_code():
+            return []
+        avisos = conectar.estado()["avisos"]
+        if avisos == "no":
+            return [{"texto": "Conectar Claude Code", "hacer": lambda: QTimer.singleShot(0, self._conectar)}]
+        return [{"texto": "Desconectar Claude Code", "hacer": self._desconectar}] if avisos == "nuestra" else []
+
+    def _aviso(self, texto, botones=QMessageBox.StandardButton.Ok):
+        d = QMessageBox(QMessageBox.Icon.Information, "Claudito", texto, botones)
+        d.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        QTimer.singleShot(0, lambda: win.user32.SetForegroundWindow(int(d.winId())))
+        return QMessageBox.StandardButton(d.exec())
+
+    def _conectar(self):
+        b = QMessageBox.StandardButton
+        if self._aviso("Para que Claudito vea tus sesiones y los límites del plan, se añaden sus avisos y su línea de estado "
+                       "al settings.json de Claude Code (si ya tienes otra línea de estado, se respeta). Antes se guarda una "
+                       "copia, settings.json.claudito-backup, y se quita en este mismo menú o al desinstalar.\n\n¿Conectar?",
+                       b.Yes | b.No) != b.Yes:
+            return
+        fallo = conectar.conectar()
+        self._uso_datos = None
+        self._aviso("No se pudo conectar:\n" + fallo if fallo else
+                    "Conectado. Las sesiones nuevas de Claude Code lo usarán; en una ya abierta, escribe /hooks una vez.")
+
+    def _desconectar(self):
+        conectar.desconectar()
+        self._uso_datos = None
 
     @Slot()
     @Slot(str)
@@ -1156,7 +1193,7 @@ class Barra(QObject):
                 {"texto": "Widgets", "marcado": a["widgets"], "hacer": lambda: self._set_widgets(not a["widgets"])},
                 {"texto": "Pincel", "marcado": a["pincel"], "hacer": lambda: self._set_pincel(not a["pincel"])},
                 *(self.novedades.interruptor() if self.novedades else [])],
-            "botones": (self.novedades.boton() if self.novedades else []) + ([{"texto": "Restablecer orden", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []) + [
+            "botones": (self.novedades.boton() if self.novedades else []) + self._boton_conectar() + ([{"texto": "Restablecer orden", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []) + [
                 {"texto": "Ciudad: " + (a["ciudad"].get("nombre") or "elegir…"), "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)},
                 {"texto": "Administrador de tareas", "hacer": lambda: win.press(0x11, 0x10, 0x1B)},
                 {"texto": "Configuración de Windows", "hacer": lambda: win.press(0x5B, 0x49)},

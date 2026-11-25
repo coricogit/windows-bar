@@ -5,7 +5,7 @@ from PySide6.QtCore import QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
-ANCHO, MARGEN, FILA, CABEZA = 290, 12, 28, 30
+ANCHO, MARGEN, FILA, CABEZA = 340, 12, 28, 30
 MAX_SESIONES = 6
 
 
@@ -23,6 +23,39 @@ def falta(cuando, ahora):
     if m >= 1440:
         return f"{m // 1440} d {m % 1440 // 60} h"
     return f"{m // 60} h {m % 60} min" if m >= 60 else f"{m} min"
+
+
+PLANES = {"pro": "Pro", "max": "Max", "team": "Team", "enterprise": "Enterprise", "free": "Gratis"}
+
+
+def linea_cuenta(uso):
+    """"Plan Max · correo", lo que se sepa de ello."""
+    c = (uso or {}).get("cuenta") or {}
+    plan = PLANES.get(c.get("plan"), c.get("plan") or "")
+    return " · ".join(x for x in (("Plan " + plan) if plan else "", c.get("correo") or "") if x)
+
+
+def falta_por_que(uso):
+    """Por qué no hay límites, en pocas palabras."""
+    con = (uso or {}).get("conexion") or {}
+    if con.get("avisos") == "no":
+        return "Sin límites: menú > Conectar Claude Code"
+    if con.get("linea") == "ajena":
+        return "Sin límites: tienes otra línea de estado"
+    return "Límites: al usar Claude en la terminal"
+
+
+def lineas_uso(uso):
+    if uso is None:
+        return ["Calculando el uso…"]
+    if uso.get("error"):
+        return ["No se pudo leer el uso (ver barra.log)"]
+    out = [f"Hoy: {miles(uso['hoy'])} tokens escritos"]
+    if uso.get("mensajes"):
+        out[0] += f" · {uso['mensajes']} mensajes"
+    if uso.get("semana"):
+        out.append(f"7 días: {miles(uso['semana'])} tokens escritos")
+    return out
 
 
 class Panel(QWidget):
@@ -50,8 +83,10 @@ class Panel(QWidget):
         if not self._sitio:
             return
         n = max(1, len(self._sesiones))
-        limites = len(uso["limites"]) if uso else 0
-        alto = CABEZA + n * FILA + 10 + limites * 34 + 26
+        alto = CABEZA + n * FILA + 10 + 8
+        if uso and not uso.get("error"):
+            alto += (20 if linea_cuenta(uso) else 0) + (len(uso["limites"]) * 34 or 20)
+        alto += 20 * len(lineas_uso(uso))
         self.setGeometry(QRect(*self._sitio(ANCHO, alto), ANCHO, alto))
         self.update()
 
@@ -118,14 +153,22 @@ class Panel(QWidget):
             p.setBrush(c["alerta"] if urge else c["tenue"] if s["modo"] in ("idle", "sleep") else c["acento"])
             p.drawEllipse(QRectF(MARGEN, y + FILA / 2 - 4, 8, 8))
             p.setBrush(Qt.BrushStyle.NoBrush)
-            texto(QRect(MARGEN + 16, y, 124, FILA), s["proyecto"] or "Claude", c["texto"], negrita if urge else f)
-            texto(QRect(ANCHO - MARGEN - 122, y, 122, FILA), s["texto"], c["alerta"] if urge else c["tenue"], f,
+            texto(QRect(MARGEN + 16, y, 150, FILA), s["proyecto"] or "Claude", c["texto"], negrita if urge else f)
+            texto(QRect(ANCHO - MARGEN - 140, y, 140, FILA), s["texto"], c["alerta"] if urge else c["tenue"], f,
                   Qt.AlignmentFlag.AlignRight)
             y += FILA
         p.setPen(QPen(c["tenue"], 0.5))
         p.drawLine(MARGEN, y + 5, ANCHO - MARGEN, y + 5)
         y += 10
         ahora = time.time()
+        bien = self._uso is not None and not self._uso.get("error")
+        cuenta = linea_cuenta(self._uso)
+        if bien and cuenta:
+            texto(QRect(MARGEN, y, dentro.width(), 20), cuenta, c["texto"])
+            y += 20
+        if bien and not self._uso["limites"]:
+            texto(QRect(MARGEN, y, dentro.width(), 20), falta_por_que(self._uso), c["tenue"])
+            y += 20
         for nombre, pct, cuando in (self._uso or {}).get("limites", []):
             zona = QRect(MARGEN, y, dentro.width(), 20)
             resto = falta(cuando, ahora)
@@ -140,6 +183,7 @@ class Panel(QWidget):
             p.drawRoundedRect(barra, 2.5, 2.5)
             p.setBrush(Qt.BrushStyle.NoBrush)
             y += 34
-        pie = "Calculando el uso…" if self._uso is None else f"Hoy: {miles(self._uso['hoy'])} tokens escritos"
-        texto(QRect(MARGEN, y - 2, dentro.width(), 24), pie, c["tenue"])
+        for linea in lineas_uso(self._uso):
+            texto(QRect(MARGEN, y, dentro.width(), 20), linea, c["tenue"])
+            y += 20
         p.end()

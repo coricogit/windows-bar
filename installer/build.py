@@ -37,7 +37,7 @@ INNO = ("https://api.nuget.org/v3-flatcontainer/tools.innosetup/6.7.3/tools.inno
 QT = (("PySide6_Essentials==6.12.0", "c9a95102aa23c1f86516a30d5a9be37552d324eee7e567eb7508973f1218cb42"),
       ("shiboken6==6.12.0", "a1906cb8116869178c64b6bab52623bbc8b4ceed7b30bfc3c9aa0f6e67f6438e"))
 # Lo que entra del repositorio (de git, para que no se cuele nada más).
-FUENTES = ("LICENSE", "README.md", "barra.pyw", "barra", "qml", "temas")
+FUENTES = ("LICENSE", "README.md", "PRIVACIDAD.md", "barra.pyw", "barra", "claudito", "qml", "temas")
 
 # Lo que entra de PySide6.
 QT_MODULOS = ("Core", "Gui", "Network", "OpenGL", "Qml", "Quick", "QuickControls2", "Widgets")

@@ -13,6 +13,10 @@ AppPublisher=coricogit
 AppPublisherURL=https://github.com/coricogit/windows-bar
 AppSupportURL=https://github.com/coricogit/windows-bar/issues
 VersionInfoVersion={#Version}
+VersionInfoProductName=Windows Bar
+VersionInfoProductVersion={#Version}
+; Qué cambia en el equipo y con quién se conecta.
+InfoBeforeFile=antes.txt
 ; Solo para ti: sin administrador y sin nada fuera de tu perfil.
 PrivilegesRequired=lowest
 DefaultDirName={localappdata}\Programs\Windows Bar
@@ -64,6 +68,7 @@ Filename: "{#Py}"; Parameters: """{#Ayuda}"" --quitar"; Flags: runhidden waitunt
 ; Los compilados de Python.
 Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\barra"
+Type: filesandordirs; Name: "{app}\claudito"
 Type: filesandordirs; Name: "{app}\lib"
 Type: filesandordirs; Name: "{app}\qml"
 Type: filesandordirs; Name: "{app}\temas"
@@ -75,7 +80,7 @@ Type: dirifempty; Name: "{app}"
 // La versión anterior se aparta, sin borrarla, hasta que la nueva está puesta:
 // si algo falla, vuelve a su sitio.
 const
-  LastPart = 6;
+  LastPart = 7;
 
 var
   AppDir: String;
@@ -96,6 +101,7 @@ begin
     3: Result := 'temas';
     4: Result := 'lib';
     5: Result := 'barra.pyw';
+    6: Result := 'claudito';
   else
     Result := 'version.txt';
   end;

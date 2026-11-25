@@ -11,6 +11,8 @@
   $ProgressPreference = 'SilentlyContinue'
   $temp = Join-Path $env:TEMP 'windows-bar-instalar'
   try {
+    Write-Host 'Windows Bar oculta la barra de Windows mientras esta abierta y pregunta a GitHub cada 6 horas si hay version nueva.'
+    Write-Host 'Privacidad: https://github.com/coricogit/windows-bar/blob/main/PRIVACIDAD.md'
     Write-Host 'Buscando la ultima version...'
     $release = Invoke-RestMethod 'https://api.github.com/repos/coricogit/windows-bar/releases/latest' -UseBasicParsing
     $zip = $release.assets | Where-Object { $_.name -like 'Windows-Bar-*.zip' } | Select-Object -First 1

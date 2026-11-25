@@ -1,0 +1,13 @@
+﻿Windows Bar sustituye a la barra de tareas de Windows mientras está abierta.
+
+CAMBIOS EN EL EQUIPO
+- Oculta la barra de Windows y, según el formato, cambia el espacio de las ventanas. Al cerrarla, o si falla, todo vuelve a su sitio.
+- Para volver a la barra de Windows en cualquier momento: Ctrl+Alt+Mayús+B.
+- Se instala en tu perfil, sin administrador. Se desinstala desde Configuración > Aplicaciones.
+
+PRIVACIDAD
+- No recoge datos ni tiene telemetría.
+- Cada 6 horas pregunta a GitHub si hay una versión nueva. Se quita en el menú: Actualizar sola.
+- Si eliges una ciudad para ver el tiempo, la consulta en Open-Meteo. Sin ciudad no se consulta nada.
+
+Detalles: https://github.com/coricogit/windows-bar/blob/main/PRIVACIDAD.md

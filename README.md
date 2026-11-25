@@ -21,7 +21,8 @@ Las dos dejan lo mismo. Lo que se ejecuta después va firmado por sus autores (P
 sola: mira este repositorio cada pocas horas, comprueba la descarga y la instala cuando llevas un par de minutos sin tocar el
 equipo. Si falla, vuelve la versión anterior. Se quita en el menú (*Actualizar sola*).
 
-Claudito sale si está [instalado](https://github.com/coricogit/claudito) o en `~/src/claudito`.
+Claudito sale en los equipos con Claude Code. Usa el [instalado](https://github.com/coricogit/claudito) o el de
+`~/src/claudito`; si no hay, el que trae la barra: para que vea tus sesiones y límites, *Conectar Claude Code* en el menú.
 
 Desde el código: `py -m pip install PySide6_Essentials`, y después
 
@@ -81,7 +82,8 @@ con `"translucida": true` (y `coloresClaros` para el texto oscuro).
 
 ## Claudito
 
-Pasa el ratón para ver tus sesiones de Claude, los límites del plan y el uso de hoy. Un clic trae al frente la ventana
+Pasa el ratón para ver tus sesiones de Claude, los límites del plan, la cuenta y los tokens de hoy y de la
+semana. Todo sale de archivos de tu equipo. Los límites los da la línea de estado de Claude Code, que solo hay en la terminal. Un clic trae al frente la ventana
 de la sesión que toca (la que te necesita, si la hay). Late cuando Claude te está esperando.
 
 ## Posición de la barra
@@ -138,17 +140,24 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 - `barra/cava.py`: proceso aparte con el visualizador.
 - `barra/atajos.py`: proceso aparte con los atajos de teclado. `barra/tiempo.py`: el tiempo.
 - `barra/actualizar.py`, `barra/instalado.py`, `installer/`: instalador y actualización (`py installer\build.py`).
+- `.github/workflows/compilar.yml`: pruebas y compilación en GitHub; con una etiqueta `v*`, borrador del release. La firma, en
+  [installer/FIRMA.md](installer/FIRMA.md).
 - `barra/bandeja.py`: proceso aparte que recibe los iconos de la bandeja y los reenvía a Explorer.
 - `barra/vigilante.py`: proceso aparte que devuelve la barra de Windows si esta se cierra o se cuelga.
 - `barra/vista.py`: vista previa de las ventanas (miniaturas de DWM).
 - `barra/vidrio.py`: el vidrio de Liquid Glass.
-- `barra/sesiones.py`, `barra/uso.py`, `barra/panel_claude.py`: Claudito interactivo.
+- `barra/sesiones.py`, `barra/uso.py`, `barra/conectar.py`, `barra/panel_claude.py`: Claudito interactivo.
+- `claudito/`: copia exacta de lo que hace falta de Claudito (`py installer\copiar_claudito.py`).
 - `barra/iconos.py`: iconos adaptados al tema.
 - `barra/programas.py`: nombre real de los programas y agrupación.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.
 
 Pruebas: `py -m unittest discover -s tests`
+
+## Privacidad
+
+Sin telemetría. Con quién se conecta, cuándo y cómo quitarlo: [PRIVACIDAD.md](PRIVACIDAD.md).
 
 ## Licencia
 
