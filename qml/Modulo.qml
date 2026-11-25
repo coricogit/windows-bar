@@ -12,7 +12,7 @@ Loader {
   // Sin tamaño propio: cada módulo pone el suyo. Si el Loader lo impusiera,
   // rompería sus enlaces y al girar la barra se quedaría con el anterior.
   sourceComponent: ({ inicio: inicio, tareas: tareasC, titulo: titulo, musica: musicaC, sistema: sistemaC,
-                      bandeja: bandejaC, volumen: volumen, reloj: reloj, temas: temasC, claudito: clauditoC })[nombre]
+                      bandeja: bandejaC, volumen: volumen, reloj: reloj, widgets: widgetsC, temas: temasC, claudito: clauditoC })[nombre]
 
   Component {
     id: inicio
@@ -103,31 +103,27 @@ Loader {
 
   Component {
     id: musicaC
-    Row {
-      height: mod.v ? (hay ? implicitHeight : 0) : mod.alto
+    Item {             // solo las barras; con el ratón se maneja la música
       // No `visible`: dentro de un grupo oculto siempre sería falso.
-      readonly property bool hay: barra.cancion.titulo !== ""
-      width: mod.v ? mod.alto : hay ? implicitWidth : 0
-      spacing: 0
-      Boton { visible: !mod.v; alto: mod.alto; colores: mod.c; texto: "\uE892"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Anterior"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("anterior") }
-      Boton {
-        alto: mod.alto
-        colores: mod.c
-        texto: barra.cancion.sonando ? "\uE769" : "\uE768"; fuente: "Segoe Fluent Icons"; tam: 13; ancho: 28; colorTexto: mod.c.acento
-        ayuda: mod.v ? barra.cancion.titulo + (barra.cancion.artista ? " — " + barra.cancion.artista : "") : barra.cancion.sonando ? "Pausar" : "Reproducir"
-        onRueda: function(p) { barra.accion(p > 0 ? "anterior" : "siguiente") }
-        onPulsado: barra.accion("pausa")
+      readonly property bool hay: barra.cancion.titulo !== "" && barra.conCava
+      width: mod.v ? mod.alto : hay ? 122 : 0
+      height: mod.v ? (hay ? 40 : 0) : mod.alto
+      Cava {
+        anchors.centerIn: parent
+        tema: mod.tema
+        cuantas: mod.v ? 8 : 16
+        visible: parent.hay
+        width: mod.v ? mod.alto - 14 : 112
+        height: mod.v ? 30 : Math.min(32, mod.alto - 8)
       }
-      Boton { visible: !mod.v; alto: mod.alto; colores: mod.c; texto: "\uE893"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Siguiente"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("siguiente") }
-      Texto {
-        visible: !mod.v
-        height: mod.alto
-        width: Math.min(implicitWidth, mod.tema.centrado ? 190 : 300)
-        elide: Text.ElideRight
-        leftPadding: 4
-        rightPadding: 6
-        color: mod.c.texto
-        text: barra.cancion.titulo + (barra.cancion.artista ? " — " + barra.cancion.artista : "")
+      Aviso { texto: "Clic: pausar o seguir · Rueda: anterior o siguiente"; fuente: zc }
+      MouseArea {
+        id: zc
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: function(e) { if (e.button === Qt.RightButton) barra.menu(); else barra.accion("pausa") }
+        onWheel: function(e) { barra.accion(e.angleDelta.y > 0 ? "anterior" : "siguiente") }
       }
     }
   }
@@ -136,7 +132,7 @@ Loader {
     id: sistemaC
     Grid {
       columns: mod.v ? 1 : 3
-      spacing: mod.v ? 6 : (mod.tema.compacto ? 7 : 9) + mod.tema.aire
+      spacing: mod.v ? 6 : (mod.tema.compacto ? 8 : 10) + mod.tema.aire / 2
       leftPadding: mod.v ? 0 : 4
       rightPadding: mod.v ? 0 : 4
       topPadding: mod.v ? 4 : 0
@@ -176,8 +172,10 @@ Loader {
         parent: mod
         visible: mod.item && mod.item.width > 0
         anchors { fill: parent; topMargin: mod.v ? -2 : 5; bottomMargin: mod.v ? -2 : 5; leftMargin: mod.v ? 1 : 0; rightMargin: mod.v ? 1 : 0 }
-        radius: mod.v ? 12 : height / 2
+        radius: mod.tema.pixelado ? 0 : mod.v ? 12 : height / 2
         color: mod.c.fondoBandeja
+        border.width: mod.tema.pixelado && Qt.color(mod.c.fondoBandeja).a > 0 ? 2 : 0
+        border.color: mod.c.borde
       }
       // Se pliega sola al rato de quitar el ratón.
       HoverHandler { id: sobre }
@@ -220,12 +218,14 @@ Loader {
             width: parent.width; height: width
             radius: Math.min(mod.tema.radio, 6)
             color: zona.containsMouse ? mod.c.encima : "transparent"
+            border.width: barra.seleccion === "b:" + model.key ? 2 : 0
+            border.color: mod.c.acento
           }
           Image {
             anchors.centerIn: parent
             width: 16; height: 16
             sourceSize: Qt.size(32, 32)
-            source: model.icono
+            source: model.icono === "" ? "" : model.icono + mod.tema.estiloBandeja
             opacity: model.oculto ? 0.75 : 1
             smooth: !mod.tema.pixelado
             mipmap: !mod.tema.pixelado
@@ -278,10 +278,54 @@ Loader {
       texto: Qt.formatTime(ahora, mod.v ? "HH:mm" : mod.tema.reloj) + (!mod.tema.fecha ? ""
              : mod.v ? "\n" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM")
              : (doble ? "\n" : "  ") + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha))
-      tam: mod.v ? Math.min(mod.tema.tamano, 13) : mod.tema.tamano
+      tam: mod.v || doble ? Math.min(mod.tema.tamano, 13) : mod.tema.tamano
       ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat)
       onPulsado: function(b) { if (b === Qt.RightButton) barra.menu(); else barra.accion("avisos") }
       Timer { interval: 1000; running: true; repeat: true; onTriggered: hora.ahora = new Date() }
+    }
+  }
+
+  Component {
+    id: widgetsC
+    Item {
+      id: wid
+      readonly property bool conTexto: barra.tiempo.hay && !mod.v && !mod.tema.compacto
+      width: mod.v ? mod.alto : icono.implicitWidth + (barra.tiempo.hay ? datos.width + 5 : 0) + 14
+      height: mod.v ? 40 : mod.alto
+      Rectangle {
+        anchors { fill: parent; topMargin: mod.tema.compacto ? 2 : 4; bottomMargin: mod.tema.compacto ? 2 : 4 }
+        radius: Math.min(Math.max(mod.tema.radio, mod.tema.radioBoton), 8)
+        color: zw.containsMouse ? mod.c.encima : "transparent"
+        Behavior on color { ColorAnimation { duration: 120 } }
+      }
+      Text {
+        id: icono
+        x: mod.v ? (parent.width - width) / 2 : 7
+        y: mod.v ? 2 : (parent.height - height) / 2
+        text: barra.tiempo.icono
+        font.family: "Segoe UI Emoji"
+        font.pixelSize: mod.tema.compacto ? 15 : 19
+        color: mod.c.texto
+      }
+      Column {
+        id: datos
+        visible: barra.tiempo.hay
+        x: mod.v ? (parent.width - width) / 2 : icono.x + icono.width + 5
+        y: mod.v ? parent.height - height - 1 : (parent.height - height) / 2
+        width: Math.max(gr.implicitWidth, wid.conTexto ? Math.min(80, Math.ceil(dm.advanceWidth) + 2) : 0)
+        spacing: -2
+        TextMetrics { id: dm; text: barra.tiempo.texto; font.family: mod.tema.fuente; font.pixelSize: 9 }
+        Texto { id: gr; text: barra.tiempo.grados; color: mod.c.texto; font.pixelSize: mod.v ? 10 : 12 }
+        Texto { id: des; visible: wid.conTexto; width: parent.width; elide: Text.ElideRight; text: barra.tiempo.texto; color: mod.c.tenue; font.pixelSize: 9; font.bold: false }
+      }
+      Aviso { texto: "Widgets" + (barra.tiempo.hay ? " · " + barra.tiempo.ciudad + ": " + barra.tiempo.grados + ", " + barra.tiempo.texto : " · La ciudad del tiempo se elige en el menú"); fuente: zw }
+      MouseArea {
+        id: zw
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: function(e) { if (e.button === Qt.RightButton) barra.menu(); else barra.accion("widgets") }
+      }
     }
   }
 

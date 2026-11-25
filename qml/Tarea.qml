@@ -35,14 +35,23 @@ Item {
     radius: Math.min(Math.max(tema.radio, tema.radioBoton), 10)
     color: tarea.activa && tarea.estilo === "relleno" ? tarea.c.acento
            : raton.containsMouse || (tarea.activa && tarea.estilo !== "corchetes" && tarea.estilo !== "gota") ? tarea.c.encima : "transparent"
+    border.width: tarea.elegida ? 2 : 0        // elegida con el teclado
+    border.color: tarea.c.acento
     Behavior on color { ColorAnimation { duration: 140 } }
+  }
+  readonly property bool elegida: esPrimaria && barra.seleccion === "t:" + clave
+  onElegidaChanged: {
+    if (!elegida) { barra.soltar(clave); return }
+    lista.positionViewAtIndex(indice, ListView.Contain)
+    var p = tarea.mapToGlobal(tarea.width / 2, tarea.height / 2)
+    barra.apuntar(clave, p.x, p.y)
   }
 
   Image {
     anchors.centerIn: parent
     width: tarea.tema.icono; height: tarea.tema.icono
     sourceSize: Qt.size(32, 32)
-    source: tarea.icono
+    source: tarea.icono === "" ? "" : tarea.icono + tarea.tema.estiloIconos
     smooth: !tarea.tema.pixelado
     mipmap: !tarea.tema.pixelado
     opacity: tarea.minimizada ? 0.55 : 1

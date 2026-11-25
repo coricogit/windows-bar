@@ -34,6 +34,30 @@ Desde el código: `py -m pip install PySide6_Essentials`, y después
 Ajustes en `%LOCALAPPDATA%\barra-temas\ajustes.json`: tema por hora (`auto`, `tema_dia`, `tema_noche`, `dia`,
 `noche`), por programa (`"por_programa": {"steam.exe": "tokyo"}`) y `modo_juego`. Errores en `barra.log`, al lado.
 
+## Atajos de teclado
+
+| Atajo | Qué hace |
+|---|---|
+| Win+1…0 | Abrir, traer al frente o minimizar ese botón; con varias ventanas, pasar de una a otra |
+| Win+Mayús+1…0 | Abrir otra ventana (con Ctrl, como administrador) |
+| Win+Ctrl+1…0 | Ir a su última ventana |
+| Win+Alt+1…0 | Su menú |
+| Win+T · Win+B | Elegir un botón · un icono de la bandeja. Flechas para moverse, Intro, Esc, tecla Menú |
+
+Los demás (Win+A, N, S, X, W, E…) son de Windows y siguen igual. El proceso que los atiende solo intercepta teclas con
+Windows pulsada o eligiendo con las flechas, y descansa en modo juego. Con una ventana de administrador delante no llegan.
+
+## Widgets y tiempo
+
+El botón abre los widgets de Windows (Win+W). Windows no enseña el tiempo con su barra oculta: si eliges una ciudad en el
+menú, se pide a [Open-Meteo](https://open-meteo.com) (CC BY 4.0) cada 20 minutos. Sin ciudad no se consulta nada.
+
+## Música y visualizador
+
+Mientras hay algo reproduciéndose salen barras de frecuencias al estilo de [cava](https://github.com/karlstav/cava), hechas aquí: capturan lo
+que sale por los altavoces (nunca el micrófono, y sin guardar nada) solo mientras suena algo. Clic: pausar o seguir; rueda: anterior o siguiente. Se quitan con *Visualizador*;
+*Animaciones* regula su ritmo.
+
 ## Formatos
 
 En el menú, *Formato* cambia la forma de cada tema por separado: completa, islas, compacta (30 px), islas compactas (36 px),
@@ -54,16 +78,22 @@ de la sesión que toca (la que te necesita, si la hay). Late cuando Claude te es
 ## Posición de la barra
 
 Abajo, arriba, a la izquierda o a la derecha: en el menú o arrastrando un hueco vacío de la barra hacia ese borde. En
-vertical los temas no llevan paisaje y la música se reduce a un botón (rueda: anterior o siguiente).
+vertical los temas no llevan paisaje.
 
 ## Posición de los iconos
 
-Sigue lo elegido en Windows (izquierda o centro) y cambia al momento. Se puede fijar en el menú.
+Sigue lo elegido en Windows (izquierda o centro) y cambia al momento. Se puede fijar en el menú. Los iconos van en el centro
+exacto o al principio; lo demás se reparte a los lados y, si no cabe, se esconde: título, música, widgets, medidores y Claudito.
 
 ## Liquid Glass
 
 Refracta la capa del fondo de escritorio, también la de Wallpaper Engine; nunca lee las ventanas. Cada pieza mide lo
 claro que es su fondo y cambia a texto oscuro si hace falta. El menú tiene cinco niveles de transparencia.
+
+## Iconos
+
+En el menú, *Iconos*: los originales o adaptados al tema, que los pinta con sus colores (en Píxel, como pixel art). Vale
+para los programas y la bandeja; no cambia ningún archivo.
 
 ## Ambiente
 
@@ -85,7 +115,8 @@ reabre si la cierras tú, con el atajo de emergencia o con el .bat, ni al apagar
 ## Crear un tema
 
 Copia una carpeta de `temas` en `%LOCALAPPDATA%\barra-temas\temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.
-`Fondo.qml` es opcional. Para verlos todos sin tocar nada: `py barra.pyw --vista CARPETA`.
+`Fondo.qml` es opcional y debe tener `radio`, `desde` y `total`: en los formatos de islas se dibuja dentro de
+cada pieza (`barra.tema.dentro`), con esas esquinas y desde ese punto de la barra. Para verlos todos sin tocar nada: `py barra.pyw --vista CARPETA`.
 
 Para recuperar un tema quitado, muévelo de `temas-retirados` a `temas`.
 
@@ -93,12 +124,15 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 
 ## Piezas
 
+- `barra/cava.py`: proceso aparte con el visualizador.
+- `barra/atajos.py`: proceso aparte con los atajos de teclado. `barra/tiempo.py`: el tiempo.
 - `barra/actualizar.py`, `barra/instalado.py`, `installer/`: instalador y actualización (`py installer\build.py`).
 - `barra/bandeja.py`: proceso aparte que recibe los iconos de la bandeja y los reenvía a Explorer.
 - `barra/vigilante.py`: proceso aparte que devuelve la barra de Windows si esta se cierra o se cuelga.
 - `barra/vista.py`: vista previa de las ventanas (miniaturas de DWM).
 - `barra/vidrio.py`: el vidrio de Liquid Glass.
 - `barra/sesiones.py`, `barra/uso.py`, `barra/panel_claude.py`: Claudito interactivo.
+- `barra/iconos.py`: iconos adaptados al tema.
 - `barra/programas.py`: nombre real de los programas y agrupación.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.

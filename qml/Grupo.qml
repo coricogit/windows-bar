@@ -8,6 +8,8 @@ Rectangle {
   property var tema
   property real alto: 40
   property real limite: 600
+  property real desde: 0             // dónde está y cuánto mide la barra, para el paisaje
+  property real total: 0
   readonly property bool isla: tema.forma === "islas" && !tema.unica
   readonly property int llenos: {        // columnas justas, como en Zona
     var n = piezas * 0
@@ -22,7 +24,7 @@ Rectangle {
       var m = rep.itemAt(i)
       if (m && m.nombre !== "tareas") s += (v ? m.height : m.width) + fila.spacing
     }
-    return s
+    return vacio ? 0 : s + (isla && (s > 0 || conTareas) ? 12 : 0)
   }
   // Sobre un fondo claro, el vidrio usa los colores oscuros del tema.
   readonly property bool clara: vidrio.item ? vidrio.item.clara : tema.clara
@@ -30,9 +32,19 @@ Rectangle {
     logo: Object.assign({}, tema.logo, { colores: tema.logoClaros }) }) : tema
 
   readonly property bool v: tema.vertical
-  width: v ? alto : fila.width + (isla ? 12 : 0)
-  height: v ? fila.height + (isla ? 12 : 0) : alto
-  opacity: modulos.length === 1 && modulos[0] === "musica" && barra.cancion.titulo === "" ? 0 : 1
+  // Al no caber se queda sin tamaño, pero sus piezas siguen midiendo lo suyo.
+  property bool oculto: false
+  readonly property bool conTareas: modulos.indexOf("tareas") >= 0
+  readonly property bool vacio: modulos.length === 1 && modulos[0] === "musica" && (barra.cancion.titulo === "" || !barra.conCava)
+  readonly property real natural: vacio ? 0 : (v ? fila.height : fila.width) + (isla ? 12 : 0)
+  readonly property int rango: {        // lo de menos rango se esconde antes
+    var orden = { titulo: 0, musica: 1, widgets: 2, sistema: 3, claudito: 4, temas: 5 }, r = 0
+    for (var i = 0; i < modulos.length; i++) r = Math.max(r, modulos[i] in orden ? orden[modulos[i]] : 99)
+    return r
+  }
+  width: v ? alto : oculto ? 0 : natural
+  height: v ? (oculto ? 0 : natural) : alto
+  opacity: oculto || vacio ? 0 : 1
   enabled: opacity > 0
   radius: Math.min(tema.radio, alto / 2)
   color: tema.unica ? "transparent" : tema.colores.isla
@@ -50,6 +62,18 @@ Rectangle {
       pintar: grupo.tema.vidrio
       radio: grupo.radius
       luzX: raton.hovered ? raton.point.position.x : -1
+    }
+  }
+
+  // El paisaje del tema, dentro de la pieza.
+  Loader {
+    anchors { fill: parent; margins: grupo.tema.borde }
+    active: grupo.isla && grupo.tema.dentro && grupo.tema.fondoUrl !== "" && grupo.width > 20
+    source: active ? grupo.tema.fondoUrl : ""
+    onLoaded: {
+      item.radio = Qt.binding(function() { return Math.max(0, grupo.radius - grupo.tema.borde) })
+      item.desde = Qt.binding(function() { return grupo.desde })
+      item.total = Qt.binding(function() { return grupo.total })
     }
   }
 

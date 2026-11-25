@@ -56,10 +56,12 @@
       "acento2": "#2B5C73",
       "alerta": "#A01515",
       "encima": "#33FFFFFF",
-      "fondoBandeja": "#A63A1F35",
+      "fondoBandeja": "#B33A1F35",
       "medidor1": "#C92A3F",
       "medidor2": "#1E7A5A",
-      "medidor3": "#2861A8"
+      "medidor3": "#2861A8",
+      "cava1": "#9C2F3F",
+      "cava2": "#B35A1E"
     },
     "dia": {
       "fondo": "#FFB4E2F8",
@@ -70,10 +72,12 @@
       "acento2": "#1B5A43",
       "alerta": "#A01515",
       "encima": "#4DFFFFFF",
-      "fondoBandeja": "#A614203A",
+      "fondoBandeja": "#B314203A",
       "medidor1": "#C92A3F",
       "medidor2": "#1B6E50",
-      "medidor3": "#1F4FA0"
+      "medidor3": "#1F4FA0",
+      "cava1": "#1F4FA0",
+      "cava2": "#1B6E50"
     },
     "atardecer": {
       "fondo": "#FF7A3F6E",

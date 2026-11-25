@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import actualizar, ajustes, arranque, bandeja, cielo, claudito, instalado, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import actualizar, ajustes, arranque, atajos, cava, iconos, tiempo, bandeja, cielo, claudito, instalado, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -355,6 +355,181 @@ class Actualizar(unittest.TestCase):
         self.assertEqual(claudito.encontrar(["C:\\no1", "C:\\no2"]), "C:\\no1")
 
 
+class Atajos(unittest.TestCase):
+    def setUp(self):
+        self.l, self.t = atajos.Logica(), 0
+
+    def pulsa(self, vk, win=False, mayus=False, ctrl=False, alt=False, suelta=True):
+        vk = ord(vk) if isinstance(vk, str) else vk
+        self.t += 0.1
+        r = self.l.tecla(vk, True, win, mayus, ctrl, alt, self.t)
+        if suelta:
+            self.assertEqual(self.l.tecla(vk, False, win, mayus, ctrl, alt, self.t)[0], r[0])
+        return r
+
+    def test_numeros(self):
+        self.assertEqual([self.pulsa(str(n), True)[1]["i"] for n in (1, 2, 9, 0)], [0, 1, 8, 9])
+        self.assertEqual(self.pulsa("1"), (False, None))                 # sin Windows, se escribe
+        a = self.pulsa("3", True, mayus=True, ctrl=True)[1]
+        self.assertEqual((a["i"], a["mayus"], a["ctrl"], a["alt"]), (2, True, True, False))
+
+    def test_mantenida_cuenta_una_vez(self):
+        self.assertIsNotNone(self.pulsa("1", True, suelta=False)[1])
+        self.assertEqual(self.pulsa("1", True, suelta=False), (True, None))
+        self.assertEqual(self.pulsa("1", False, suelta=False)[0], True)      # soltó Windows antes que el número
+
+    def test_lo_demas_sigue_siendo_de_windows(self):
+        for k in "ADELRSVXNWI":
+            self.assertEqual(self.pulsa(k, True), (False, None), k)
+        for k in ({"ctrl": True}, {"alt": True}, {"mayus": True}):           # PowerToys, HDR...
+            self.assertEqual(self.pulsa("T", True, **k), (False, None))
+            self.assertEqual(self.pulsa("B", True, **k), (False, None))
+
+    def test_elegir_con_flechas(self):
+        self.assertEqual(self.pulsa("T", True), (True, {"op": "mover", "lista": "tareas", "paso": 1}))
+        self.assertEqual(self.pulsa("T", True, mayus=True)[1]["paso"], -1)
+        self.assertEqual(self.pulsa(0x27)[1]["paso"], 1)
+        self.assertEqual(self.pulsa(0x25)[1]["paso"], -1)
+        self.assertEqual(self.pulsa(0x10), (False, None))                    # Mayús sola no corta
+        self.assertEqual(self.pulsa(0x0D), (True, {"op": "pulsar", "lista": "tareas"}))
+        self.assertEqual(self.pulsa(0x0D), (False, None))                    # ya terminó
+        self.pulsa("B", True)
+        self.assertEqual(self.pulsa(0x5D)[1], {"op": "menu", "lista": "bandeja"})
+        self.pulsa("B", True)
+        self.assertEqual(self.pulsa(0x1B), (True, {"op": "cancelar"}))
+
+    def test_escribir_cancela_sin_perder_la_tecla(self):
+        self.pulsa("T", True)
+        self.assertEqual(self.pulsa("H"), (False, {"op": "cancelar"}))
+        self.assertEqual(self.pulsa("O"), (False, None))
+        self.pulsa("T", True)
+        self.t += atajos.ESPERA + 1
+        self.assertEqual(self.pulsa(0x27), (False, {"op": "cancelar"}))      # caducó: la flecha no se pierde
+
+
+class Cava(unittest.TestCase):
+    @staticmethod
+    def tono(hz, volumen, fs=24000):
+        import math
+        return [volumen * math.sin(2 * math.pi * hz * i / fs) for i in range(cava.MAX_MUESTRAS)]
+
+    def mas_alta(self, hz, volumen=0.3):
+        e = cava.Espectro(24000)
+        e.anadir(self.tono(hz, volumen))
+        for _ in range(20):
+            b = e.fotograma(1 / 30)
+        return b.index(max(b)), b
+
+    def test_cada_tono_en_su_barra(self):
+        sitios = [self.mas_alta(hz)[0] for hz in (70, 150, 400, 1000, 2500, 6000)]
+        self.assertEqual(sitios, sorted(set(sitios)))
+        self.assertTrue(sitios[0] <= 2 and sitios[-1] >= 13, sitios)
+
+    def test_el_volumen_no_importa(self):
+        self.assertGreater(max(self.mas_alta(440, 0.9)[1]), 95)
+        self.assertGreater(max(self.mas_alta(440, 0.02)[1]), 95)
+
+    def test_silencio_y_caida(self):
+        e = cava.Espectro(24000)
+        self.assertEqual(e.fotograma(0.03), [0] * cava.BARRAS)
+        e.anadir(self.tono(440, 0.3))
+        for _ in range(20):
+            e.fotograma(0.03)
+        e.anadir([0.0] * cava.MAX_MUESTRAS)
+        maximos = [max(e.fotograma(0.03)) for _ in range(60)]
+        self.assertEqual(maximos, sorted(maximos, reverse=True))
+        self.assertEqual(maximos[-1], 0)
+
+    def test_mono(self):
+        datos = struct.pack("<8f", .5, .3, 9, 9, .1, .1, 9, 9)
+        self.assertEqual([round(x, 3) for x in cava.a_mono(datos, 2, 2, True)], [0.4, 0.1])
+        self.assertEqual(cava.a_mono(struct.pack("<2h", 16384, -16384), 1, 1, False), [0.5, -0.5])
+
+
+class IconosDelTema(unittest.TestCase):
+    @staticmethod
+    def icono(colores):
+        from PySide6.QtGui import QColor, QImage
+        img = QImage(32, 32, QImage.Format.Format_ARGB32)
+        img.fill(0)
+        for i, c in enumerate(colores):
+            for y in range(4, 28):
+                for x in range(4 + i * 24 // len(colores), 4 + (i + 1) * 24 // len(colores)):
+                    img.setPixelColor(x, y, QColor(c))
+        return img
+
+    def test_originales(self):
+        for t in temas.cargar((temas.RAIZ,)).values():
+            self.assertEqual(iconos.con_iconos(t, "originales")["estiloIconos"], "")
+            self.assertEqual(iconos.con_iconos(t, "raro")["icono"], t["icono"])
+
+    def test_se_ven_en_todos_los_temas(self):
+        for ident, t in temas.cargar((temas.RAIZ,)).items():
+            if t["pixelado"]:
+                continue
+            for m in cielo.MOMENTOS:
+                for f in temas.FORMATOS:
+                    for n in (100, 30, 0):
+                        for detras in (0.05, 0.95):
+                            x = temas.con_opacidad(temas.con_formato(temas.con_momento(t, m), f), n, detras)
+                            base = temas.base_de(x)
+                            if x["opacidad"] < 100:
+                                base = tuple(b * n / 100 + detras * (1 - n / 100) for b in base[:3])
+                            tonos = iconos.tonos(x)
+                            self.assertGreater(max(temas.contraste(c, base) for c in tonos), 3, (ident, m, f, n, detras))
+                            self.assertEqual(sorted(tonos, key=temas.luz), list(tonos), (ident, m))
+
+    def test_bandeja_con_fondo(self):
+        t = temas.cargar((temas.RAIZ,))["sakura"]
+        fondo = temas.rgb(t["colores"]["fondoBandeja"])
+        tonos = iconos.tonos_bandeja(t)
+        self.assertGreater(temas.contraste(tonos[0], fondo), 1.8)
+        self.assertGreater(temas.contraste(tonos[2], fondo), 7)
+        self.assertEqual(iconos.tonos_bandeja(temas.cargar((temas.RAIZ,))["tokyo"]), iconos.tonos(temas.cargar((temas.RAIZ,))["tokyo"]))
+
+    def test_dos_tonos(self):
+        e = iconos.adaptar(self.icono(["#000000", "#808080", "#FFFFFF"]), "d-102030-405060-A0B0C0")
+        self.assertEqual([e.pixelColor(x, 16).name() for x in (5, 27)], ["#102030", "#a0b0c0"])
+        self.assertEqual(e.pixelColor(0, 0).alpha(), 0)
+        plano = iconos.adaptar(self.icono(["#5865F2"]), "d-102030-405060-A0B0C0")
+        self.assertEqual(plano.pixelColor(16, 16).name(), "#405060")          # de un color: el del medio
+
+    def test_pixel(self):
+        e = iconos.adaptar(self.icono(["#FF0000", "#00FF00"]), "p-17122E")
+        self.assertEqual((e.width(), e.height()), (16, 16))
+        usados = {e.pixelColor(x, y).getRgb()[:3] for x in range(16) for y in range(16) if e.pixelColor(x, y).alpha()}
+        self.assertLessEqual(usados, set(iconos.PALETA))
+        self.assertIn((0x17, 0x12, 0x2E), usados)
+
+    def test_texto_raro(self):
+        i = self.icono(["#123456"])
+        for malo in ("", "x", "d-12", "p-zzzzzz"):
+            self.assertEqual(iconos.adaptar(i, malo), i)
+        for t in temas.cargar((temas.RAIZ,)).values():
+            e = iconos.estilo(t, "tema")
+            self.assertTrue(e.startswith("~"))
+            self.assertNotEqual(iconos.adaptar(i, e[1:]), i)
+
+
+class Tiempo(unittest.TestCase):
+    def test_leer(self):
+        def r(codigo, grados=21.6, dia=1):
+            return tiempo.leer_tiempo(json.dumps({"current": {"weather_code": codigo, "temperature_2m": grados, "is_day": dia}}))
+        self.assertEqual(r(0), {"hay": True, "icono": "☀️", "grados": "22°", "texto": "Despejado"})
+        self.assertEqual(r(0, -0.4, 0)["grados"], "0°")
+        self.assertEqual([r(c)["texto"] for c in (3, 45, 61, 75, 95, 500)], ["Nublado", "Niebla", "Lluvia", "Nieve", "Tormenta", "Tormenta"])
+        for malo in ("", "{}", "[]", "null", '{"current": {"weather_code": "x"}}'):
+            self.assertIsNone(tiempo.leer_tiempo(malo))
+            self.assertIsNone(tiempo.leer_ciudad(malo))
+        c = tiempo.leer_ciudad('{"results": [{"name": "X", "latitude": 1.5, "longitude": -3}]}')
+        self.assertEqual(c, {"nombre": "X", "lat": 1.5, "lon": -3.0})
+        self.assertTrue(tiempo.ciudad_valida(c))
+
+    def test_ajuste(self):
+        for malo in ({"nombre": "x"}, {"nombre": "x", "lat": "1", "lon": 2}, "Lima", {"nombre": "x", "lat": 1, "lon": 999}):
+            self.assertEqual(ajustes.normalizar({"ciudad": malo}, {"tokyo": 1}, temas.FORMATOS)["ciudad"], {})
+
+
 class Sitio(unittest.TestCase):
     P = (1920, -468, 1200, 1920)
 
@@ -462,18 +637,16 @@ class Alineacion(unittest.TestCase):
                 zona = [m for g in n["modulos"]["centro" if centro else "izquierda"] for m in g]
                 self.assertEqual(zona[:2], ["inicio", "tareas"], ident)
                 izq = [m for g in n["modulos"]["izquierda"] for m in g]
-                for m in ("claudito", "sistema"):
+                for m in ("widgets", "claudito", "sistema"):
                     self.assertEqual(m in izq, centro and m in todos, (ident, m))
 
     def test_una_isla(self):
         for ident, t in temas.cargar().items():
-            todos = sorted(m for z in t["modulos"].values() for g in z for m in g)
             for f in ("isla", "isla_compacta"):
                 for centro in (True, False):
                     n = temas.con_alineacion(temas.con_formato(t, f), centro)
-                    self.assertEqual((n["modulos"]["izquierda"], n["modulos"]["derecha"]), ([], []))
-                    self.assertEqual(sorted(m for g in n["modulos"]["centro"] for m in g), todos, ident)
-                    self.assertTrue(n["centrado"])
+                    zona = [m for g in n["modulos"]["centro" if centro else "izquierda"] for m in g]
+                    self.assertEqual((zona[:2], n["centrado"], n["unica"]), (["inicio", "tareas"], centro, True), ident)
                     self.assertGreater(temas.rgb(n["colores"]["isla"])[3], 0.5)
 
     def test_lee_windows(self):

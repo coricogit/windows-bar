@@ -3,6 +3,19 @@ import QtQuick
 // Cielo según la hora, en bloques de 3 px: sol o luna, nubes o estrellas, colinas y hierba.
 Item {
   id: f
+  // Dentro de una isla: sus esquinas, y qué trozo del paisaje le toca.
+  property real radio: 0
+  property real desde: 0
+  property real total: 0
+  readonly property real largo: total > 0 ? total : width
+  readonly property bool dentro: barra.tema.dentro
+  function recortar(x, w, h) {
+    if (radio <= 0) return
+    var r = Math.min(radio, h / 2, w / 2)
+    x.beginPath()
+    x.moveTo(r, 0); x.arcTo(w, 0, w, h, r); x.arcTo(w, h, 0, h, r); x.arcTo(0, h, 0, 0, r); x.arcTo(0, 0, w, 0, r)
+    x.closePath(); x.clip()
+  }
   readonly property string momento: barra.momento
   onMomentoChanged: { paisaje.requestPaint() }
   readonly property bool deNoche: momento === "noche" || momento === "atardecer"
@@ -19,16 +32,25 @@ Item {
     renderStrategy: Canvas.Cooperative
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
+    readonly property real trozo: f.desde + f.largo
+    onTrozoChanged: requestPaint()
     onPaint: {
       var x = getContext("2d"), p = 3, s = 11, t = f.tonos
       function azar() { s = (s * 16807) % 2147483647; return s / 2147483647 }
-      function px(cx, cy, w, h, c) { x.fillStyle = c; x.fillRect(cx * p, cy * p, w * p, h * p) }
+      var quita = Math.floor(f.desde / p), caben = Math.ceil(width / p)
+      function px(cx, cy, w, h, c) {
+        cx -= quita
+        if (cx + w < 0 || cx > caben) return
+        x.fillStyle = c; x.fillRect(cx * p, cy * p, w * p, h * p)
+      }
       function disco(cx, cy, r, c) {
         for (var dy = -r; dy <= r; dy++)
           for (var dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r + 1) px(cx + dx, cy + dy, 1, 1, c)
       }
       x.reset()
-      var n = Math.ceil(width / p), alto = Math.floor(height / p), astro = Math.floor(n * 0.73)
+      f.recortar(x, width, height)
+      var n = Math.ceil(f.largo / p), alto = Math.floor(height / p), astro = Math.floor(n * 0.73)
+      x.translate(0, height - alto * p)        // la tierra llega justo al borde
       px(0, 0, n, 1, f.deNoche ? "#17122E" : "#4D14203A")
       if (f.deNoche)
         for (var i = 0; i < n / (f.momento === "noche" ? 7 : 16); i++)
@@ -49,41 +71,46 @@ Item {
     }
   }
 
-  // Nubes, de día y al amanecer
-  Repeater {
-    id: nubes
-    model: f.deNoche ? 0 : Math.max(3, Math.round(f.width / 320))
-    Item {
-      y: 4 + (index % 3) * 5
-      opacity: f.momento === "dia" ? 0.75 : 0.5
-      Component.onCompleted: x = (index + Math.random() * 0.6) * f.width / nubes.count
-      Rectangle { x: 6; width: 24; height: 3; color: "#FFFFFF" }
-      Rectangle { y: 3; width: 39; height: 6; color: "#FFFFFF" }
-      Rectangle { x: 3; y: 9; width: 33; height: 3; color: "#E6F4FC" }
+  Item {               // lo que se mueve, sin asomar por las esquinas
+    id: marco
+    anchors { fill: parent; leftMargin: f.radio * 0.55; rightMargin: f.radio * 0.55; topMargin: f.radio > 0 ? 1 : 0; bottomMargin: f.radio > 0 ? 1 : 0 }
+    clip: f.dentro
+    // Nubes, de día y al amanecer
+    Repeater {
+      id: nubes
+      model: f.deNoche || f.width < 110 ? 0 : Math.max(f.dentro ? 1 : 3, Math.round(f.width / 320))
+      Item {
+        y: 4 + (index % 3) * 5
+        opacity: f.momento === "dia" ? 0.75 : 0.5
+        Component.onCompleted: x = (index + Math.random() * 0.6) * f.width / nubes.count
+        Rectangle { x: 6; width: 24; height: 3; color: "#FFFFFF" }
+        Rectangle { y: 3; width: 39; height: 6; color: "#FFFFFF" }
+        Rectangle { x: 3; y: 9; width: 33; height: 3; color: "#E6F4FC" }
+      }
     }
-  }
-  Timer {
-    interval: 400; repeat: true; running: !f.deNoche && f.visible && barra.mover
-    onTriggered: {
-      for (var i = 0; i < nubes.count; i++) { var o = nubes.itemAt(i); o.x = o.x > f.width ? -45 : o.x + 3 }
+    Timer {
+      interval: 400; repeat: true; running: !f.deNoche && f.visible && barra.mover
+      onTriggered: {
+        for (var i = 0; i < nubes.count; i++) { var o = nubes.itemAt(i); o.x = o.x > f.width ? -45 : o.x + 3 }
+      }
     }
-  }
-  // Estrellas que titilan
-  Repeater {
-    id: brillos
-    model: f.momento === "noche" ? 14 : 0
-    Rectangle {
-      width: 3; height: 3; color: "#FFF4D6"
-      x: Math.floor(Math.random() * f.width / 3) * 3
-      y: 6 + Math.floor(Math.random() * 5) * 3
-      opacity: Math.random() > 0.5 ? 0.9 : 0.1
+    // Estrellas que titilan
+    Repeater {
+      id: brillos
+      model: f.momento === "noche" ? Math.max(1, Math.round(14 * f.width / f.largo)) : 0
+      Rectangle {
+        width: 3; height: 3; color: "#FFF4D6"
+        x: Math.floor(Math.random() * f.width / 3) * 3
+        y: 6 + Math.floor(Math.random() * 5) * 3
+        opacity: Math.random() > 0.5 ? 0.9 : 0.1
+      }
     }
-  }
-  Timer {
-    interval: 700; repeat: true; running: f.momento === "noche" && f.visible && barra.mover
-    onTriggered: {
-      var o = brillos.itemAt(Math.floor(Math.random() * brillos.count))
-      if (o) o.opacity = o.opacity > 0.5 ? 0.1 : 0.9
+    Timer {
+      interval: 700; repeat: true; running: f.momento === "noche" && f.visible && barra.mover
+      onTriggered: {
+        var o = brillos.itemAt(Math.floor(Math.random() * brillos.count))
+        if (o) o.opacity = o.opacity > 0.5 ? 0.1 : 0.9
+      }
     }
   }
 }

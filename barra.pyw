@@ -25,9 +25,9 @@ from PySide6.QtGui import QAction, QColor, QCursor, QGuiApplication, QIcon, QIma
 from PySide6.QtQml import QQmlComponent, QQmlContext, QQmlEngine  # noqa: E402
 from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRendererInterface  # noqa: E402
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
-from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu  # noqa: E402
+from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox  # noqa: E402
 
-from barra import (actualizar, ajustes as cfg, arranque, bandeja, cielo, claudito, musica, panel_claude, programas, selector, sesiones, sistema, sitio, temas,  # noqa: E402
+from barra import (actualizar, ajustes as cfg, arranque, bandeja, cielo, claudito, iconos, musica, panel_claude, programas, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -111,9 +111,18 @@ class Iconos(QQuickImageProvider):
     def __init__(self, almacen):
         super().__init__(QQuickImageProvider.ImageType.Image)
         self.almacen = almacen
+        self._hechos = {}            # los adaptados al tema
 
     def requestImage(self, ident, size, requested):
-        img = self.almacen.get(ident.rsplit("/", 1)[0])
+        nombre, _, rev = ident.rpartition("/")
+        img = self.almacen.get(nombre)
+        _, _, estilo = rev.partition("~")
+        if estilo and img is not None:
+            if ident not in self._hechos:
+                if len(self._hechos) > 200:
+                    self._hechos.clear()
+                self._hechos[ident] = iconos.adaptar(img, estilo)
+            img = self._hechos[ident]
         if img is None or img.isNull():
             img = QImage(32, 32, QImage.Format.Format_ARGB32)
             img.fill(Qt.GlobalColor.transparent)
@@ -226,6 +235,13 @@ class Barra(QObject):
     momentoCambio = Signal()
     ritmoCambio = Signal()
     bandejaCambio = Signal()
+    seleccionCambio = Signal()
+    tiempoCambio = Signal()
+    cavaCambio = Signal()
+    _cava = Signal(object)
+    _atajo = Signal(object)
+    _tiempo = Signal(object)
+    _ciudad = Signal(object)
     _musica = Signal(object)
     _bandeja = Signal(object)
     _uso = Signal(object)
@@ -275,6 +291,13 @@ class Barra(QObject):
         self.animarCambio.connect(self._zonas_vidrio)
         self._apuntado, self._previa_desde = None, 0
         self._t_previa = QTimer(self, singleShot=True, interval=380, timeout=self._mostrar_previa)
+        self._seleccion = ""        # lo elegido con el teclado: "t:" y una fila, o "b:" y un icono
+        self._clima, self._hilo_tiempo = dict(tiempo.NADA), None
+        self._barras = [0] * 16
+        self._cava.connect(self._set_cava)
+        self._atajo.connect(self._hacer_atajo)
+        self._tiempo.connect(self._set_tiempo)
+        self._ciudad.connect(self._set_ciudad)
         self._musica.connect(self._set_musica)
         self._bandeja.connect(self._set_bandeja)
         self.musica = None
@@ -292,6 +315,9 @@ class Barra(QObject):
         self._t_pronto = QTimer(self, interval=60, singleShot=True, timeout=self.actualizar_ventanas)
         for t in (self._t_sis, self._t_cl, self._t_tema, self._t_ven):
             t.start()
+        self._t_tiempo = QTimer(self, interval=20 * 60 * 1000, timeout=self._pedir_tiempo)
+        self._t_tiempo.start()
+        QTimer.singleShot(3000, self._pedir_tiempo)
         self._gancho = win.watch(self._t_pronto.start)
         self._sistema()
         self._leer_claude()
@@ -369,6 +395,7 @@ class Barra(QObject):
             t = temas.con_opacidad(t, self.ajustes["opacidad"],
                                    temas.brillo_de_lado(self._pix_fondo, self.ajustes["posicion"]))
         t = temas.con_posicion(t, self.ajustes["posicion"])
+        t = iconos.con_iconos(t, self.ajustes["iconos"])
         t = temas.con_icono(t, self._tono_fondo if self.ajustes["icono"] == "fondo" or t["vidrio"] or t["adapta"] else None)
         al = self.ajustes["alineacion"]
         return temas.con_alineacion(t, self._centrado if al == "windows" else al == "centro")
@@ -391,6 +418,11 @@ class Barra(QObject):
         self.ajustes["opacidad"] = n
         self._guardar()
         self._actualizar_camaleon(avisar=False)
+        self.temaCambio.emit()
+
+    def _set_iconos(self, cual):
+        self.ajustes["iconos"] = cual
+        self._guardar()
         self.temaCambio.emit()
 
     def _set_alineacion(self, a):
@@ -606,7 +638,8 @@ class Barra(QObject):
         self._ids = {h: i for h, i in self._ids.items() if h in hwnds}
         for z, h in enumerate(hwnds):            # de la más reciente a la más antigua
             exe = programas.principal(win.app_exe(h))
-            info.append({"hwnd": h, "exe": exe, "titulo": win.title(h), "activa": h == activa, "z": z,
+            info.append({"hwnd": h, "exe": exe, "titulo": win.title(h), "z": z,
+                         "activa": h == activa and not win.user32.IsIconic(h),
                          "clave": win.clave_exe(exe), "nombre": self._nombre(h, exe),
                          "minimizada": bool(win.user32.IsIconic(h)), "pantalla": win.monitor_of(h),
                          "icono": self.almacen.url(self.almacen.de_ventana(h, exe))})
@@ -703,10 +736,10 @@ class Barra(QObject):
             ruta = TIENDA + i if i else ""
         return {"clave": win.clave_exe(f["exe"]), "exe": f["exe"], "nombre": f["nombre"], "ruta": ruta}
 
-    def _abrir(self, f):
+    def _abrir(self, f, modo="open"):
         e = self._entrada(f)
         try:
-            os.startfile(e["ruta"] or e["exe"])
+            os.startfile(e["ruta"] or e["exe"], modo)
         except OSError:
             registrar("abrir " + str(e["exe"]))
 
@@ -831,6 +864,164 @@ class Barra(QObject):
         if self.previa:
             self.previa.ocultar()
 
+    # ----- atajos de teclado (barra/atajos.py) -----
+    seleccion = Property(str, lambda self: self._seleccion, notify=seleccionCambio)
+
+    def _seleccionar(self, que):
+        if que != self._seleccion:
+            self._seleccion = que
+            self.seleccionCambio.emit()
+
+    def _principal(self):
+        return next((p for p in self.paneles if p.primaria), None)
+
+    def _hacer_atajo(self, m):
+        p = self._principal()
+        if not p:
+            return
+        op = m.get("op")
+        if op == "numero":
+            self._seleccionar("")
+            if m["i"] < len(p.tareas.filas):
+                self._atajo_numero(p.tareas.filas[m["i"]], m)
+        elif op == "mover":
+            b = m["lista"] == "bandeja"
+            if b:
+                self.abrir_bandeja(True)
+            pre, filas = ("b:", self.tray.filas) if b else ("t:", p.tareas.filas)
+            claves = [pre + f["key"] for f in filas]
+            if claves:
+                i = claves.index(self._seleccion) + m["paso"] if self._seleccion in claves else (0 if m["paso"] > 0 else -1)
+                self._seleccionar(claves[i % len(claves)])
+        elif op in ("pulsar", "menu") and self._seleccion:
+            clave, derecho = self._seleccion[2:], op == "menu"
+            if self._seleccion.startswith("b:"):
+                self.pulsar_bandeja(clave, derecho)
+            elif derecho:
+                self._menu_elegida(clave)
+            else:
+                f = self._fila(clave)
+                if f:
+                    self._atajo_numero(f, {})
+            self._seleccionar("")
+        else:
+            self._seleccionar("")
+
+    def _atajo_numero(self, f, m):
+        """Como en Windows: abre, trae al frente, minimiza, o pasa por sus ventanas."""
+        self._quitar_previa()
+        if m.get("alt"):
+            self._seleccionar("t:" + f["key"])        # así se sabe dónde está el botón
+            QTimer.singleShot(60, lambda: (self._menu_elegida(f["key"]), self._seleccionar("")))
+        elif m.get("mayus"):
+            self._abrir(f, "runas" if m.get("ctrl") else "open")
+        elif not f["hwnd"]:
+            self._abrir(f)
+        elif f["cuenta"] > 1 and not m.get("ctrl"):
+            vs, activa = f["ventanas"], win.user32.GetForegroundWindow()
+            win.activate(vs[(vs.index(activa) + 1) % len(vs)] if activa in vs else int(f["hwnd"]))
+        elif f["activa"] and not m.get("ctrl"):
+            win.minimize(int(f["hwnd"]))
+        else:
+            win.activate(int(f["hwnd"]))
+
+    def _menu_elegida(self, clave):
+        f, a = self._fila(clave), self._apuntado
+        if f:
+            self._quitar_previa()
+            self._abrir_menu(self._crear_menu_tarea(f), a[1:] if a and a[0] == clave else None)
+
+    # ----- visualizador (barra/cava.py) -----
+    cava = Property("QVariantList", lambda self: self._barras, notify=cavaCambio)
+    conCava = Property(bool, lambda self: self.ajustes["cava"], notify=temaCambio)
+
+    def _set_cava(self, b):
+        if isinstance(b, list) and b != self._barras:
+            self._barras = b
+            self.cavaCambio.emit()
+
+    def _poner_cava(self, si):
+        self.ajustes["cava"] = si
+        self._guardar()
+        self.temaCambio.emit()
+        self.musicaCambio.emit()
+
+    def fps_cava(self):
+        """Fotogramas por segundo del visualizador; 0 si ahora no toca."""
+        if not (self.ajustes["cava"] and self._cancion["sonando"] and self._animar):
+            return 0
+        return {"completas": 30, "suaves": 20}.get(self.ajustes["animaciones"], 0)
+
+    # ----- widgets y tiempo -----
+    widgets = Property(bool, lambda self: self.ajustes["widgets"], notify=temaCambio)
+    tiempo = Property("QVariantMap", lambda self: {**self._clima, "ciudad": self.ajustes["ciudad"].get("nombre", "")},
+                      notify=tiempoCambio)
+
+    def _pedir_tiempo(self):
+        c = self.ajustes["ciudad"]
+        if self.vista or not c or not self.ajustes["widgets"] or not self._animar or (self._hilo_tiempo and self._hilo_tiempo.is_alive()):
+            return
+
+        def pedir():
+            try:
+                t = tiempo.ahora(c, DATOS)
+            except (OSError, ValueError):
+                return                  # se queda el último
+            if t:
+                self._tiempo.emit((c, t))
+        self._hilo_tiempo = threading.Thread(target=pedir, daemon=True)
+        self._hilo_tiempo.start()
+
+    def _set_tiempo(self, par):
+        if par[0] == self.ajustes["ciudad"]:          # no ha cambiado mientras tanto
+            self._clima = par[1]
+            self.tiempoCambio.emit()
+
+    def _pedir_ciudad(self):
+        d = QInputDialog()
+        d.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        d.setWindowTitle("Ciudad del tiempo")
+        d.setLabelText("Tu ciudad (vacío para no mostrar el tiempo).\nSe consulta en open-meteo.com.")
+        d.setTextValue(self.ajustes["ciudad"].get("nombre", ""))
+        QTimer.singleShot(0, lambda: win.user32.SetForegroundWindow(int(d.winId())))
+        if not d.exec():
+            return
+        nombre = d.textValue().strip()[:80]
+        if not nombre:
+            self._set_ciudad({})
+            return
+
+        def buscar():
+            try:
+                self._ciudad.emit(tiempo.buscar_ciudad(nombre, DATOS) or nombre)
+            except (OSError, ValueError):
+                self._ciudad.emit(nombre)
+        threading.Thread(target=buscar, daemon=True).start()
+
+    def _set_ciudad(self, c):
+        if isinstance(c, str):
+            d = QMessageBox(QMessageBox.Icon.Information, "Ciudad del tiempo", f"No se encontró «{c}», o no hay conexión.")
+            d.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+            d.exec()
+            return
+        self.ajustes["ciudad"] = c
+        self._guardar()
+        self._clima = dict(tiempo.NADA)
+        self.tiempoCambio.emit()
+        self._hilo_tiempo = None
+        self._pedir_tiempo()
+
+    def _set_widgets(self, si):
+        self.ajustes["widgets"] = si
+        self._guardar()
+        self.temaCambio.emit()
+        self._pedir_tiempo()
+
+    def _set_atajos(self, si):
+        self.ajustes["atajos"] = si
+        self._guardar()
+        self.animarCambio.emit()
+
     # ----- bandeja -----
     def _set_bandeja(self, m):
         if m["op"] == "quitar":
@@ -909,7 +1100,7 @@ class Barra(QObject):
     # ----- botones -----
     @Slot(str)
     def accion(self, que):
-        teclas = {"inicio": (0x5B,), "buscar": (0x5B, 0x53), "rapidos": (0x5B, 0x41), "avisos": (0x5B, 0x4E),
+        teclas = {"inicio": (0x5B,), "buscar": (0x5B, 0x53), "rapidos": (0x5B, 0x41), "avisos": (0x5B, 0x4E), "widgets": (0x5B, 0x57),
                   "menu_inicio": (0x5B, 0x58), "silencio": (0xAD,), "menos": (0xAE,), "mas": (0xAF,)}
         if que in teclas:
             win.press(*teclas[que])
@@ -942,7 +1133,8 @@ class Barra(QObject):
         filas = [("Posición", fila(sitio.LADOS, a["posicion"], self._set_posicion)),
                  ("Formato", fila(temas.FORMATOS, a["formatos"].get(self._elegido, "tema"), self._set_formato)
                   + [{"texto": "Usar en todos", "hacer": self._formato_para_todos}]),
-                 ("Iconos", fila(temas.ALINEACIONES, a["alineacion"], self._set_alineacion)),
+                 ("Iconos", fila(iconos.ESTILOS, a["iconos"], self._set_iconos)),
+                 ("Alinear iconos", fila(temas.ALINEACIONES, a["alineacion"], self._set_alineacion)),
                  ("Icono de Windows", fila(temas.ICONO, a["icono"], self._set_icono)),
                  *([("Bandeja (visibles)", self._fila_bandeja())] if self._tray else []),
                  ("Animaciones", fila(temas.ANIMACIONES, a["animaciones"], self._set_animaciones))]
@@ -960,9 +1152,13 @@ class Barra(QObject):
                 {"texto": "Según la hora", "marcado": a["auto"], "hacer": lambda: self._set_auto(not a["auto"])},
                 {"texto": "Modo juego", "marcado": a["modo_juego"], "hacer": lambda: self._set_juego(not a["modo_juego"])},
                 {"texto": "Agrupar ventanas", "marcado": a["agrupar"], "hacer": lambda: self._set_agrupar(not a["agrupar"])},
+                {"texto": "Atajos (Win+1…)", "marcado": a["atajos"], "hacer": lambda: self._set_atajos(not a["atajos"])},
+                {"texto": "Visualizador", "marcado": a["cava"], "hacer": lambda: self._poner_cava(not a["cava"])},
+                {"texto": "Widgets", "marcado": a["widgets"], "hacer": lambda: self._set_widgets(not a["widgets"])},
                 {"texto": "Pincel", "marcado": a["pincel"], "hacer": lambda: self._set_pincel(not a["pincel"])},
                 *(self.novedades.interruptor() if self.novedades else [])],
             "botones": (self.novedades.boton() if self.novedades else []) + ([{"texto": "Restablecer orden", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []) + [
+                {"texto": "Ciudad: " + (a["ciudad"].get("nombre") or "elegir…"), "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)},
                 {"texto": "Administrador de tareas", "hacer": lambda: win.press(0x11, 0x10, 0x1B)},
                 {"texto": "Configuración de Windows", "hacer": lambda: win.press(0x5B, 0x49)},
                 {"texto": "Salir y volver a la barra de Windows", "hacer": self.app.quit}]}
@@ -992,9 +1188,9 @@ class Barra(QObject):
                         f"QMenu::item:disabled{{color:{QColor(c['tenue']).name()};}}")
         return m
 
-    def _abrir_menu(self, m):
+    def _abrir_menu(self, m, donde=None):
         QTimer.singleShot(0, lambda: win.user32.SetForegroundWindow(int(m.winId())))
-        pos, t = QCursor.pos(), m.sizeHint()
+        pos, t = QPoint(*map(round, donde)) if donde else QCursor.pos(), m.sizeHint()
         pos = QPoint(*self.sitio(pos.x(), pos.y())(t.width(), t.height()))
         m.exec(pos)
 
@@ -1167,13 +1363,19 @@ class Reemplazo(QObject):
         super().__init__(barra)
         self.barra = barra
         self.activo = True
-        self.vigilante = self.tray = None
-        self._fallos = 0
+        self.vigilante = self.tray = self.teclas = self.cava = None
+        self._fps = self._fallos_cava = 0
+        self._fallos = self._fallos_teclas = 0
         self._timer = QTimer(self, interval=1000, timeout=self.latido)
 
     def empezar(self):
         self._vigilar()
         self._bandeja()
+        self._atajos()
+        self.barra.animarCambio.connect(self._atajos)
+        for s in (self.barra.musicaCambio, self.barra.animarCambio, self.barra.ritmoCambio):
+            s.connect(self._ver_cava)
+        self._ver_cava()
         self._timer.start()
         self.barra.temaCambio.connect(self.ajustar)
         self.latido()
@@ -1187,17 +1389,74 @@ class Reemplazo(QObject):
     def _bandeja(self):
         self.tray = lanzar(os.path.join(AQUI, "barra", "bandeja.py"))
 
-        def leer(proc):
-            for linea in proc.stdout:
-                try:
-                    self.barra._bandeja.emit(json.loads(linea))
-                except (ValueError, RuntimeError):
-                    pass
-        threading.Thread(target=leer, args=(self.tray,), daemon=True).start()
+        threading.Thread(target=self._leer, args=(self.tray, self.barra._bandeja), daemon=True).start()
+
+    def _atajos(self):
+        """El proceso de los atajos: en marcha si se quieren, y quieto en modo juego."""
+        if not self.activo:
+            return
+        quiere, vivo = self.barra.ajustes["atajos"], self.teclas is not None and self.teclas.poll() is None
+        try:
+            if vivo and not quiere:
+                self.teclas.stdin.close()
+            elif vivo:
+                self.teclas.stdin.write("si\n" if self.barra._animar else "no\n")
+                self.teclas.stdin.flush()
+            elif quiere and self._fallos_teclas <= 2:
+                if self.teclas is not None and self.teclas.returncode:
+                    self._fallos_teclas += 1
+                self.teclas = lanzar(os.path.join(AQUI, "barra", "atajos.py"))
+                threading.Thread(target=self._leer, args=(self.teclas, self.barra._atajo), daemon=True).start()
+        except (OSError, ValueError):
+            pass
+
+    def _ver_cava(self):
+        """El proceso del visualizador solo existe mientras hay algo que enseñar."""
+        fps = self.barra.fps_cava() if self.activo else 0
+        vivo = self.cava is not None and self.cava.poll() is None
+        if vivo and fps == self._fps:
+            return
+        if vivo:
+            try:
+                self.cava.stdin.close()
+            except (OSError, ValueError):
+                pass
+        self._fps, self.cava = fps, None
+        if fps and self._fallos_cava < 4:
+            self._fallos_cava += 1               # se perdona si aguanta
+            self.cava = proc = lanzar(os.path.join(AQUI, "barra", "cava.py"), str(fps))
+            QTimer.singleShot(10_000, lambda: self._perdonar_cava(proc))
+
+            def leer():
+                for linea in proc.stdout:
+                    if proc is self.cava:
+                        try:
+                            self.barra._cava.emit(json.loads(linea))
+                        except (ValueError, RuntimeError):
+                            pass
+            threading.Thread(target=leer, daemon=True).start()
+        elif not fps:
+            self.barra._set_cava([0] * 16)
+
+    def _perdonar_cava(self, proc):
+        if proc.poll() is None or proc is not self.cava:
+            self._fallos_cava = 0
+
+    @staticmethod
+    def _leer(proc, aviso):
+        for linea in proc.stdout:
+            try:
+                aviso.emit(json.loads(linea))
+            except (ValueError, RuntimeError):
+                pass
 
     def latido(self):
         if not self.activo:
             return
+        if self.cava is not None and self.cava.poll() is not None:
+            self._ver_cava()
+        if self.barra.ajustes["atajos"] and self.teclas is not None and self.teclas.poll() is not None:
+            self._atajos()
         if self.vigilante.poll() is not None:
             self._fallos += 1
             if self._fallos > 2:            # sin vigilante no se oculta nada
@@ -1228,7 +1487,7 @@ class Reemplazo(QObject):
             return                  # ya se paró
         self.activo = False
         self._timer.stop()
-        for p in (self.tray, self.vigilante):
+        for p in (self.cava, self.teclas, self.tray, self.vigilante):
             try:
                 if p is self.vigilante:
                     p.stdin.write("adios\n")      # cierre a propósito: que no la reabra
@@ -1248,6 +1507,9 @@ def preparar_vista(app, todo=False):
                                  "gpu": [10, 80, 72, 35, 41]}}
     barra._cancion = {"titulo": "Canción de ejemplo", "artista": "Artista", "sonando": True}
     barra._titulo = "Documento sin título - Bloc de notas"
+    barra._clima = {"hay": True, "icono": "🌤️", "grados": "22°", "texto": "Poco nuboso"}
+    barra.ajustes["widgets"] = barra.ajustes["cava"] = True
+    barra._barras = [35, 62, 88, 100, 81, 66, 74, 52, 60, 43, 38, 49, 30, 24, 17, 10]
     barra._leer_ropa()
     barra._claude = {"modo": "idle", "texto": "Construyendo…"}
     exes = [os.path.join(os.environ["WINDIR"], n) for n in ("explorer.exe", "notepad.exe", "regedit.exe")]

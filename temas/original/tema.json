@@ -8,7 +8,6 @@
   "radioBoton": 5,
   "indicador": "linea",
   "translucida": true,
-  "relojDoble": true,
   "glifos": true,
   "fuente": "Segoe UI Variable Text",
   "tamano": 12,
@@ -20,7 +19,9 @@
     "dentro": 0.12,
     "lados": 0.12,
     "hueco": 1.5,
-    "colores": ["acento"]
+    "colores": [
+      "acento"
+    ]
   },
   "colores": {
     "fondo": "#FF1C1C1C",

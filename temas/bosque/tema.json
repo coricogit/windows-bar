@@ -5,16 +5,16 @@
   "alto": 46,
   "radio": 0,
   "relleno": 12,
-  "fuente": "Georgia",
+  "fuente": "Cambria",
   "tamano": 14,
   "indicador": "punto",
   "fondo": "Fondo.qml",
   "colores": {
-    "fondo": "#F51C2416",
-    "fondo2": "#F52E3A22",
-    "borde": "#664F6B33",
+    "fondo": "#F52A341F",
+    "fondo2": "#F540502E",
+    "borde": "#807C9A55",
     "texto": "#F1EAD4",
-    "tenue": "#A9B08A",
+    "tenue": "#C6CCA8",
     "acento": "#9CCC65",
     "acento2": "#E0A458",
     "alerta": "#EF8354",
@@ -42,17 +42,17 @@
       "acento2": "#F4E285"
     },
     "amanecer": {
-      "fondo": "#F52A3326",
-      "fondo2": "#F5414B3B",
-      "tenue": "#C5CBAE",
+      "fondo": "#F5343F2F",
+      "fondo2": "#F54D5946",
+      "tenue": "#D3D8BF",
       "acento": "#D4E79E",
       "acento2": "#F2C6A0"
     },
     "dia": {},
     "atardecer": {
-      "fondo": "#F5281A12",
-      "fondo2": "#F5452A1A",
-      "tenue": "#CDB08F",
+      "fondo": "#F5342318",
+      "fondo2": "#F5573622",
+      "tenue": "#DCC3A6",
       "acento": "#F0B35A",
       "acento2": "#E07A5F"
     }

@@ -14,18 +14,18 @@ BASE = {
     "nombre": "", "orden": 99, "forma": "completa", "alto": 48, "margen": 0, "radio": 0, "relleno": 6,
     "separacion": 8, "fuente": "Segoe UI", "tamano": 13, "negrita": False, "borde": 0, "indicador": "linea",
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
-    "corchetes": False, "dinamico": False, "icono": 24, "vidrio": False,
+    "corchetes": False, "dinamico": False, "icono": 24, "estiloIconos": "", "estiloBandeja": "", "vidrio": False,
     "compacto": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
-    "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": False,
+    "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "dentro": False,
     "glifos": False, "translucida": False, "opacidad": 100, "aire": 0, "clara": False, "contorno": False,
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
                 "texto": "#FFFFFF", "tenue": "#A0A0A0", "acento": "#4CC2FF", "acento2": "#4CC2FF",
                 "alerta": "#FF6B6B", "encima": "#22FFFFFF", "fondoBandeja": "transparent",
-                "medidor1": "", "medidor2": "", "medidor3": ""},
+                "medidor1": "", "medidor2": "", "medidor3": "", "cava1": "", "cava2": ""},
     "modulos": {"izquierda": [["inicio", "tareas"]], "centro": [["musica"]],
-                "derecha": [["claudito"], ["sistema"], ["bandeja", "volumen"], ["reloj"], ["temas"]]},
+                "derecha": [["widgets"], ["claudito"], ["sistema"], ["bandeja", "volumen"], ["reloj"], ["temas"]]},
 }
 
 
@@ -72,12 +72,13 @@ def con_formato(t, formato):
     if formato in ("isla", "isla_compacta"):       # todo junto, en el centro
         if t["forma"] != "islas" or rgb(col["isla"])[3] < 0.5:
             col["isla"] = col["fondo"]
-        t.update(forma="islas", unica=True, fondoUrl="", paseo=False, vidrio=False, adapta=False,
-                 separacion=10 if t["compacto"] else 16, aire=4 if t["compacto"] else 6, relleno=8, borde=1, alto=42, margen=3)
+        t.update(forma="islas", unica=True, dentro=True, paseo=False, vidrio=False, adapta=False,
+                 separacion=10 if t["compacto"] else 16, aire=4 if t["compacto"] else 6, relleno=8,
+                 borde=2 if t["pixelado"] else 1, alto=42, margen=3)
         t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 14)
     elif formato.startswith("islas"):
         if t["forma"] != "islas":
-            t.update(forma="islas", fondoUrl="", separacion=8, relleno=8, borde=1)
+            t.update(forma="islas", dentro=True, separacion=8, relleno=8, borde=2 if t["pixelado"] else 1)
             t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 12)
             col["isla"] = col["fondo"]
         t.update(alto=42, margen=3)
@@ -163,22 +164,21 @@ def windows_centrado():
 
 
 def con_alineacion(t, centro):
-    """Inicio y ventanas en el centro o a la izquierda. En el centro, Claudito,
-    el uso del sistema y lo que había allí pasan a la izquierda."""
+    """Inicio y ventanas en el centro o a la izquierda. En el centro, los
+    widgets, Claudito, el uso del sistema y lo que había allí pasan a la izquierda."""
     m = t["modulos"]
     grupos = m["izquierda"] + m["centro"]
     apps = [g for g in grupos if "inicio" in g or "tareas" in g]
     resto = [g for g in grupos if g not in apps]
     if centro:
-        lado = [g for g in m["derecha"] if "claudito" in g or "sistema" in g]
+        lado = [g for g in m["derecha"] if {"widgets", "claudito", "sistema"} & set(g)]
         nuevo = {"izquierda": lado + resto, "centro": apps,
                  "derecha": [g for g in m["derecha"] if g not in lado]}
+        if t["unica"]:             # repartido, para que la isla sea más corta
+            nuevo.update(izquierda=lado, derecha=resto + nuevo["derecha"])
     else:
         nuevo = {"izquierda": apps, "centro": resto}
-    if t["unica"]:
-        todo = {**m, **nuevo}
-        nuevo = {"izquierda": [], "centro": todo["izquierda"] + todo["centro"] + todo["derecha"], "derecha": []}
-    return {**t, "modulos": {**m, **nuevo}, "centrado": centro or t["unica"]}
+    return {**t, "modulos": {**m, **nuevo}, "centrado": centro}
 
 
 ICONO = {"tema": "Color del tema", "fondo": "Color del fondo"}

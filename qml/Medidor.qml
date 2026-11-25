@@ -12,9 +12,11 @@ Row {
   readonly property var c: tema.colores
   readonly property string estilo: tema.medidor
   readonly property color tono: valor >= 85 ? c.alerta : ([c.medidor1, c.medidor2, c.medidor3][orden] || c.acento)
-  readonly property bool conNombre: estilo !== "pildora"
-  readonly property bool conNumero: ["anillo", "corazones", "pildora"].indexOf(estilo) < 0
-  readonly property var anchos: ({ onda: 34, flor: 22, anillo: 26, corazones: 62, rama: 36 })
+  // Un dibujo y, a su lado, el nombre sobre el número.
+  readonly property real escala: tema.compacto ? 0.75 : 0.9
+  readonly property int letra: tema.compacto ? 11 : Math.min(14, Math.max(13, tema.tamano))
+  readonly property bool apilado: estilo !== "pildora" && !v
+  readonly property var anchos: ({ onda: 34, flor: 22, anillo: 26, corazones: 22, rama: 36 })
   readonly property bool v: tema.vertical
   height: v ? pila.height : alto
   spacing: v ? 0 : 4
@@ -24,25 +26,19 @@ Row {
   onTemaChanged: lienzo.requestPaint()
   onTonoChanged: lienzo.requestPaint()
 
-  Texto {
-    visible: med.conNombre && !med.v
-    text: med.nombre
-    height: med.alto
-    color: med.c.tenue
-    font.pixelSize: med.tema.tamano - 2
-  }
-
   Canvas {
     id: lienzo
     visible: width > 0
-    width: med.v ? 0 : med.anchos[med.estilo] || 0
+    width: med.v ? 0 : med.estilo === "corazones" ? 18 : Math.round((med.anchos[med.estilo] || 0) * med.escala)
     height: med.alto
     renderStrategy: Canvas.Cooperative
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
     onPaint: {
-      var x = getContext("2d"), v = Math.max(0, Math.min(1, med.valor / 100)), cy = height / 2
+      var x = getContext("2d"), v = Math.max(0, Math.min(1, med.valor / 100))
+      var k = med.escala, width = lienzo.width / k, height = lienzo.height / k, cy = height / 2
       x.reset()
+      x.scale(k, k)
       var t = med.tono
       function rgba(a) { return Qt.rgba(t.r, t.g, t.b, a) }
       if (med.estilo === "onda") {
@@ -75,16 +71,18 @@ Row {
           x.beginPath(); x.arc(width / 2, cy, ra, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * v); x.stroke()
         }
       } else if (med.estilo === "corazones") {
-        var forma = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."], px = 2, mitades = Math.round(v * 8)
-        var y1 = Math.round(cy - 6)
-        for (var n = 0; n < 4; n++)
-          for (var f = 0; f < 6; f++)
-            for (var col = 0; col < 7; col++) {
-              if (forma[f][col] !== "#") continue
-              var on = mitades >= 2 * n + 2 || (mitades === 2 * n + 1 && col < 4)
-              x.fillStyle = on ? (f === 1 && col === 1 ? "#FFFFFF" : rgba(1)) : "rgba(0,0,0,0.38)"
-              x.fillRect(n * 16 + col * px, y1 + f * px, px, px)
-            }
+        var forma = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."], px = 2 / k, x0 = 0
+        // Un corazón con contorno que se llena de abajo arriba, en píxeles enteros.
+        var y1 = Math.round(lienzo.height / 2 - 8) / k
+        function lleno(a, b) { return a >= 0 && a < 6 && b >= 0 && b < 7 && forma[a][b] === "#" }
+        for (var f = -1; f < 7; f++)
+          for (var col = -1; col < 8; col++) {
+            var on = 6 - f <= Math.ceil(v * 6)
+            if (lleno(f, col)) x.fillStyle = f === 1 && col === 1 ? "#FFFFFF" : on ? rgba(1) : "rgba(255,255,255,0.45)"
+            else if (lleno(f - 1, col) || lleno(f + 1, col) || lleno(f, col - 1) || lleno(f, col + 1)) x.fillStyle = med.c.borde
+            else continue
+            x.fillRect(x0 + (col + 1) * px, y1 + (f + 1) * px, px, px)
+          }
       } else if (med.estilo === "rama") {
         x.strokeStyle = med.c.tenue; x.lineWidth = 1.4
         x.beginPath(); x.moveTo(1, cy + 3); x.quadraticCurveTo(width / 2, cy - 4, width - 2, cy - 1); x.stroke()
@@ -98,30 +96,26 @@ Row {
         }
       }
     }
-    Texto {
-      anchors.centerIn: parent
-      visible: med.estilo === "anillo"
-      text: med.valor
-      color: med.c.texto
-      font.pixelSize: med.valor > 99 ? 8 : 9
-      font.bold: true
-    }
   }
 
-  Texto {
-    visible: med.conNumero && !med.v
-    text: med.valor + "%"
-    width: medida.width
-    height: med.alto
-    horizontalAlignment: Text.AlignRight
-    color: med.valor >= 85 ? med.c.alerta : med.c.texto
-    TextMetrics { id: medida; text: "100%"; font.family: med.tema.fuente; font.pixelSize: med.tema.tamano; font.bold: med.tema.negrita }
-    Rectangle {        // Minimalista: una raya que crece
-      visible: med.estilo === "linea"
-      y: parent.height / 2 + 10
-      height: 2
-      width: Math.max(2, parent.width * med.valor / 100)
-      color: med.tono
+  Column {             // nombre y número
+    visible: med.apilado
+    anchors.verticalCenter: parent.verticalCenter
+    spacing: med.tema.compacto ? -3 : -2
+    Texto { text: med.nombre; color: med.c.tenue; font.pixelSize: med.tema.compacto ? 9 : 10; font.bold: false }
+    Texto {
+      text: med.valor + "%"
+      width: medida.width
+      color: med.valor >= 85 ? med.c.alerta : med.c.texto
+      font.pixelSize: med.letra
+      TextMetrics { id: medida; text: "00%"; font.family: med.tema.fuente; font.pixelSize: med.letra; font.bold: med.tema.negrita }
+      Rectangle {        // una raya que crece
+        visible: med.estilo === "linea"
+        y: parent.height - 1
+        height: 2
+        width: Math.max(2, parent.width * med.valor / 100)
+        color: med.tono
+      }
     }
   }
 

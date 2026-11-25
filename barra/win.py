@@ -180,6 +180,10 @@ def activate(hwnd):
 
 
 def minimize(hwnd):
+    # Como su propio botón: así Windows activa la siguiente ventana. Con
+    # ShowWindowAsync la minimizada seguía siendo la activa.
+    if user32.GetWindowLongW(hwnd, -16) & 0x20000 and user32.PostMessageW(hwnd, 0x112, 0xF020, 0):
+        return                  # WS_MINIMIZEBOX; WM_SYSCOMMAND, SC_MINIMIZE
     user32.ShowWindowAsync(hwnd, 6)
 
 

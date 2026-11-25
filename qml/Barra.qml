@@ -9,7 +9,6 @@ Item {
   readonly property var c: t.colores
   readonly property bool v: t.vertical
   readonly property bool islas: t.forma === "islas"
-  readonly property bool estrecha: !v && width < 1500
   readonly property real altoUtil: t.alto - 2 * (islas ? 0 : t.borde)
   readonly property real largo: v ? height : width
 
@@ -33,7 +32,7 @@ Item {
     Loader {
       id: adorno
       anchors.fill: parent
-      source: root.t.fondoUrl
+      source: root.t.dentro ? "" : root.t.fondoUrl
       opacity: status === Loader.Ready ? 1 : 0
       Behavior on opacity { NumberAnimation { duration: 400 } }
     }
@@ -65,7 +64,7 @@ Item {
         var m = grupos[i][j]
         if (m === "claudito" && (!barra.personaje || (t.paseo && !t.vertical))) continue
         if (m === "temas" && !barra.pincel) continue
-        if (estrecha && (m === "sistema" || m === "musica" || m === "titulo")) continue
+        if (m === "widgets" && !barra.widgets) continue
         if (t.vertical && m === "titulo") continue
         if (!esPrimaria && m === "bandeja") continue
         g.push(m)
@@ -75,55 +74,96 @@ Item {
     return out
   }
 
-  // Formato "una isla": todo va en la zona del centro, sobre esta pieza.
-  Rectangle {
-    visible: root.t.unica
-    readonly property real aire: 10 + root.t.aire
-    x: root.v ? cuerpo.x : centro.x - aire
-    y: root.v ? centro.y - aire : cuerpo.y
-    width: root.v ? cuerpo.width : centro.width + 2 * aire
-    height: root.v ? centro.height + 2 * aire : cuerpo.height
+  // Los iconos mandan: van en el centro exacto o al principio, y lo demás se
+  // reparte lo que queda a sus lados (Zona esconde lo que no quepa).
+  readonly property bool unica: t.unica
+  readonly property real aire: 10 + t.aire
+  readonly property real margen: t.relleno + (unica ? aire : 0)
+  readonly property real sep: unica ? t.separacion : 12
+  readonly property real total: largo - 2 * margen      // sitio para todo
+
+  // En una isla con los iconos al principio va todo seguido; con ellos en el
+  // centro, la isla es simétrica y cada lado se pega a su borde.
+  readonly property real seguido: izquierda.mio + (centro.mio > 0 ? sep + centro.mio : 0) + (derecha.mio > 0 ? sep + derecha.mio : 0)
+  readonly property real mitad: centro.mio / 2 + sep + Math.max(izquierda.mio, derecha.mio)
+  readonly property real anchoIsla: t.centrado ? 2 * mitad : seguido
+  readonly property real inicio: (largo - anchoIsla) / 2
+  readonly property real pIzq: unica ? inicio : (v ? cuerpo.y : cuerpo.x) + t.relleno
+  readonly property real pDer: !unica ? (v ? cuerpo.y + cuerpo.height : cuerpo.x + cuerpo.width) - derecha.mio - t.relleno
+                               : inicio + anchoIsla - derecha.mio
+  readonly property real pCen: {
+    if (t.centrado) return (largo - centro.mio) / 2
+    var antes = pIzq + izquierda.mio + sep
+    return unica ? antes : Math.max(antes, Math.min((largo - centro.mio) / 2, pDer - centro.mio - sep))
+  }
+
+  Rectangle {          // el fondo de "una isla"
+    visible: root.unica
+    x: root.v ? cuerpo.x : root.inicio - root.aire
+    y: root.v ? root.inicio - root.aire : cuerpo.y
+    width: root.v ? cuerpo.width : root.anchoIsla + 2 * root.aire
+    height: root.v ? root.anchoIsla + 2 * root.aire : cuerpo.height
     radius: Math.min(root.t.radio, root.t.alto / 2)
     color: root.c.isla
     border.width: root.t.borde
     border.color: root.c.borde
     Behavior on color { ColorAnimation { duration: 350 } }
+
+    // El degradado, por dentro: en el mismo rectángulo deja huecos junto al borde.
+    Rectangle {
+      visible: root.t.fondoUrl !== "" && root.t.dentro
+      anchors { fill: parent; margins: root.t.borde }
+      radius: Math.max(0, parent.radius - root.t.borde)
+      gradient: Gradient {
+        GradientStop { position: 0; color: root.c.fondo2 }
+        GradientStop { position: 1; color: root.c.fondo }
+      }
+    }
+    // El paisaje del tema, dentro de la pieza.
+    Loader {
+      anchors { fill: parent; margins: root.t.borde }
+      active: root.unica && root.t.dentro && root.t.fondoUrl !== ""
+      source: active ? root.t.fondoUrl : ""
+      onLoaded: {
+        item.radio = Qt.binding(function() { return Math.max(0, Math.min(root.t.radio, root.t.alto / 2) - root.t.borde) })
+        item.desde = Qt.binding(function() { return 0 })
+        item.total = Qt.binding(function() { return 0 })
+      }
+    }
   }
 
   Zona {
     id: izquierda
     tema: root.t
     alto: root.altoUtil
-    limite: root.largo * (root.estrecha ? 0.5 : 0.4)
+    // Con las ventanas aquí, todas las que dejen sitio a lo imprescindible.
+    limite: Math.max(80, root.total - derecha.esencial - otros - 2 * root.sep)
+    hueco: root.t.centrado ? (root.total - centro.mio) / 2 - root.sep : 100000
+    total: root.largo
     grupos: root.visibles(root.t.modulos.izquierda)
-    x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : cuerpo.x + root.t.relleno
-    y: root.v ? cuerpo.y + root.t.relleno : cuerpo.y + (cuerpo.height - height) / 2
+    x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : root.pIzq
+    y: root.v ? root.pIzq : cuerpo.y + (cuerpo.height - height) / 2
   }
   Zona {
     id: derecha
     tema: root.t
     alto: root.altoUtil
-    limite: root.largo * (root.estrecha ? 0.5 : 0.4)
+    hueco: root.t.centrado ? (root.total - centro.mio) / 2 - root.sep : root.total - izquierda.mio - root.sep
+    total: root.largo
     grupos: root.visibles(root.t.modulos.derecha)
-    x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : cuerpo.x + cuerpo.width - width - root.t.relleno
-    y: root.v ? cuerpo.y + cuerpo.height - height - root.t.relleno : cuerpo.y + (cuerpo.height - height) / 2
+    x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : root.pDer
+    y: root.v ? root.pDer : cuerpo.y + (cuerpo.height - height) / 2
   }
   Zona {
     id: centro
     tema: root.t
     alto: root.altoUtil
-    readonly property real antes: root.v ? izquierda.y + izquierda.height : izquierda.x + izquierda.width
-    readonly property real despues: root.v ? derecha.y : derecha.x
-    readonly property real mio: root.v ? height : width
-    readonly property real hueco: despues - antes - 24
-    // Con las ventanas aquí, se encogen antes que desaparecer.
-    limite: root.t.unica ? Math.max(80, root.largo - otros - 80) : root.t.centrado ? Math.max(120, Math.min(root.largo * 0.5, hueco - 90)) : root.largo * 0.4
+    limite: Math.max(80, root.total - 2 * (Math.max(izquierda.esencial, derecha.esencial) + root.sep) - otros)
+    hueco: root.t.centrado ? 100000 : root.total - izquierda.mio - derecha.mio - 2 * root.sep
+    total: root.largo
     grupos: root.visibles(root.t.modulos.centro)
-    // En el medio, salvo que tape a los lados.
-    readonly property real sitio: Math.max(antes + 12, Math.min((root.largo - mio) / 2, despues - mio - 12))
-    x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : sitio
-    y: root.v ? sitio : cuerpo.y + (cuerpo.height - height) / 2
-    visible: root.t.centrado || hueco > mio
+    x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : root.pCen
+    y: root.v ? root.pCen : cuerpo.y + (cuerpo.height - height) / 2
   }
 
   // ---------- Claudito de paseo (tema Píxel) ----------
@@ -131,7 +171,7 @@ Item {
     activo: root.t.paseo && !root.v && barra.personaje !== ""
     // Con los iconos en el centro, pasea por la izquierda.
     desde: (root.t.centrado ? izquierda.x + izquierda.width
-            : Math.max(izquierda.x + izquierda.width, centro.visible && centro.width > 0 ? centro.x + centro.width : 0)) + 10
+            : Math.max(izquierda.x + izquierda.width, centro.width > 0 ? centro.x + centro.width : 0)) + 10
     hasta: (root.t.centrado ? centro.x : derecha.x) - 10
     y: cuerpo.y + cuerpo.height - height
     height: 48
