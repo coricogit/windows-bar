@@ -74,6 +74,7 @@ Loader {
         activa: !!model.activa
         abierta: !!model.abierta
         minimizada: !!model.minimizada
+        cuenta: model.cuenta || 0
         onActivaChanged: marcar()
         Component.onCompleted: marcar()
         Component.onDestruction: if (ListView.view && ListView.view.activaItem === this) ListView.view.activaItem = null

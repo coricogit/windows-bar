@@ -12,7 +12,7 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 | Dónde | Qué hace |
 |---|---|
 | Reloj, volumen o un hueco | Clic derecho: menú de temas y ajustes |
-| Ventana | Pasar el ratón: vista previa · Clic: activar o minimizar · Clic central: abrir otra · Clic derecho: menú (anclar, cerrar...) |
+| Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: pasar de una a otra · Clic central: abrir otra · Clic derecho: menú |
 | Volumen | Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio |
 | Reloj | Clic: notificaciones y calendario |
 | Inicio | Clic: menú Inicio · Clic derecho: menú Win+X · Rueda: pasar de tema |
@@ -72,6 +72,7 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 - `barra/vista.py`: vista previa de las ventanas (miniaturas de DWM).
 - `barra/vidrio.py`: el vidrio de Liquid Glass.
 - `barra/sesiones.py`, `barra/uso.py`, `barra/panel_claude.py`: Claudito interactivo.
+- `barra/programas.py`: nombre real de los programas y agrupación.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.
 - `lib/`: paquetes `winrt-*` para la música. Se regenera con

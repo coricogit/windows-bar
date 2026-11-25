@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu  # noqa: E402
 
-from barra import (ajustes as cfg, arranque, bandeja, cielo, claudito, musica, panel_claude, selector, sesiones, sistema, temas,  # noqa: E402
+from barra import (ajustes as cfg, arranque, bandeja, cielo, claudito, musica, panel_claude, programas, selector, sesiones, sistema, temas,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -197,7 +197,8 @@ def anclados():
             exe = QFileInfo(ruta).symLinkTarget().replace("/", "\\")
             if not exe.lower().endswith(".exe"):       # el Explorador no apunta a ningún archivo
                 exe = os.path.join(os.environ["WINDIR"], "explorer.exe")
-            out.append({"clave": win.clave_exe(exe), "exe": exe, "nombre": n[:-4], "ruta": ruta})
+            exe = programas.principal(exe)
+            out.append({"clave": win.clave_exe(exe), "exe": exe, "nombre": programas.nombre(exe), "ruta": ruta})
     return out
 
 
@@ -229,7 +230,7 @@ class Barra(QObject):
         self.tray = Lista(["key", "icono", "tip"], self)
         self._tray = {}
         self._camaleon, self._camaleon_imagen, self._tono_fondo = {}, None, None
-        self._inactivo, self.selector, self.motor = False, None, None
+        self._inactivo, self.selector, self.motor, self._vueltas = False, None, None, 0
         self._elegido = None
         self._datos = {"cpu": 0, "ram": 0, "gpu": -1, "volumen": 0, "silencio": False}
         self._claude = {"modo": "sleep", "texto": ""}
@@ -246,6 +247,8 @@ class Barra(QObject):
         self.de_windows = anclados()
         self.fijos = cfg.lista_fijos(self.ajustes, self.de_windows)
         self.previa = None
+        self._orden = {}            # cuándo se vio cada programa
+        self._ids = {}              # ventana -> identificador de app de la Tienda
         self.panel_claude = None
         self._uso_datos, self._uso_hora, self._uso_hilo = None, 0, None
         self._uso.connect(self._set_uso)
@@ -256,7 +259,7 @@ class Barra(QObject):
         self.fondo = vidrio.fondo = vidrio.Fondo()
         self.temaCambio.connect(self._zonas_vidrio)
         self.animarCambio.connect(self._zonas_vidrio)
-        self._apuntado = None
+        self._apuntado, self._previa_desde = None, 0
         self._t_previa = QTimer(self, singleShot=True, interval=380, timeout=self._mostrar_previa)
         self._musica.connect(self._set_musica)
         self._bandeja.connect(self._set_bandeja)
@@ -271,7 +274,6 @@ class Barra(QObject):
         self._t_ropa.start()
         self._leer_ropa()
         self._t_tema = QTimer(self, interval=10000, timeout=self._revisar_tema)
-        self._vueltas = 0
         self._t_ven = QTimer(self, interval=1200, timeout=self.actualizar_ventanas)
         self._t_pronto = QTimer(self, interval=60, singleShot=True, timeout=self.actualizar_ventanas)
         for t in (self._t_sis, self._t_cl, self._t_tema, self._t_ven):
@@ -556,9 +558,11 @@ class Barra(QObject):
         hwnds = win.windows()
         self.almacen.olvidar_ventanas(set(hwnds))
         info = []
-        for h in sorted(hwnds):            # orden estable, no el de uso
-            exe = win.app_exe(h)
-            info.append({"hwnd": h, "exe": exe, "titulo": win.title(h), "activa": h == activa,
+        self._ids = {h: i for h, i in self._ids.items() if h in hwnds}
+        for z, h in enumerate(hwnds):            # de la más reciente a la más antigua
+            exe = programas.principal(win.app_exe(h))
+            info.append({"hwnd": h, "exe": exe, "titulo": win.title(h), "activa": h == activa, "z": z,
+                         "clave": win.clave_exe(exe), "nombre": self._nombre(h, exe),
                          "minimizada": bool(win.user32.IsIconic(h)), "pantalla": win.monitor_of(h),
                          "icono": self.almacen.url(self.almacen.de_ventana(h, exe))})
         titulo = next((i["titulo"] for i in info if i["activa"]), "")
@@ -567,8 +571,8 @@ class Barra(QObject):
             self.tituloCambio.emit()
         for p in self.paneles:
             p.poner_ventanas(info, self.fijos)
-        if self.previa and self.previa.hwnd and self.previa.hwnd not in hwnds:
-            self.previa.ocultar()
+        if self.previa and self.previa.hwnds:
+            self.previa.quitar_muertas(hwnds)
         if self.ajustes["modo_juego"] and not self.vista:
             self._modo_juego(activa)
 
@@ -594,6 +598,17 @@ class Barra(QObject):
             self.animarCambio.emit()
             self.ritmoCambio.emit()
 
+    def _id_tienda(self, h, exe):
+        """El identificador de app de la ventana, si es de la Tienda."""
+        if h not in self._ids:
+            i = win.app_id(h) if win.de_la_tienda(h, exe) else ""
+            self._ids[h] = i if "!" in i else ""
+        return self._ids[h]
+
+    def _nombre(self, h, exe):
+        i = self._id_tienda(h, exe)
+        return (programas.nombre_tienda(i) if i else "") or programas.nombre(exe)
+
     def _fila(self, clave):
         for p in self.paneles:
             for f in p.tareas.filas:
@@ -603,27 +618,45 @@ class Barra(QObject):
 
     @Slot(str, bool)
     def pulsar_tarea(self, clave, nueva):
-        self._quitar_previa()
         f = self._fila(clave)
         if not f:
             return
-        if f["hwnd"] and not nueva:
+        if not f["hwnd"] or nueva:
+            self._quitar_previa()
+            self._abrir(f)
+        elif f["cuenta"] > 1:
+            # Varias: se enseñan para elegir; otro clic las esconde.
+            if self.previa and self.previa.isVisible() and self.previa.clave == clave and not self._t_previa.isActive():
+                if time.monotonic() - self._previa_desde > 0.6:
+                    self._quitar_previa()
+            elif self._apuntado:
+                self._t_previa.stop()
+                self._mostrar_previa()
+        else:
+            self._quitar_previa()
             h = int(f["hwnd"])
             if f["activa"]:
                 win.minimize(h)
             else:
                 win.activate(h)
-        else:
-            self._abrir(f)
+
+    @Slot(str, int)
+    def rodar_tarea(self, clave, paso):
+        """La rueda pasa por las ventanas del grupo."""
+        f = self._fila(clave)
+        if f and f["cuenta"] > 1:
+            vs = f["ventanas"]
+            activa = win.user32.GetForegroundWindow()
+            i = (vs.index(activa) + paso) % len(vs) if activa in vs else vs.index(int(f["hwnd"]))
+            win.activate(vs[i])
 
     def _entrada(self, f):
         """Lo necesario para anclar o volver a abrir el programa de una fila."""
         ruta = f["ruta"]
-        if not ruta and f["hwnd"] and win.de_la_tienda(int(f["hwnd"]), f["exe"]):
-            ident = win.app_id(int(f["hwnd"]))
-            ruta = TIENDA + ident if "!" in ident else ""
-        nombre = os.path.splitext(os.path.basename(f["exe"]))[0]
-        return {"clave": win.clave_exe(f["exe"]), "exe": f["exe"], "nombre": nombre, "ruta": ruta}
+        if not ruta and f["hwnd"]:
+            i = self._id_tienda(int(f["hwnd"]), f["exe"])
+            ruta = TIENDA + i if i else ""
+        return {"clave": win.clave_exe(f["exe"]), "exe": f["exe"], "nombre": f["nombre"], "ruta": ruta}
 
     def _abrir(self, f):
         e = self._entrada(f)
@@ -650,13 +683,19 @@ class Barra(QObject):
         nombre.setEnabled(False)
         m.addAction(nombre)
         m.addSeparator()
+        if f["cuenta"] > 1:
+            for h, t in list(zip(f["ventanas"], f["titulos"]))[:12]:
+                corto = t if len(t) <= 48 else t[:47] + "…"
+                m.addAction(corto.replace("&", "&&"), lambda h=h: win.activate(h))
+            m.addSeparator()
         m.addAction("Abrir otra ventana" if f["hwnd"] else "Abrir", lambda: self._abrir(f))
         if any(x["clave"] == e["clave"] for x in self.fijos):
             m.addAction("Desanclar de esta barra", lambda: self._anclar(e, False))
         elif e["exe"]:
             m.addAction("Anclar a esta barra", lambda: self._anclar(e, True))
-        if f["hwnd"]:
-            h = int(f["hwnd"])
+        vs = list(f["ventanas"])
+        if len(vs) == 1:
+            h = vs[0]
             m.addSeparator()
             if win.user32.IsIconic(h) or win.user32.IsZoomed(h):
                 m.addAction("Restaurar", lambda: win.restore(h))
@@ -666,9 +705,11 @@ class Barra(QObject):
                 m.addAction("Maximizar", lambda: win.maximize(h))
             m.addSeparator()
             m.addAction("Cerrar ventana", lambda: win.close(h))
-            todas = [i for i in win.windows() if win.clave_exe(win.app_exe(i)) == e["clave"]]
-            if len(todas) > 1:
-                m.addAction(f"Cerrar las {len(todas)} ventanas", lambda: [win.close(i) for i in todas])
+        elif vs:
+            m.addSeparator()
+            m.addAction("Minimizar todas", lambda: [win.minimize(h) for h in vs])
+            m.addSeparator()
+            m.addAction(f"Cerrar las {len(vs)} ventanas", lambda: [win.close(h) for h in vs])
         return m
 
     def _anclar(self, e, si):
@@ -701,15 +742,17 @@ class Barra(QObject):
             return
         clave, x, y = self._apuntado
         f = self._fila(clave)
-        if not f or not f["hwnd"] or not win.user32.IsWindow(int(f["hwnd"])):
+        ventanas = [(h, t) for h, t in zip(f["ventanas"], f["titulos"]) if win.user32.IsWindow(h)] if f else []
+        if not ventanas:
             if self.previa:
                 self.previa.ocultar()
             return
         if not self.previa:
             self.previa = previa.Vista(win.activate, win.close)
+        self._previa_desde = time.monotonic()
         pantalla = QGuiApplication.screenAt(QPoint(round(x), round(y))) or self.app.primaryScreen()
         g = pantalla.geometry()
-        self.previa.mostrar(int(f["hwnd"]), f["titulo"], x, g.y() + g.height() - self.alto(), g, self._get_tema())
+        self.previa.mostrar(clave, ventanas, x, g.y() + g.height() - self.alto(), g, self._get_tema())
 
     def _quitar_previa(self):
         self._apuntado = None
@@ -726,7 +769,7 @@ class Barra(QObject):
             self.almacen.poner_pixeles(nombre, m.pop("pixels"))
             self._tray[m["key"]] = {**m, "icono": self.almacen.url(nombre)}
         self.tray.poner([{"key": k, "icono": v["icono"],
-                          "tip": v["tip"] or os.path.splitext(os.path.basename(v["exe"]))[0]}
+                          "tip": v["tip"] or programas.nombre(v["exe"])}
                          for k, v in self._tray.items() if not v["hidden"] and v["icono"]])
 
     @Slot(str, bool)
@@ -784,11 +827,18 @@ class Barra(QObject):
                 {"texto": "Arrancar con Windows", "marcado": con_windows, "hacer": lambda: arranque.poner(not con_windows)},
                 {"texto": "Según la hora", "marcado": a["auto"], "hacer": lambda: self._set_auto(not a["auto"])},
                 {"texto": "Modo juego", "marcado": a["modo_juego"], "hacer": lambda: self._set_juego(not a["modo_juego"])},
+                {"texto": "Agrupar ventanas", "marcado": a["agrupar"], "hacer": lambda: self._set_agrupar(not a["agrupar"])},
                 {"texto": "Pincel", "marcado": a["pincel"], "hacer": lambda: self._set_pincel(not a["pincel"])}],
             "botones": [
                 {"texto": "Administrador de tareas", "hacer": lambda: win.press(0x11, 0x10, 0x1B)},
                 {"texto": "Configuración de Windows", "hacer": lambda: win.press(0x5B, 0x49)},
                 {"texto": "Salir y volver a la barra de Windows", "hacer": self.app.quit}]}
+
+    def _set_agrupar(self, si):
+        self.ajustes["agrupar"] = si
+        self._guardar()
+        self._quitar_previa()
+        self.actualizar_ventanas()
 
     def _set_icono(self, i):
         self.ajustes["icono"] = i
@@ -839,7 +889,7 @@ class Panel:
 
     def __init__(self, barra, pantalla, primaria):
         self.barra, self.pantalla, self.primaria = barra, pantalla, primaria
-        self.tareas = Lista(["key", "titulo", "icono", "activa", "minimizada", "abierta", "hwnd", "exe", "ruta"])
+        self.tareas = Lista(["key", "titulo", "icono", "activa", "minimizada", "abierta", "hwnd", "exe", "ruta", "cuenta"])
         if barra.motor is None:              # uno para todas las pantallas: ahorra unos 15 MB
             barra.motor = QQmlEngine(barra)
             barra.motor.addImageProvider("iconos", Iconos(barra.almacen))
@@ -889,24 +939,8 @@ class Panel:
             mia = self.pantalla_real()
             info = [i for i in info if i["pantalla"] == mia]
             fijos = []
-        filas, usadas = [], set()
-
-        def fila(i):
-            return {"key": str(i["hwnd"]), "titulo": i["titulo"], "icono": i["icono"], "activa": i["activa"],
-                    "minimizada": i["minimizada"], "abierta": True, "hwnd": str(i["hwnd"]), "exe": i["exe"],
-                    "ruta": ""}
-
-        for x in fijos:
-            suyas = [i for i in info if win.clave_exe(i["exe"]) == x["clave"]]
-            usadas.update(i["hwnd"] for i in suyas)
-            if suyas:
-                filas.extend(fila(i) for i in suyas)
-            else:
-                filas.append({"key": "fijo-" + x["clave"], "titulo": x["nombre"], "activa": False,
-                              "minimizada": False, "icono": self.barra.almacen.url(self.barra.almacen.de_fijo(x)),
-                              "abierta": False, "hwnd": "", "exe": x["exe"], "ruta": x["ruta"]})
-        filas.extend(fila(i) for i in info if i["hwnd"] not in usadas)
-        self.tareas.poner(filas)
+        fijos = [{**x, "icono": self.barra.almacen.url(self.barra.almacen.de_fijo(x))} for x in fijos]
+        self.tareas.poner(programas.agrupar(info, fijos, self.barra.ajustes["agrupar"], self.barra._orden))
 
 
 # ---------------------------------------------------------------------------
@@ -1013,7 +1047,7 @@ def preparar_vista(app):
     barra.fondo.leer()
     panel = Panel(barra, None, True)
     panel.tareas.poner([{"key": str(i), "titulo": os.path.basename(e), "activa": i == 1, "minimizada": False,
-                         "icono": barra.almacen.url(barra.almacen.de_archivo(e)), "abierta": i != 2, "hwnd": "",
+                         "icono": barra.almacen.url(barra.almacen.de_archivo(e)), "abierta": i != 2, "cuenta": (3, 1, 0)[i], "hwnd": "",
                          "exe": e, "ruta": ""} for i, e in enumerate(exes)])
     barra.tray.poner([{"key": e, "icono": barra.almacen.url(barra.almacen.de_archivo(e)), "tip": e} for e in exes])
     panel.view.setGeometry(-6000, -6000, 1920, ALTO)

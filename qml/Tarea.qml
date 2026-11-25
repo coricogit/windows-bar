@@ -11,6 +11,7 @@ Item {
   property bool activa: false
   property bool abierta: false
   property bool minimizada: false
+  property int cuenta: 0
   readonly property var c: tema.colores
   readonly property string estilo: tema.indicador
   width: tema.compacto ? 32 : 42
@@ -44,16 +45,23 @@ Item {
     font.pixelSize: 18
   }
 
-  // Indicador de abierta / activa
-  Rectangle {
+  // Indicador de abierta / activa: un trozo por ventana, hasta tres.
+  Row {
     visible: tarea.abierta && (tarea.estilo === "linea" || tarea.estilo === "punto")
     anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: tarea.tema.compacto ? 0 : 2 }
-    width: tarea.estilo === "punto" ? 4 : tarea.activa ? 22 : 8
-    height: tarea.estilo === "punto" ? 4 : tarea.tema.compacto ? 2 : 3
-    radius: tarea.tema.pixelado ? 0 : height / 2
-    color: tarea.activa ? tarea.c.acento : tarea.c.tenue
-    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-    Behavior on color { ColorAnimation { duration: 140 } }
+    spacing: 2
+    Repeater {
+      model: Math.max(1, Math.min(3, tarea.cuenta))
+      Rectangle {
+        readonly property int n: Math.max(1, Math.min(3, tarea.cuenta))
+        width: tarea.estilo === "punto" ? 4 : (tarea.activa ? 22 : n > 1 ? 14 : 8) / n - (n > 1 ? 1 : 0)
+        height: tarea.estilo === "punto" ? 4 : tarea.tema.compacto ? 2 : 3
+        radius: tarea.tema.pixelado ? 0 : height / 2
+        color: tarea.activa ? tarea.c.acento : tarea.c.tenue
+        Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: 140 } }
+      }
+    }
   }
   Rectangle {
     visible: tarea.abierta && !tarea.activa && tarea.estilo === "relleno"
@@ -85,6 +93,7 @@ Item {
       var p = tarea.mapToGlobal(tarea.width / 2, 0)
       barra.apuntar(tarea.clave, p.x, p.y)
     }
+    onWheel: function(e) { barra.rodar_tarea(tarea.clave, e.angleDelta.y > 0 ? -1 : 1) }
     onClicked: function(e) {
       if (e.button === Qt.RightButton) barra.menu_tarea(tarea.clave)
       else barra.pulsar_tarea(tarea.clave, e.button === Qt.MiddleButton)

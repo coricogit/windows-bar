@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, selector, sesiones, sistema, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, programas, selector, sesiones, sistema, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -178,6 +178,46 @@ class Arranque(unittest.TestCase):
         self.assertFalse(arranque.desactivada(None))
 
 
+class Programas(unittest.TestCase):
+    def test_elegir(self):
+        e = programas.elegir
+        self.assertEqual(e("Windows Terminal Host", "Windows Terminal", "WindowsTerminal.exe"), "Windows Terminal")
+        self.assertEqual(e("Bloc de notas", "Sistema operativo Microsoft® Windows®", "notepad.exe"), "Bloc de notas")
+        self.assertEqual(e("Microsoft PowerPoint", "Microsoft Office", "POWERPNT.EXE"), "Microsoft PowerPoint")
+        self.assertEqual(e("", "", "juego.exe"), "Juego")
+        self.assertEqual(e("x" * 80, "", "raro.exe"), "Raro")
+
+    def test_nombre_real(self):
+        self.assertNotIn(programas.nombre(os.path.join(os.environ["WINDIR"], "explorer.exe")).lower(), ("", "explorer"))
+        self.assertEqual(programas.nombre("C:\\no\\existe.exe"), "Existe")
+        self.assertEqual(programas.principal("C:\\a\\b.exe"), "C:\\a\\b.exe")
+
+    @staticmethod
+    def v(h, clave, z=0, **k):
+        return {"hwnd": h, "clave": clave, "nombre": clave.title(), "titulo": f"t{h}", "icono": "", "activa": False,
+                "minimizada": False, "exe": clave, "z": z, **k}
+
+    def test_agrupar(self):
+        v, orden = self.v, {}
+        info = [v(30, "zen", 0, activa=True), v(10, "disc", 1), v(20, "zen", 2, minimizada=True)]
+        f = programas.agrupar(info, [], True, orden)
+        self.assertEqual([(x["key"], x["cuenta"], x["titulo"]) for x in f], [("g:disc", 1, "t10"), ("g:zen", 2, "Zen")])
+        self.assertEqual((f[1]["ventanas"], f[1]["hwnd"], f[1]["activa"], f[1]["minimizada"]), ([20, 30], "30", True, False))
+        # no se mueven al cambiar de ventana activa ni al cerrarse una
+        info = [v(10, "disc", 0), v(20, "zen", 1), v(5, "nota", 2)]
+        self.assertEqual([x["key"] for x in programas.agrupar(info, [], True, orden)], ["g:disc", "g:zen", "g:nota"])
+        # sin agrupar, una por ventana
+        info = [v(30, "zen"), v(20, "zen")]
+        self.assertEqual([x["key"] for x in programas.agrupar(info, [], False, {})], ["20", "30"])
+
+    def test_anclados(self):
+        fijo = {"clave": "zen", "exe": "zen.exe", "nombre": "Zen", "ruta": "r", "icono": ""}
+        f = programas.agrupar([self.v(1, "disc")], [fijo], True, {})
+        self.assertEqual([(x["key"], x["abierta"], x["cuenta"]) for x in f], [("g:zen", False, 0), ("g:disc", True, 1)])
+        f = programas.agrupar([self.v(1, "disc"), self.v(2, "zen")], [fijo], True, {})
+        self.assertEqual([x["key"] for x in f], ["g:zen", "g:disc"])       # misma clave: el botón no salta
+
+
 class Reinicio(unittest.TestCase):
     def test_tope(self):
         self.assertTrue(vigilante.puede_reiniciar([], 1000))
@@ -322,6 +362,18 @@ class Previa(unittest.TestCase):
         self.assertEqual(vista.encajar(600, 1200), (75, 150))
         self.assertEqual(vista.encajar(100, 80), (100, 80))
         self.assertEqual(vista.encajar(0, 0), (0, 0))
+
+    def test_disponer(self):
+        for n in (1, 2, 3, 5, 8, 20):
+            for ancho in (1896, 1176):
+                for tam in ((1920, 1080), (600, 1200), (0, 0)):
+                    t, r, an, al = vista.disponer([tam] * n, ancho)
+                    self.assertEqual((len(t), len(r)), (n, n))
+                    self.assertLessEqual(an, ancho)
+                    for i, x in enumerate(t):
+                        self.assertTrue(x.right() < an and x.bottom() < al, (n, ancho, tam))
+                        self.assertTrue(r[i].isEmpty() or x.contains(r[i]))
+                        self.assertFalse(any(x.intersects(y) for y in t[:i]))
 
     def test_estructura_de_dwm(self):
         self.assertEqual(vista.ctypes.sizeof(vista.PROPS), 45)
