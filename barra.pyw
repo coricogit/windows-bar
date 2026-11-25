@@ -26,7 +26,8 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu  # noqa: E402
 
-from barra import ajustes as cfg, bandeja, claudito, musica, sistema, temas, vista as previa, win  # noqa: E402
+from barra import (ajustes as cfg, bandeja, claudito, musica, panel_claude, sesiones, sistema, temas,  # noqa: E402
+                   vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
 ALTO = temas.NORMAL
@@ -211,6 +212,8 @@ class Barra(QObject):
     ropaCambio = Signal()
     _musica = Signal(object)
     _bandeja = Signal(object)
+    _uso = Signal(object)
+    _ventana_claude = Signal(object)
 
     def __init__(self, app, vista=False):
         super().__init__()
@@ -235,6 +238,16 @@ class Barra(QObject):
         self.de_windows = anclados()
         self.fijos = cfg.lista_fijos(self.ajustes, self.de_windows)
         self.previa = None
+        self.panel_claude = None
+        self._uso_datos, self._uso_hora, self._uso_hilo = None, 0, None
+        self._uso.connect(self._set_uso)
+        self._ventana_claude.connect(lambda h: win.activate(h))
+        self._sitio_claude = None
+        self._t_claude = QTimer(self, singleShot=True, interval=350, timeout=self._mostrar_claude)
+        self._centrado = temas.windows_centrado()
+        self.fondo = vidrio.fondo = vidrio.Fondo()
+        self.temaCambio.connect(self._zonas_vidrio)
+        self.animarCambio.connect(self._zonas_vidrio)
         self._apuntado = None
         self._t_previa = QTimer(self, singleShot=True, interval=380, timeout=self._mostrar_previa)
         self._musica.connect(self._set_musica)
@@ -303,7 +316,28 @@ class Barra(QObject):
         t = self.temas[self._elegido]
         if t["dinamico"]:
             t = {**t, "colores": {**t["colores"], **self._camaleon}}
-        return temas.con_formato(t, self.ajustes["formatos"].get(self._elegido, "tema"))
+        t = temas.con_formato(t, self.ajustes["formatos"].get(self._elegido, "tema"))
+        al = self.ajustes["alineacion"]
+        return temas.con_alineacion(t, self._centrado if al == "windows" else al == "centro")
+
+    def _zonas_vidrio(self):
+        """Qué trozos del fondo hacen falta: los de las barras a la vista."""
+        if self.vista:
+            return
+        t = self._get_tema()
+        activo = bool(t["vidrio"]) and self._animar
+        zonas = [p.zona_real() for p in self.paneles] if activo else []
+        self.fondo.poner(zonas, self.ajustes["vidrio"], activo and bool(zonas))
+
+    def _set_vidrio(self, nivel):
+        self.ajustes["vidrio"] = nivel
+        self._guardar()
+        self._zonas_vidrio()
+
+    def _set_alineacion(self, a):
+        self.ajustes["alineacion"] = a
+        self._guardar()
+        self.temaCambio.emit()
 
     tema = Property("QVariantMap", _get_tema, notify=temaCambio)
 
@@ -363,6 +397,8 @@ class Barra(QObject):
     def _leer_claude(self):
         if self.claudito.disponible and self._animar:
             d = self.claudito.leer()
+            if self.panel_claude and self.panel_claude.isVisible():
+                self.panel_claude.poner(self.claudito.sesiones, self._uso_datos)
             if d and d != self._claude:
                 self._claude = d
                 self.claudeCambio.emit()
@@ -381,6 +417,68 @@ class Barra(QObject):
     # Falso en modo juego: nada se anima ni se consulta.
     animar = Property(bool, lambda self: self._animar, notify=animarCambio)
 
+    # ----- Claudito interactivo -----
+    @Slot(float, float)
+    def claude_entrar(self, x, y):
+        self._quitar_previa()
+        self._sitio_claude = (x, y)
+        self._t_claude.start()
+
+    @Slot()
+    def claude_salir(self):
+        self._sitio_claude = None
+        self._t_claude.stop()
+        if self.panel_claude:
+            self.panel_claude.pronto()
+
+    def _mostrar_claude(self):
+        if not self._sitio_claude:
+            return
+        x, y = self._sitio_claude
+        if not self.panel_claude:
+            self.panel_claude = panel_claude.Panel(self.ir_a_claude)
+        pantalla = QGuiApplication.screenAt(QPoint(round(x), round(y))) or self.app.primaryScreen()
+        g = pantalla.geometry()
+        self.panel_claude.mostrar(self.claudito.sesiones, self._uso_datos, x, g.y() + g.height() - self.alto(), g,
+                                  self._get_tema())
+        self._pedir_uso()
+
+    def _pedir_uso(self):
+        if time.monotonic() - self._uso_hora < 30 and self._uso_datos or self._uso_hilo and self._uso_hilo.is_alive():
+            return
+        self._uso_hilo = threading.Thread(target=self._calcular_uso, daemon=True)
+        self._uso_hilo.start()
+
+    def _calcular_uso(self):
+        try:
+            r = subprocess.run([sys.executable.replace("pythonw.exe", "python.exe"),
+                                os.path.join(AQUI, "barra", "uso.py")], capture_output=True, text=True, timeout=60,
+                               creationflags=SIN_CONSOLA)
+            self._uso.emit(json.loads(r.stdout))
+        except (OSError, ValueError, subprocess.TimeoutExpired, RuntimeError):
+            pass                      # se queda el último dato
+
+    def _set_uso(self, d):
+        self._uso_datos, self._uso_hora = d, time.monotonic()
+        if self.panel_claude and self.panel_claude.isVisible():
+            self.panel_claude.poner(self.claudito.sesiones, d)
+
+    @Slot()
+    @Slot(str)
+    def ir_a_claude(self, sesion=""):
+        """Trae al frente la ventana de esa sesión, o de la que te necesita."""
+        if self.panel_claude:
+            self.panel_claude.hide()
+        lista = self.claudito.sesiones
+        sesion = sesion or self.claudito.actual or (lista[0]["id"] if lista else "")
+
+        def buscar():
+            pid = sesiones.pid_de(sesion) if sesion else None
+            h = sesiones.ventana_de(pid) if pid else None
+            if h:
+                self._ventana_claude.emit(h)
+        threading.Thread(target=buscar, daemon=True).start()
+
     titulo = Property(str, lambda self: self._titulo, notify=tituloCambio)
 
     # ----- ventanas -----
@@ -391,6 +489,10 @@ class Barra(QObject):
             registrar("ventanas")
 
     def _actualizar_ventanas(self):
+        centrado = temas.windows_centrado()
+        if centrado != self._centrado:
+            self._centrado = centrado
+            self.temaCambio.emit()
         activa = win.user32.GetForegroundWindow()
         hwnds = win.windows()
         self.almacen.olvidar_ventanas(set(hwnds))
@@ -424,6 +526,7 @@ class Barra(QObject):
             p.mostrar(p.pantalla_real() not in self._plena)
         if self._plena:
             self._quitar_previa()
+            self.claude_salir()
         animar = not self._plena
         if animar != self._animar:
             self._animar = animar
@@ -601,6 +704,17 @@ class Barra(QObject):
                         f"QMenu::item:disabled{{color:{QColor(c['tenue']).name()};}}")
         return m
 
+    def _submenu(self, m, titulo, opciones, actual, poner):
+        sub = m.addMenu(titulo)
+        sub.setStyleSheet(m.styleSheet())
+        grupo = QActionGroup(sub)
+        for k, nombre in opciones.items():
+            a = QAction(nombre, sub, checkable=True, checked=k == actual)
+            a.triggered.connect(lambda _=False, k=k: poner(k))
+            grupo.addAction(a)
+            sub.addAction(a)
+        return sub
+
     def _crear_menu(self):
         m = self._nuevo_menu()
         grupo = QActionGroup(m)
@@ -610,17 +724,13 @@ class Barra(QObject):
             grupo.addAction(a)
             m.addAction(a)
         m.addSeparator()
-        sub = m.addMenu("Formato de " + self.temas[self._elegido]["nombre"])
-        sub.setStyleSheet(m.styleSheet())
-        grupo2 = QActionGroup(m)
-        actual = self.ajustes["formatos"].get(self._elegido, "tema")
-        for f, nombre in temas.FORMATOS.items():
-            a = QAction(nombre, sub, checkable=True, checked=f == actual)
-            a.triggered.connect(lambda _=False, k=f: self._set_formato(k))
-            grupo2.addAction(a)
-            sub.addAction(a)
+        sub = self._submenu(m, "Formato de " + self.temas[self._elegido]["nombre"], temas.FORMATOS,
+                            self.ajustes["formatos"].get(self._elegido, "tema"), self._set_formato)
         sub.addSeparator()
         sub.addAction("Usar este en todos los temas", self._formato_para_todos)
+        self._submenu(m, "Posición de los iconos", temas.ALINEACIONES, self.ajustes["alineacion"], self._set_alineacion)
+        if self._get_tema()["vidrio"]:
+            self._submenu(m, "Transparencia del vidrio", vidrio.NOMBRES, self.ajustes["vidrio"], self._set_vidrio)
         auto = QAction("Cambiar según la hora", m, checkable=True, checked=bool(self.ajustes["auto"]))
         auto.triggered.connect(self._set_auto)
         m.addAction(auto)
@@ -694,6 +804,11 @@ class Panel:
 
     def pantalla_real(self):
         return win.monitor_of(int(self.view.winId()))
+
+    def zona_real(self):
+        """(x, y, ancho, alto) en píxeles, como los da Qt."""
+        g = self.pantalla.geometry()
+        return g.x(), g.y() + g.height() - ALTO, g.width(), ALTO
 
     def mostrar(self, si):
         if self.view.isVisible() != si:
@@ -818,6 +933,9 @@ def hacer_vista(app, carpeta):
     barra._leer_ropa()
     barra._claude = {"modo": "idle", "texto": "Construyendo…"}
     exes = [os.path.join(os.environ["WINDIR"], n) for n in ("explorer.exe", "notepad.exe", "regedit.exe")]
+    g = app.primaryScreen().geometry()
+    barra.fondo.zonas = [(g.x(), g.y() + g.height() - ALTO, g.width(), ALTO)]
+    barra.fondo.leer()
     panel = Panel(barra, None, True)
     panel.tareas.poner([{"key": str(i), "titulo": os.path.basename(e), "activa": i == 1, "minimizada": False,
                          "icono": barra.almacen.url(barra.almacen.de_archivo(e)), "abierta": i != 2, "hwnd": "",
@@ -827,7 +945,7 @@ def hacer_vista(app, carpeta):
     panel.view.show()
     for e in panel.view.errors():
         print("QML:", e.toString())
-    casos = [(t, f) for t in barra.temas for f in (["tema", "islas_compactas"] if t != "pixel" else temas.FORMATOS)]
+    casos = [(t, f, a) for t in barra.temas for f in ("tema", "islas_compactas") for a in ("izquierda", "centro")]
 
     def siguiente(i):
         if i:
@@ -835,6 +953,9 @@ def hacer_vista(app, carpeta):
             fondo = QImage(img.width(), ALTO + 24, QImage.Format.Format_RGB32)
             fondo.fill(QColor("#4A6B8A"))
             p = QPainter(fondo)
+            _, f = barra.fondo.franja(g.x() + 1, g.y() + g.height() - 2)
+            if f:
+                p.drawImage(QPoint(0, 24 + ALTO - f["nitida"].height()), f["nitida"])
             p.drawImage(QPoint(0, 24), img)
             p.end()
             fondo.save(os.path.join(carpeta, "-".join(casos[i - 1]) + ".png"))
@@ -842,8 +963,9 @@ def hacer_vista(app, carpeta):
             app.quit()
             return
         barra.ajustes["formatos"] = {casos[i][0]: casos[i][1]}
+        barra.ajustes["alineacion"] = casos[i][2]
         barra._aplicar_tema(casos[i][0])
-        QTimer.singleShot(1200, lambda: siguiente(i + 1))
+        QTimer.singleShot(900, lambda: siguiente(i + 1))
 
     siguiente(0)
     app.exec()
@@ -860,6 +982,7 @@ def main():
     QQuickStyle.setStyle("Basic")
     app = QApplication(sys.argv[:1])
     app.setQuitOnLastWindowClosed(False)
+    vidrio.registrar_tipo()
     if args.vista:
         hacer_vista(app, args.vista)
         return 0
@@ -882,6 +1005,7 @@ def main():
             barra.temaCambio.disconnect(p.colocar)
             p.view.close()
         barra.paneles[:] = [Panel(barra, s, s == app.primaryScreen()) for s in app.screens()]
+        barra._zonas_vidrio()
         for p in barra.paneles:
             p.view.show()
 
@@ -892,6 +1016,7 @@ def main():
     reemplazo = Reemplazo(barra)
     app.aboutToQuit.connect(reemplazo.parar)
     barra.arrancar()
+    barra._zonas_vidrio()
     reemplazo.empezar()
     if args.segundos:
         QTimer.singleShot(args.segundos * 1000, app.quit)

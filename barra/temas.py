@@ -11,7 +11,7 @@ BASE = {
     "separacion": 8, "fuente": "Segoe UI", "tamano": 13, "negrita": False, "borde": 0, "indicador": "linea",
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "vidrio": False,
-    "compacto": False,
+    "compacto": False, "centrado": False, "coloresClaros": {},
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
@@ -71,6 +71,33 @@ def con_formato(t, formato):
         t.update(alto=30, margen=3 if t["forma"] == "islas" else 0, tamano=min(t["tamano"], 12), icono=18)
     t["colores"] = col
     return t
+
+
+ALINEACIONES = {"windows": "Como en Windows", "izquierda": "A la izquierda", "centro": "En el centro"}
+
+
+def windows_centrado():
+    """Lo elegido en Configuración > Personalización > Barra de tareas."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced") as k:
+            return winreg.QueryValueEx(k, "TaskbarAl")[0] != 0
+    except OSError:
+        return True          # el valor de fábrica de Windows 11
+
+
+def con_alineacion(t, centro):
+    """Inicio y ventanas en el centro o a la izquierda; lo que había en el
+    centro pasa al otro lado."""
+    m = t["modulos"]
+    grupos = m["izquierda"] + m["centro"]
+    apps = [g for g in grupos if "inicio" in g or "tareas" in g]
+    resto = [g for g in grupos if g not in apps]
+    if centro:
+        nuevo = {"izquierda": resto, "centro": apps}
+    else:
+        nuevo = {"izquierda": apps, "centro": resto}
+    return {**t, "modulos": {**m, **nuevo}, "centrado": centro}
 
 
 def alto_total(t):

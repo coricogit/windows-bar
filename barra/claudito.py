@@ -49,11 +49,20 @@ def elegir_ropa(estacion, gorro, traje, auto):
     return {"gorro": estacion if gorro.lower() in si else "", "traje": estacion if traje.lower() in si else ""}
 
 
+def lista_sesiones(vistas, vivas):
+    """Las sesiones abiertas: primero las que te necesitan, luego las recientes."""
+    abiertas = [v for v in vistas.values() if (v["session"] in vivas if vivas is not None else v["mode"] != "sleep")]
+    abiertas.sort(key=lambda v: (v["mode"] != "waiting", -v["ts"]))
+    return [{"id": v["session"], "proyecto": v["project"], "modo": v["mode"],
+             "texto": NOMBRES.get(v["mode"], v["mode"])} for v in abiertas]
+
+
 class Claudito:
     def __init__(self):
         self._mod = _cargar("activity")
         self._estaciones = _cargar("seasons")
         self._tracker = self._mod.Tracker() if self._mod else None
+        self.sesiones, self.actual = [], ""
         self._estado = os.path.join(os.environ["LOCALAPPDATA"], "claudito", "state.json")
 
     @property
@@ -79,7 +88,11 @@ class Claudito:
         except OSError:
             return None
         try:
-            vista, _ = self._tracker.update(texto, self._mod.read_registry(), time.time())
+            vivas = self._mod.read_registry()
+            vista, vistas = self._tracker.update(texto, vivas, time.time())
+            if vistas is not None:
+                self.sesiones = lista_sesiones(vistas, vivas)
+            self.actual = vista.get("session", "")
         except Exception:
             return None
         modo = vista.get("mode", "sleep")

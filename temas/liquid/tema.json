@@ -2,23 +2,23 @@
   "nombre": "Liquid Glass",
   "orden": 4,
   "forma": "islas",
-  "alto": 42,
-  "margen": 3,
-  "radio": 21,
-  "borde": 1,
+  "alto": 44,
+  "margen": 2,
+  "radio": 22,
+  "borde": 0,
   "relleno": 8,
-  "separacion": 8,
+  "separacion": 10,
   "fuente": "Segoe UI Variable Text",
   "tamano": 13,
   "indicador": "gota",
   "vidrio": true,
   "colores": {
-    "isla": "#73202A38",
-    "borde": "#80FFFFFF",
-    "fondo": "#E62A3442",
-    "fondo2": "#E6384454",
+    "isla": "transparent",
+    "borde": "transparent",
+    "fondo": "#E6222B38",
+    "fondo2": "#E6303B4C",
     "texto": "#FFFFFF",
-    "tenue": "#DCE6F0",
+    "tenue": "#E3EAF2",
     "acento": "#FFFFFF",
     "acento2": "#BFE3FF",
     "alerta": "#FFB3B3",
@@ -36,13 +36,22 @@
   },
   "logo": {
     "colores": [
-      "#FFFFFF"
+      "texto"
     ],
     "fuera": 0.8,
     "dentro": 0.3,
     "lados": 0.3,
     "hueco": 2,
-    "opacidad": 0.45,
-    "filo": "#E6FFFFFF"
+    "opacidad": 0.5,
+    "filo": "texto"
+  },
+  "coloresClaros": {
+    "texto": "#12161D",
+    "tenue": "#37414D",
+    "acento": "#12161D",
+    "acento2": "#1D4E89",
+    "alerta": "#B3261E",
+    "encima": "#26000000",
+    "fondoBandeja": "#8C1A212B"
   }
 }

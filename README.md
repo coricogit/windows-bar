@@ -1,6 +1,6 @@
 # Barra de temas
 
-Barra de tareas para Windows 11 con 10 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
+Barra de tareas para Windows 11 con 7 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
 sistema ni inyectar código: solo la oculta mientras está abierta.
 
 - **Abrir:** `Iniciar barra.bat`
@@ -25,6 +25,20 @@ Ajustes en `%LOCALAPPDATA%\barra-temas\ajustes.json`: tema por hora (`auto`, `te
 En el menú, *Formato* cambia la forma de cada tema por separado: completa, islas, compacta (30 px) o islas compactas (36 px).
 Las compactas agrandan el área de trabajo, y las ventanas maximizadas ganan ese espacio; al cerrar vuelve a su sitio.
 
+## Claudito
+
+Pasa el ratón para ver tus sesiones de Claude, los límites del plan y el uso de hoy. Un clic trae al frente la ventana
+de la sesión que toca (la que te necesita, si la hay). Late cuando Claude te está esperando.
+
+## Posición de los iconos
+
+Sigue lo elegido en Windows (izquierda o centro) y cambia al momento. Se puede fijar en el menú.
+
+## Liquid Glass
+
+Refracta la capa del fondo de escritorio, también la de Wallpaper Engine; nunca lee las ventanas. Cada pieza mide lo
+claro que es su fondo y cambia a texto oscuro si hace falta. El menú tiene cinco niveles de transparencia.
+
 ## Crear un tema
 
 Copia una carpeta de `temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.
@@ -39,6 +53,8 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 - `barra/bandeja.py`: proceso aparte que recibe los iconos de la bandeja y los reenvía a Explorer.
 - `barra/vigilante.py`: proceso aparte que devuelve la barra de Windows si esta se cierra o se cuelga.
 - `barra/vista.py`: vista previa de las ventanas (miniaturas de DWM).
+- `barra/vidrio.py`: el vidrio de Liquid Glass.
+- `barra/sesiones.py`, `barra/uso.py`, `barra/panel_claude.py`: Claudito interactivo.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.
 - `lib/`: paquetes `winrt-*` para la música. Se regenera con

@@ -44,6 +44,5 @@ Item {
       item.visible = Qt.binding(function() { return barra.animar })
     }
   }
-  Aviso { texto: barra.claude.texto; fuente: zona }
-  MouseArea { id: zona; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
+  ZonaClaude { anchors.fill: parent }
 }

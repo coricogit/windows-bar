@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import ajustes, bandeja, claudito, temas, vista, win  # noqa: E402
+from barra import ajustes, bandeja, claudito, panel_claude, sesiones, temas, vidrio, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -45,8 +45,8 @@ class Bandeja(unittest.TestCase):
 
 class Temas(unittest.TestCase):
     def test_los_que_hay(self):
-        self.assertEqual(list(temas.cargar()), ["tokyo", "catppuccin", "sakura", "liquid", "capsula", "terminal", "pixel", "bosque",
-                                                "minimal", "camaleon"])
+        self.assertEqual(list(temas.cargar()), ["tokyo", "sakura", "liquid", "pixel", "bosque", "minimal",
+                                                "camaleon"])
 
     def test_caben_y_tienen_colores(self):
         for ident, t in temas.cargar().items():
@@ -72,6 +72,70 @@ class Temas(unittest.TestCase):
         self.assertTrue(r > g and r > b)
         self.assertEqual(temas.paleta([]), {})
         self.assertIn("acento", temas.paleta([(90, 90, 90)] * 10))
+
+
+class Alineacion(unittest.TestCase):
+    def test_centro_e_izquierda(self):
+        for ident, t in temas.cargar().items():
+            todos = sorted(m for z in t["modulos"].values() for g in z for m in g)
+            for centro in (True, False):
+                n = temas.con_alineacion(t, centro)
+                self.assertEqual(sorted(m for z in n["modulos"].values() for g in z for m in g), todos, ident)
+                zona = [m for g in n["modulos"]["centro" if centro else "izquierda"] for m in g]
+                self.assertEqual(zona[:2], ["inicio", "tareas"], ident)
+
+    def test_lee_windows(self):
+        self.assertIn(temas.windows_centrado(), (True, False))
+
+
+class Vidrio(unittest.TestCase):
+    def test_velo(self):
+        v = [vidrio.velo(n, [0.2], False) for n in vidrio.NIVELES]
+        self.assertEqual(v, sorted(v))
+        self.assertEqual(set(vidrio.NIVELES), set(vidrio.NOMBRES))
+        self.assertEqual(vidrio.velo("raro", [0.2], False), vidrio.velo("normal", [0.2], False))
+
+    @staticmethod
+    def _contraste(fondo, texto):
+        def lin(x):
+            return x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
+        a, b = sorted((lin(fondo) + 0.05, lin(texto) + 0.05))
+        return b / a
+
+    def test_el_texto_se_lee(self):
+        for nivel in vidrio.NIVELES:
+            for i in range(101):
+                luz = i / 100
+                clara = vidrio.es_clara([luz], False)
+                v = vidrio.velo(nivel, [luz], clara)
+                fondo = luz * (1 - v) + (1 if clara else 0.07) * v
+                self.assertGreater(self._contraste(fondo, 0.085 if clara else 1), 4.5, (nivel, luz))
+
+    def test_clara(self):
+        self.assertTrue(vidrio.es_clara([0.9, 0.7], False))
+        self.assertFalse(vidrio.es_clara([0.9, 0.2], False))      # mitad oscura: texto blanco
+        self.assertNotEqual(vidrio.es_clara([0.58], True), vidrio.es_clara([0.58], False))
+        self.assertFalse(vidrio.es_clara([], True))
+
+
+class Claude(unittest.TestCase):
+    def test_lista(self):
+        def v(s, m, ts):
+            return {"session": s, "mode": m, "ts": ts, "project": "p" + s}
+        vistas = {x["session"]: x for x in (v("a", "idle", 9), v("b", "waiting", 1), v("c", "sleep", 5))}
+        self.assertEqual([x["id"] for x in claudito.lista_sesiones(vistas, {"a": 1, "b": 1})], ["b", "a"])
+        self.assertEqual([x["id"] for x in claudito.lista_sesiones(vistas, None)], ["b", "a"])
+
+    def test_cadena(self):
+        t = {5: (4, "claude.exe"), 4: (3, "pwsh.exe"), 3: (2, "windowsterminal.exe"), 2: (1, "explorer.exe")}
+        self.assertEqual(sesiones.cadena(5, t), [5, 4, 3])
+        self.assertEqual(sesiones.cadena(1, {1: (2, "a"), 2: (1, "b")}), [1, 2])
+
+    def test_textos(self):
+        self.assertEqual([panel_claude.miles(n) for n in (5, 1500, 2_400_000)], ["5", "1.5 k", "2.4 M"])
+        self.assertEqual(panel_claude.falta(1000 + 7800, 1000), "2 h 10 min")
+        self.assertEqual(panel_claude.falta(1000 + 90000, 1000), "1 d 1 h")
+        self.assertEqual(panel_claude.falta(None, 0), "")
 
 
 class Ajustes(unittest.TestCase):

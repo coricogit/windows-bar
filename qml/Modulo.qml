@@ -17,6 +17,7 @@ Loader {
     Boton {
       id: botonInicio
       alto: mod.alto
+      colores: mod.c
       ancho: mod.tema.compacto ? 30 : 38
       ayuda: "Inicio · Rueda: cambiar de tema (" + mod.tema.nombre + ")"
       onPulsado: function(b) { barra.accion(b === Qt.RightButton ? "menu_inicio" : "inicio") }
@@ -35,21 +36,32 @@ Loader {
       interactive: contentWidth > width
       spacing: 2
       model: tareas
-      // La gota de vidrio se desliza hasta la ventana activa.
+      // La gota: sus dos bordes van a distinta velocidad, así se estira al moverse.
       property Item activaItem: null
-      Rectangle {
+      Item {
+        id: gota
         parent: contentItem
         z: -1
         visible: mod.tema.indicador === "gota" && !!activaItem
-        x: activaItem ? activaItem.x + 2 : 0
-        y: 3
-        width: activaItem ? activaItem.width - 4 : 0
-        height: mod.alto - 6
-        radius: height / 2
-        color: "#3DFFFFFF"
-        border.color: "#8CFFFFFF"
-        border.width: 1
-        Behavior on x { SpringAnimation { spring: 3.2; damping: 0.32; epsilon: 0.3 } }
+        property real izq: activaItem ? activaItem.x + 2 : 0
+        property real der: activaItem ? activaItem.x + activaItem.width - 2 : 0
+        Behavior on izq { SpringAnimation { spring: 3.6; damping: 0.36; epsilon: 0.3 } }
+        Behavior on der { SpringAnimation { spring: 2.2; damping: 0.30; epsilon: 0.3 } }
+        x: Math.min(izq, der)
+        width: Math.max(12, Math.abs(der - izq))
+        y: 4
+        height: mod.alto - 8
+        Rectangle {
+          anchors.fill: parent
+          radius: height / 2
+          border.width: 1
+          border.color: "#99FFFFFF"
+          gradient: Gradient {
+            GradientStop { position: 0; color: "#73FFFFFF" }
+            GradientStop { position: 0.45; color: "#24FFFFFF" }
+            GradientStop { position: 1; color: "#4DFFFFFF" }
+          }
+        }
       }
       add: Transition { NumberAnimation { property: "scale"; from: 0.4; to: 1; duration: 160; easing.type: Easing.OutBack } }
       displaced: Transition { NumberAnimation { property: "x"; duration: 160 } }
@@ -80,6 +92,7 @@ Loader {
       height: mod.alto
       elide: Text.ElideRight
       text: barra.titulo
+      color: mod.c.texto
     }
   }
 
@@ -91,20 +104,22 @@ Loader {
       readonly property bool hay: barra.cancion.titulo !== ""
       width: hay ? implicitWidth : 0
       spacing: 0
-      Boton { alto: mod.alto; texto: "\uE892"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Anterior"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("anterior") }
+      Boton { alto: mod.alto; colores: mod.c; texto: "\uE892"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Anterior"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("anterior") }
       Boton {
         alto: mod.alto
+        colores: mod.c
         texto: barra.cancion.sonando ? "\uE769" : "\uE768"; fuente: "Segoe Fluent Icons"; tam: 13; ancho: 28; colorTexto: mod.c.acento
         ayuda: barra.cancion.sonando ? "Pausar" : "Reproducir"
         onPulsado: barra.accion("pausa")
       }
-      Boton { alto: mod.alto; texto: "\uE893"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Siguiente"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("siguiente") }
+      Boton { alto: mod.alto; colores: mod.c; texto: "\uE893"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Siguiente"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("siguiente") }
       Texto {
         height: mod.alto
         width: Math.min(implicitWidth, 300)
         elide: Text.ElideRight
         leftPadding: 4
         rightPadding: 6
+        color: mod.c.texto
         text: barra.cancion.titulo + (barra.cancion.artista ? " — " + barra.cancion.artista : "")
       }
     }
@@ -187,6 +202,7 @@ Loader {
     id: volumen
     Boton {
       alto: mod.alto
+      colores: mod.c
       texto: (barra.datos.silencio ? "✕" : "♪") + " " + barra.datos.volumen + "%"
       ayuda: "Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio"
       onPulsado: function(b) {
@@ -201,6 +217,7 @@ Loader {
     id: reloj
     Boton {
       alto: mod.alto
+      colores: mod.c
       id: hora
       property date ahora: new Date()
       texto: Qt.formatTime(ahora, mod.tema.reloj) + (mod.tema.fecha ? "  " + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha) : "")
@@ -214,6 +231,7 @@ Loader {
     id: temasC
     Boton {
       alto: mod.alto
+      colores: mod.c
       texto: "\uE771"
       fuente: "Segoe Fluent Icons"
       colorTexto: mod.c.acento2
@@ -230,6 +248,20 @@ Loader {
       width: 60
       height: mod.alto
       clip: true
+      Rectangle {       // late cuando Claude te necesita
+        anchors { fill: parent; margins: 2 }
+        radius: Math.min(mod.tema.radio, height / 2)
+        color: mod.c.alerta
+        opacity: 0
+        SequentialAnimation on opacity {
+          running: barra.claude.modo === "waiting" && barra.animar
+          loops: Animation.Infinite
+          alwaysRunToEnd: true
+          NumberAnimation { to: 0.45; duration: 500 }
+          NumberAnimation { to: 0; duration: 500 }
+          PauseAnimation { duration: 300 }
+        }
+      }
       Loader {
         anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: mod.tema.compacto ? -3 : 0 }
         width: 60; height: 50
@@ -241,8 +273,7 @@ Loader {
           item.visible = Qt.binding(function() { return barra.animar })
         }
       }
-      Aviso { texto: barra.claude.texto; fuente: zc }
-      MouseArea { id: zc; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
+      ZonaClaude { anchors.fill: parent }
     }
   }
 }

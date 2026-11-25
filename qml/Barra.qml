@@ -79,13 +79,15 @@ Item {
     id: centro
     tema: root.t
     alto: root.altoUtil
-    limite: root.width * (root.estrecha ? 0.5 : 0.4)
+    readonly property real hueco: derecha.x - (izquierda.x + izquierda.width) - 24
+    // Con las ventanas aquí, se encogen antes que desaparecer.
+    limite: root.t.centrado ? Math.max(120, Math.min(root.width * 0.5, hueco - 90)) : root.width * 0.4
     grupos: root.visibles(root.t.modulos.centro)
     anchors.verticalCenter: cuerpo.verticalCenter
     // En el medio, salvo que tape a los lados.
     x: Math.max(izquierda.x + izquierda.width + 12,
                 Math.min((root.width - width) / 2, derecha.x - width - 12))
-    visible: derecha.x - (izquierda.x + izquierda.width) > width + 24
+    visible: root.t.centrado || hueco > width
   }
 
   // ---------- Claudito de paseo (tema Píxel) ----------
