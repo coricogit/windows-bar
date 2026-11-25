@@ -41,7 +41,7 @@ MUSICA = (("winrt-runtime==4.2.1", "c4c82b8aace86435f833059d583679e5dfb552603286
           ("typing_extensions==4.16.0", "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"))
 
 # Lo que entra del repositorio (de git, para que no se cuele nada más).
-FUENTES = ("README.md", "barra.pyw", "barra", "qml", "temas")
+FUENTES = ("LICENSE", "README.md", "barra.pyw", "barra", "qml", "temas")
 
 # Lo que entra de PySide6.
 QT_MODULOS = ("Core", "Gui", "Network", "OpenGL", "Qml", "Quick", "QuickControls2", "Widgets")

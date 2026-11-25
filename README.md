@@ -106,3 +106,7 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
   `py -m pip install --target lib winrt-runtime winrt-Windows.Media.Control winrt-Windows.Foundation winrt-Windows.Foundation.Collections`
 
 Pruebas: `py -m unittest discover -s tests`
+
+## Licencia
+
+[MIT](LICENSE). El instalador incluye Python, Qt/PySide6 y PyWinRT, con sus licencias en `licenses`.
