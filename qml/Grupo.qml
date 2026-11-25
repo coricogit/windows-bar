@@ -29,8 +29,9 @@ Rectangle {
   Loader {
     id: vidrio
     anchors.fill: parent
-    active: grupo.isla && grupo.tema.vidrio
+    active: grupo.isla && (grupo.tema.vidrio || grupo.tema.adapta)
     sourceComponent: Vidrio {
+      pintar: grupo.tema.vidrio
       radio: grupo.radius
       luzX: raton.hovered ? raton.point.position.x : -1
     }

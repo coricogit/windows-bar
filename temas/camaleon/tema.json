@@ -36,5 +36,6 @@
     "dentro": 0.2,
     "lados": 0.2,
     "hueco": 2
-  }
+  },
+  "medidor": "pildora"
 }

@@ -40,6 +40,12 @@ def velo(nivel, luces, clara):
     return min(0.85, max(base, falta))
 
 
+def velo_justo(luces, clara):
+    """Para temas sin vidrio: solo el velo imprescindible, y ninguno si no hace falta."""
+    mas = max(luces, default=0.3)
+    return 0 if clara or mas <= 0.46 else min(0.85, (mas - 0.46) / (mas - 0.07))
+
+
 def es_clara(luces, antes):
     """¿Texto oscuro? Solo si todo el fondo es claro; con margen, para no parpadear."""
     return bool(luces) and min(luces) > (0.54 if antes else 0.62)
@@ -219,7 +225,7 @@ class Vidrio(QQuickPaintedItem):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._clara, self._luces, self._medido = False, [], None
+        self._clara, self._luces, self._medido, self._pintar = False, [], None, True
         # Las piezas se mueven al crecer sus vecinas, y eso no las repinta.
         self._t = QTimer(self, interval=200, timeout=self._medir)
         self._t.start()
@@ -246,6 +252,17 @@ class Vidrio(QQuickPaintedItem):
         if v != self._luzX:
             self._luzX = v
             self.cambio.emit()
+
+    def _get_pintar(self):
+        return self._pintar
+
+    def _set_pintar(self, v):
+        if v != self._pintar:
+            self._pintar = v
+            self.cambio.emit()
+
+    # Falso: solo mide el fondo y pone el velo imprescindible.
+    pintar = Property(bool, _get_pintar, _set_pintar, notify=cambio)
 
     # Dónde está el ratón sobre la pieza; negativo si no está.
     luzX = Property(float, _get_luz, _set_luz, notify=cambio)
@@ -290,6 +307,12 @@ class Vidrio(QQuickPaintedItem):
         p.setPen(Qt.PenStyle.NoPen)
         caja = QRectF(0.75, 0.75, an - 1.5, al - 1.5)
         radio = min(self._radio, caja.height() / 2)
+        if not self._pintar:
+            v = velo_justo(self._luces, self._clara)
+            if v > 0.03:
+                p.setBrush(QColor.fromRgbF(0.05, 0.07, 0.11, v))
+                p.drawPath(self._camino(caja, 10))
+            return
         forma = self._camino(caja, radio)
         gx, gy = self._posicion()
         zona, f = fondo.franja(gx + an / 2, gy + al / 2) if fondo else (None, None)

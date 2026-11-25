@@ -11,12 +11,14 @@ BASE = {
     "separacion": 8, "fuente": "Segoe UI", "tamano": 13, "negrita": False, "borde": 0, "indicador": "linea",
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "vidrio": False,
-    "compacto": False, "centrado": False, "coloresClaros": {},
+    "compacto": False, "centrado": False, "coloresClaros": {}, "adapta": False,
+    "medidor": "texto", "momentos": {},
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
                 "texto": "#FFFFFF", "tenue": "#A0A0A0", "acento": "#4CC2FF", "acento2": "#4CC2FF",
-                "alerta": "#FF6B6B", "encima": "#22FFFFFF", "fondoBandeja": "transparent"},
+                "alerta": "#FF6B6B", "encima": "#22FFFFFF", "fondoBandeja": "transparent",
+                "medidor1": "", "medidor2": "", "medidor3": ""},
     "modulos": {"izquierda": [["inicio", "tareas"]], "centro": [["musica"]],
                 "derecha": [["claudito"], ["sistema"], ["bandeja", "volumen"], ["reloj"], ["temas"]]},
 }
@@ -50,6 +52,12 @@ FORMATOS = {"tema": "El del tema", "completa": "Completa", "islas": "Islas", "co
 NORMAL = 48        # lo que reserva la barra de Windows
 
 
+def con_momento(t, momento):
+    """El tema con los colores de ese momento del día, si los tiene."""
+    extra = t["momentos"].get(momento)
+    return {**t, "colores": {**t["colores"], **extra}} if extra else t
+
+
 def con_formato(t, formato):
     """El tema con otra forma o tamaño."""
     if formato not in FORMATOS or formato == "tema":
@@ -64,7 +72,7 @@ def con_formato(t, formato):
         t.update(alto=42, margen=3)
     else:
         if t["forma"] == "islas":
-            t.update(forma="completa", radio=0, vidrio=False, brillo=False)
+            t.update(forma="completa", radio=0, vidrio=False, adapta=False)
             col["isla"] = "transparent"
         t.update(alto=46, margen=0)
     if t["compacto"]:
@@ -155,13 +163,10 @@ def imagen_fondo(wallpaper_engine):
 
 
 def paleta(pixeles):
-    """Colores del tema a partir de [(r, g, b)]: fondo oscuro del tono medio y
-    acento del tono vivo más presente."""
+    """Colores del tema a partir de [(r, g, b)]: fondo muy oscuro y casi opaco
+    del tono vivo más presente, para que se lea sobre cualquier imagen."""
     if not pixeles:
         return {}
-    n = len(pixeles)
-    r, g, b = (sum(p[i] for p in pixeles) / n / 255 for i in range(3))
-    h, s, _ = colorsys.rgb_to_hsv(r, g, b)
     cubos = {}
     for p in pixeles:
         ph, ps, pv = colorsys.rgb_to_hsv(*(x / 255 for x in p))
@@ -170,18 +175,20 @@ def paleta(pixeles):
             c = cubos.setdefault(int(ph * 24) % 24, [0, 0])
             c[0] += peso
             c[1] += ph * peso
-    if cubos:
-        mejor = max(cubos.values(), key=lambda c: c[0])
-        tono = mejor[1] / mejor[0]
-    else:                      # fondo gris
-        tono, s = h, 0
+    orden = sorted(cubos.values(), key=lambda c: -c[0])
+    tonos = [c[1] / c[0] for c in orden]
+    uno = tonos[0] if tonos else 0
+    # El segundo, el más presente que sea claramente otro color.
+    dos = next((t for c, t in zip(orden, tonos) if 0.14 < abs(t - uno) < 0.86 and c[0] > orden[0][0] * 0.08),
+               uno + 0.45)
+    sat = 1 if tonos else 0.08              # fondo gris: casi sin color
 
-    def color(hh, ss, vv, alfa=255):
-        return "#%02X%02X%02X%02X" % ((alfa,) + tuple(round(x * 255) for x in colorsys.hsv_to_rgb(hh % 1, ss, vv)))
+    def color(h, s, v, alfa=255):
+        return "#%02X%02X%02X%02X" % ((alfa,) + tuple(round(x * 255) for x in colorsys.hsv_to_rgb(h % 1, s * sat, v)))
 
-    viva = 0.55 if cubos else 0.05
-    return {"fondo": color(h, min(s, 0.6), 0.13, 235), "fondo2": color(h, min(s, 0.6), 0.2, 235),
-            "isla": color(h, min(s, 0.5), 0.24, 160), "borde": color(tono, viva * 0.7, 0.6, 90),
-            "texto": color(tono, 0.06, 0.97), "tenue": color(tono, 0.14, 0.72),
-            "acento": color(tono, viva, 0.95), "acento2": color(tono + 0.08, viva, 0.85),
-            "encima": color(tono, viva, 0.95, 45)}
+    return {"fondo": color(uno, 0.50, 0.11, 242), "fondo2": color(uno, 0.50, 0.15, 242),
+            "isla": color(uno, 0.48, 0.14, 236), "borde": color(uno, 0.55, 0.85, 150),
+            "texto": color(uno, 0.05, 0.99), "tenue": color(uno, 0.16, 0.84),
+            "acento": color(uno, 0.55, 1.0), "acento2": color(dos, 0.55, 1.0), "encima": color(uno, 0.55, 1.0, 50),
+            "medidor1": color(uno, 0.55, 1.0), "medidor2": color(dos, 0.55, 1.0),
+            "medidor3": color((uno + dos) / 2, 0.45, 1.0)}

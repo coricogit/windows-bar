@@ -31,5 +31,30 @@
     "dentro": 0,
     "lados": 1.5,
     "hueco": 1
+  },
+  "medidor": "rama",
+  "momentos": {
+    "noche": {
+      "fondo": "#F70C120E",
+      "fondo2": "#F7151F1A",
+      "tenue": "#93A58C",
+      "acento": "#B5E48C",
+      "acento2": "#F4E285"
+    },
+    "amanecer": {
+      "fondo": "#F52A3326",
+      "fondo2": "#F5414B3B",
+      "tenue": "#C5CBAE",
+      "acento": "#D4E79E",
+      "acento2": "#F2C6A0"
+    },
+    "dia": {},
+    "atardecer": {
+      "fondo": "#F5281A12",
+      "fondo2": "#F5452A1A",
+      "tenue": "#CDB08F",
+      "acento": "#F0B35A",
+      "acento2": "#E07A5F"
+    }
   }
 }

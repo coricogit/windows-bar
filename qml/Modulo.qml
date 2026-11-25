@@ -129,26 +129,29 @@ Loader {
     id: sistemaC
     Row {
       height: mod.alto
-      spacing: 8
+      spacing: mod.tema.compacto ? 7 : 9
       leftPadding: 4
       rightPadding: 4
       Repeater {
         model: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]]
-        Row {
-          readonly property int valor: barra.datos[modelData[1]]
+        Medidor {
+          tema: mod.tema
+          alto: mod.alto
+          nombre: modelData[0]
+          orden: index
+          valor: barra.datos[modelData[1]]
+          historia: barra.datos.historia ? barra.datos.historia[modelData[1]] : []
           visible: valor >= 0
-          height: mod.alto
-          spacing: 4
-          Texto { text: modelData[0]; height: mod.alto; color: mod.c.tenue; font.pixelSize: mod.tema.tamano - 2 }
-          Texto {
-            text: parent.valor + "%"
-            width: medida.width
-            height: mod.alto
-            horizontalAlignment: Text.AlignRight
-            color: parent.valor >= 85 ? mod.c.alerta : mod.c.texto
-            TextMetrics { id: medida; text: "100%"; font.family: mod.tema.fuente; font.pixelSize: mod.tema.tamano; font.bold: mod.tema.negrita }
-          }
         }
+      }
+      Item {
+        parent: mod
+        anchors.fill: parent
+        Aviso {
+          texto: "CPU " + barra.datos.cpu + " %  ·  RAM " + barra.datos.ram + " %" + (barra.datos.gpu >= 0 ? "  ·  GPU " + barra.datos.gpu + " %" : "")
+          fuente: zm
+        }
+        MouseArea { id: zm; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
       }
     }
   }

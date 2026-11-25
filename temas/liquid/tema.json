@@ -53,5 +53,6 @@
     "alerta": "#B3261E",
     "encima": "#26000000",
     "fondoBandeja": "#8C1A212B"
-  }
+  },
+  "medidor": "anillo"
 }

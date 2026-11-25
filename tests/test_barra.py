@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import ajustes, bandeja, claudito, panel_claude, sesiones, temas, vidrio, vista, win  # noqa: E402
+from barra import ajustes, bandeja, cielo, claudito, panel_claude, sesiones, temas, vidrio, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -72,6 +72,74 @@ class Temas(unittest.TestCase):
         self.assertTrue(r > g and r > b)
         self.assertEqual(temas.paleta([]), {})
         self.assertIn("acento", temas.paleta([(90, 90, 90)] * 10))
+
+
+def _rgb(c):
+    c = c.lstrip("#")
+    return [int(c[-6:][i:i + 2], 16) / 255 for i in (0, 2, 4)]
+
+
+def _alfa(c):
+    return int(c[1:3], 16) / 255 if len(c) == 9 else 1
+
+
+def _lum(rgb):
+    v = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in rgb]
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+
+
+def contraste(a, b):
+    x, y = sorted((_lum(a) + 0.05, _lum(b) + 0.05))
+    return y / x
+
+
+class Contraste(unittest.TestCase):
+    def revisar(self, col, fondos, nombre, con_tenue=True):
+        for f in fondos:
+            for detras in (0, 1):          # escritorio negro o blanco
+                base = [x * _alfa(f) + detras * (1 - _alfa(f)) for x in _rgb(f)]
+                self.assertGreaterEqual(contraste(_rgb(col["texto"]), base), 4.5, (nombre, f, detras))
+                if con_tenue:
+                    self.assertGreaterEqual(contraste(_rgb(col["tenue"]), base), 4.2, (nombre, "tenue", f, detras))
+
+    def test_temas_y_momentos(self):
+        for ident, t in temas.cargar().items():
+            if t["vidrio"] or t["adapta"] or t["dinamico"]:
+                continue
+            for m in cielo.MOMENTOS:
+                c = temas.con_momento(t, m)["colores"]
+                self.revisar(c, [c["isla"]] if t["forma"] == "islas" else [c["fondo"], c["fondo2"]], (ident, m))
+
+    def test_camaleon(self):
+        import random
+        azar = random.Random(3)
+        casos = [[tuple(azar.randrange(256) for _ in range(3)) for _ in range(60)] for _ in range(40)]
+        casos += [[(255, 255, 255)] * 9, [(0, 0, 0)] * 9, [(250, 240, 20)] * 9, [(20, 20, 250)] * 9]
+        for pix in casos:
+            c = temas.paleta(pix)
+            self.revisar(c, [c["isla"], c["fondo"]], "camaleon")
+            self.assertGreater(contraste(_rgb(c["acento"]), _rgb(c["isla"])), 4)
+
+    def test_minimalista(self):
+        for i in range(101):
+            clara = vidrio.es_clara([i / 100], False)
+            v = vidrio.velo_justo([i / 100], clara)
+            fondo = i / 100 * (1 - v) + 0.07 * v
+            self.assertGreater(contraste([0.08] * 3 if clara else [0.96] * 3, [fondo] * 3), 4.1, i)
+        self.assertEqual(vidrio.velo_justo([0.2, 0.4], False), 0)
+
+
+class Cielo(unittest.TestCase):
+    def test_momentos(self):
+        for mes in range(1, 13):
+            self.assertEqual([cielo.momento(h, mes) for h in (0, 3, 12, 15, 23)],
+                             ["noche", "noche", "dia", "dia", "noche"])
+            visto = []
+            for h in range(0, 24 * 60):
+                m = cielo.momento(h / 60, mes)
+                if not visto or visto[-1] != m:
+                    visto.append(m)
+            self.assertEqual(visto, ["noche", "amanecer", "dia", "atardecer", "noche"])
 
 
 class Alineacion(unittest.TestCase):

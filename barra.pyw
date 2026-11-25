@@ -26,7 +26,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu  # noqa: E402
 
-from barra import (ajustes as cfg, bandeja, claudito, musica, panel_claude, sesiones, sistema, temas,  # noqa: E402
+from barra import (ajustes as cfg, bandeja, cielo, claudito, musica, panel_claude, sesiones, sistema, temas,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -210,6 +210,7 @@ class Barra(QObject):
     animarCambio = Signal()
     tituloCambio = Signal()
     ropaCambio = Signal()
+    momentoCambio = Signal()
     _musica = Signal(object)
     _bandeja = Signal(object)
     _uso = Signal(object)
@@ -232,6 +233,8 @@ class Barra(QObject):
         self._cancion = dict(musica.NADA)
         self._animar = True
         self._titulo = ""
+        self._momento = self._que_momento()
+        self._historia = {"cpu": [], "ram": [], "gpu": []}
         self._plena = {}
         self.cpu, self.gpu, self.vol = sistema.Cpu(), sistema.Gpu(), sistema.Volume()
         self.claudito = claudito.Claudito()
@@ -286,7 +289,22 @@ class Barra(QObject):
         tema = tema or a["tema"]
         return tema if tema in self.temas else next(iter(self.temas))
 
+    @staticmethod
+    def _que_momento():
+        h = time.localtime()
+        return cielo.momento(h.tm_hour + h.tm_min / 60, h.tm_mon)
+
+    def _poner_momento(self, m):
+        if m != self._momento:
+            self._momento = m
+            self.momentoCambio.emit()
+            self.temaCambio.emit()
+
+    # "noche", "amanecer", "dia" o "atardecer"
+    momento = Property(str, lambda self: self._momento, notify=momentoCambio)
+
     def _revisar_tema(self):
+        self._poner_momento(self._que_momento())
         toca = self._tema_que_toca()
         if toca != self._elegido:
             self._aplicar_tema(toca)
@@ -316,6 +334,7 @@ class Barra(QObject):
         t = self.temas[self._elegido]
         if t["dinamico"]:
             t = {**t, "colores": {**t["colores"], **self._camaleon}}
+        t = temas.con_momento(t, self._momento)
         t = temas.con_formato(t, self.ajustes["formatos"].get(self._elegido, "tema"))
         al = self.ajustes["alineacion"]
         return temas.con_alineacion(t, self._centrado if al == "windows" else al == "centro")
@@ -325,7 +344,7 @@ class Barra(QObject):
         if self.vista:
             return
         t = self._get_tema()
-        activo = bool(t["vidrio"]) and self._animar
+        activo = bool(t["vidrio"] or t["adapta"]) and self._animar
         zonas = [p.zona_real() for p in self.paneles] if activo else []
         self.fondo.poner(zonas, self.ajustes["vidrio"], activo and bool(zonas))
 
@@ -378,7 +397,10 @@ class Barra(QObject):
             return
         v = self.vol.read()
         g = self.gpu.percent()
-        self._set_datos({"cpu": self.cpu.percent(), "ram": sistema.ram_percent(), "gpu": -1 if g is None else g,
+        uso = {"cpu": self.cpu.percent(), "ram": sistema.ram_percent(), "gpu": -1 if g is None else g}
+        for k, n in uso.items():
+            self._historia[k] = (self._historia[k] + [n])[-24:]
+        self._set_datos({**uso, "historia": dict(self._historia),
                          "volumen": v[0] if v else 0, "silencio": v[1] if v else True})
 
     def _set_datos(self, d):
@@ -413,7 +435,7 @@ class Barra(QObject):
     claude = Property("QVariantMap", lambda self: self._claude, notify=claudeCambio)
     personaje = Property(str, lambda self: QUrl.fromLocalFile(claudito.PERSONAJE).toString()
                          if self.claudito.disponible else "", constant=True)
-    mes = Property(int, lambda self: time.localtime().tm_mon, constant=True)
+    mes = Property(int, lambda self: time.localtime().tm_mon, notify=momentoCambio)
     # Falso en modo juego: nada se anima ni se consulta.
     animar = Property(bool, lambda self: self._animar, notify=animarCambio)
 
@@ -927,7 +949,9 @@ def hacer_vista(app, carpeta):
     """Una imagen por tema con datos de ejemplo, fuera de la pantalla."""
     os.makedirs(carpeta, exist_ok=True)
     barra = Barra(app, vista=True)
-    barra._datos = {"cpu": 23, "ram": 58, "gpu": 41, "volumen": 64, "silencio": False}
+    barra._datos = {"cpu": 23, "ram": 58, "gpu": 41, "volumen": 64, "silencio": False,
+                    "historia": {"cpu": [12, 18, 35, 22, 60, 41, 30, 23], "ram": [55, 56, 58, 57, 58],
+                                 "gpu": [10, 80, 72, 35, 41]}}
     barra._cancion = {"titulo": "Canción de ejemplo", "artista": "Artista", "sonando": True}
     barra._titulo = "Documento sin título - Bloc de notas"
     barra._leer_ropa()
@@ -945,7 +969,8 @@ def hacer_vista(app, carpeta):
     panel.view.show()
     for e in panel.view.errors():
         print("QML:", e.toString())
-    casos = [(t, f, a) for t in barra.temas for f in ("tema", "islas_compactas") for a in ("izquierda", "centro")]
+    casos = [(t, f, a, m) for t in barra.temas for f in ("tema", "islas_compactas") for a in ("izquierda", "centro")
+             for m in (cielo.MOMENTOS if barra.temas[t]["momentos"] and (f, a) == ("tema", "centro") else ("dia",))]
 
     def siguiente(i):
         if i:
@@ -964,6 +989,7 @@ def hacer_vista(app, carpeta):
             return
         barra.ajustes["formatos"] = {casos[i][0]: casos[i][1]}
         barra.ajustes["alineacion"] = casos[i][2]
+        barra._poner_momento(casos[i][3])
         barra._aplicar_tema(casos[i][0])
         QTimer.singleShot(900, lambda: siguiente(i + 1))
 

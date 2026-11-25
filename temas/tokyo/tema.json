@@ -18,11 +18,14 @@
     "fondo2": "#F224283B",
     "borde": "#FF3B4261",
     "texto": "#C0CAF5",
-    "tenue": "#7982A9",
+    "tenue": "#929BC6",
     "acento": "#7AA2F7",
     "acento2": "#BB9AF7",
     "alerta": "#F7768E",
-    "encima": "#FF292E42"
+    "encima": "#FF292E42",
+    "medidor1": "#7AA2F7",
+    "medidor2": "#9ECE6A",
+    "medidor3": "#BB9AF7"
   },
   "modulos": {
     "izquierda": [
@@ -45,5 +48,7 @@
     "dentro": 0.2,
     "lados": 0.2,
     "hueco": 2
-  }
+  },
+  "medidor": "onda",
+  "fondo": "Fondo.qml"
 }

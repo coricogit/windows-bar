@@ -39,6 +39,12 @@ Sigue lo elegido en Windows (izquierda o centro) y cambia al momento. Se puede f
 Refracta la capa del fondo de escritorio, también la de Wallpaper Engine; nunca lee las ventanas. Cada pieza mide lo
 claro que es su fondo y cambia a texto oscuro si hace falta. El menú tiene cinco niveles de transparencia.
 
+## Ambiente
+
+Píxel y Bosque cambian con la hora (noche, amanecer, día y atardecer, con horas aproximadas del hemisferio norte) y
+Bosque, también con la estación. CPU, RAM y GPU tienen un dibujo propio en cada tema (`medidor` en `tema.json`:
+`texto`, `onda`, `flor`, `anillo`, `corazones`, `rama`, `linea` o `pildora`). Los colores por momento van en `momentos`.
+
 ## Crear un tema
 
 Copia una carpeta de `temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.

@@ -61,5 +61,16 @@
     "dentro": 0,
     "lados": 0,
     "hueco": 2
+  },
+  "medidor": "linea",
+  "adapta": true,
+  "coloresClaros": {
+    "texto": "#12161D",
+    "tenue": "#37414D",
+    "acento": "#12161D",
+    "acento2": "#37414D",
+    "alerta": "#A61B14",
+    "encima": "#26000000",
+    "fondoBandeja": "#8C1A212B"
   }
 }

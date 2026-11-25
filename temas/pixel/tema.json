@@ -22,7 +22,10 @@
     "acento": "#FFD23F",
     "acento2": "#63E6BE",
     "alerta": "#FF6B6B",
-    "encima": "#40FFFFFF"
+    "encima": "#40FFFFFF",
+    "medidor1": "#FF6B6B",
+    "medidor2": "#63E6BE",
+    "medidor3": "#74C0FC"
   },
   "logo": {
     "colores": [
@@ -36,5 +39,46 @@
     "lados": 0,
     "hueco": 2,
     "bisel": true
+  },
+  "medidor": "corazones",
+  "momentos": {
+    "noche": {
+      "fondo": "#FF221A48",
+      "fondo2": "#FF120D2E",
+      "tenue": "#B9A9E8"
+    },
+    "amanecer": {
+      "fondo": "#FFFBE0B0",
+      "fondo2": "#FFF2B48C",
+      "texto": "#3A1F35",
+      "tenue": "#4A2A3A",
+      "acento": "#9C2F3F",
+      "acento2": "#2B5C73",
+      "alerta": "#A01515",
+      "encima": "#33FFFFFF",
+      "fondoBandeja": "#A63A1F35",
+      "medidor1": "#C92A3F",
+      "medidor2": "#1E7A5A",
+      "medidor3": "#2861A8"
+    },
+    "dia": {
+      "fondo": "#FFB4E2F8",
+      "fondo2": "#FF78C0EC",
+      "texto": "#14203A",
+      "tenue": "#243B63",
+      "acento": "#A3341C",
+      "acento2": "#1B5A43",
+      "alerta": "#A01515",
+      "encima": "#4DFFFFFF",
+      "fondoBandeja": "#A614203A",
+      "medidor1": "#C92A3F",
+      "medidor2": "#1B6E50",
+      "medidor3": "#1F4FA0"
+    },
+    "atardecer": {
+      "fondo": "#FF7A3F6E",
+      "fondo2": "#FF33265F",
+      "tenue": "#E3C3DC"
+    }
   }
 }

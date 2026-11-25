@@ -15,7 +15,7 @@ Item {
     anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: root.t.margen }
     height: root.t.alto
     radius: root.t.radio
-    clip: true
+    clip: !root.islas      // la ciudad de Tokyo Night llega hasta el borde
     border.width: root.islas ? 0 : root.t.borde
     border.color: root.c.borde
     gradient: Gradient {
