@@ -87,14 +87,16 @@ def windows_centrado():
 
 
 def con_alineacion(t, centro):
-    """Inicio y ventanas en el centro o a la izquierda; lo que había en el
-    centro pasa al otro lado."""
+    """Inicio y ventanas en el centro o a la izquierda. En el centro, Claudito,
+    el uso del sistema y lo que había allí pasan a la izquierda."""
     m = t["modulos"]
     grupos = m["izquierda"] + m["centro"]
     apps = [g for g in grupos if "inicio" in g or "tareas" in g]
     resto = [g for g in grupos if g not in apps]
     if centro:
-        nuevo = {"izquierda": resto, "centro": apps}
+        lado = [g for g in m["derecha"] if "claudito" in g or "sistema" in g]
+        nuevo = {"izquierda": lado + resto, "centro": apps,
+                 "derecha": [g for g in m["derecha"] if g not in lado]}
     else:
         nuevo = {"izquierda": apps, "centro": resto}
     return {**t, "modulos": {**m, **nuevo}, "centrado": centro}

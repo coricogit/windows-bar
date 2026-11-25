@@ -93,8 +93,10 @@ Item {
   // ---------- Claudito de paseo (tema Píxel) ----------
   Paseo {
     activo: root.t.paseo && barra.personaje !== ""
-    desde: Math.max(izquierda.x + izquierda.width, centro.visible && centro.width > 0 ? centro.x + centro.width : 0) + 10
-    hasta: derecha.x - 10
+    // Con los iconos en el centro, pasea por la izquierda.
+    desde: (root.t.centrado ? izquierda.x + izquierda.width
+            : Math.max(izquierda.x + izquierda.width, centro.visible && centro.width > 0 ? centro.x + centro.width : 0)) + 10
+    hasta: (root.t.centrado ? centro.x : derecha.x) - 10
     anchors.bottom: cuerpo.bottom
     height: 48
   }

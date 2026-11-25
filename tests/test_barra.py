@@ -83,6 +83,9 @@ class Alineacion(unittest.TestCase):
                 self.assertEqual(sorted(m for z in n["modulos"].values() for g in z for m in g), todos, ident)
                 zona = [m for g in n["modulos"]["centro" if centro else "izquierda"] for m in g]
                 self.assertEqual(zona[:2], ["inicio", "tareas"], ident)
+                izq = [m for g in n["modulos"]["izquierda"] for m in g]
+                for m in ("claudito", "sistema"):
+                    self.assertEqual(m in izq, centro and m in todos, (ident, m))
 
     def test_lee_windows(self):
         self.assertIn(temas.windows_centrado(), (True, False))

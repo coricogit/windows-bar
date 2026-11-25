@@ -88,7 +88,7 @@ Loader {
   Component {
     id: titulo
     Texto {
-      width: Math.min(implicitWidth, 420)
+      width: Math.min(implicitWidth, mod.tema.centrado ? 300 : 420)
       height: mod.alto
       elide: Text.ElideRight
       text: barra.titulo
@@ -115,7 +115,7 @@ Loader {
       Boton { alto: mod.alto; colores: mod.c; texto: "\uE893"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Siguiente"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("siguiente") }
       Texto {
         height: mod.alto
-        width: Math.min(implicitWidth, 300)
+        width: Math.min(implicitWidth, mod.tema.centrado ? 190 : 300)
         elide: Text.ElideRight
         leftPadding: 4
         rightPadding: 6
