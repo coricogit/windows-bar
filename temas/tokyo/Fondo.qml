@@ -61,7 +61,7 @@ Item {
   }
   Repeater {
     id: luz
-    model: Math.min(70, f.ventanas.length)
+    model: Math.min(40, f.ventanas.length)
     Rectangle {
       readonly property var sitio: f.ventanas[(index * 37) % f.ventanas.length] || [0, 0]
       x: sitio[0]; y: sitio[1]
@@ -72,12 +72,12 @@ Item {
     }
   }
   Timer {
-    interval: 600; repeat: true; running: f.visible && barra.animar
+    interval: 600; repeat: true; running: f.visible && barra.mover
     onTriggered: { var o = luz.itemAt(Math.floor(Math.random() * luz.count)); if (o) o.encendida = !o.encendida }
   }
   Repeater {
     id: gotas
-    model: Math.round(f.width / 95)
+    model: Math.round(f.width / 160)
     Rectangle {
       property real v: 4.5 + Math.random() * 3.5
       width: 1; height: 5 + v
@@ -87,7 +87,7 @@ Item {
     }
   }
   Timer {
-    interval: 125; repeat: true; running: f.visible && barra.animar
+    interval: barra.ritmo; repeat: true; running: f.visible && barra.mover
     onTriggered: { for (var i = 0; i < gotas.count; i++) gotas.itemAt(i).caer() }
   }
 }

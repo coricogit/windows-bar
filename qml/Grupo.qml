@@ -11,7 +11,8 @@ Rectangle {
   readonly property bool isla: tema.forma === "islas"
   // Sobre un fondo claro, el vidrio usa los colores oscuros del tema.
   readonly property bool clara: vidrio.item ? vidrio.item.clara : false
-  readonly property var temaPieza: clara ? Object.assign({}, tema, { colores: Object.assign({}, tema.colores, tema.coloresClaros) }) : tema
+  readonly property var temaPieza: clara ? Object.assign({}, tema, { colores: Object.assign({}, tema.colores, tema.coloresClaros),
+    logo: Object.assign({}, tema.logo, { colores: tema.logoClaros }) }) : tema
 
   anchors.verticalCenter: parent ? parent.verticalCenter : undefined
   height: alto

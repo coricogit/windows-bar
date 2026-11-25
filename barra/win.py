@@ -308,6 +308,16 @@ def is_fullscreen(hwnd):
     return covers((r.left, r.top, r.right, r.bottom), monitor_of(hwnd))
 
 
+class LASTINPUTINFO(ctypes.Structure):
+    _fields_ = [("cbSize", w.UINT), ("dwTime", w.DWORD)]
+
+
+def segundos_inactivo():
+    i = LASTINPUTINFO(cbSize=ctypes.sizeof(LASTINPUTINFO))
+    user32.GetLastInputInfo(ctypes.byref(i))
+    return ((kernel32.GetTickCount() - i.dwTime) & 0xFFFFFFFF) / 1000
+
+
 # ----- teclas y bandeja -----------------------------------------------------
 
 def press(*keys):

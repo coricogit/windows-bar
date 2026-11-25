@@ -271,6 +271,7 @@ Loader {
         source: barra.personaje
         onLoaded: {
           item.mode = Qt.binding(function() { return barra.claude.modo })
+          if ("minimo" in item) item.minimo = Qt.binding(function() { return barra.paso * (esPrimaria ? 1 : 2) })
           item.seasonHat = Qt.binding(function() { return barra.ropa.gorro })
           item.seasonOutfit = Qt.binding(function() { return barra.ropa.traje })
           item.visible = Qt.binding(function() { return barra.animar })

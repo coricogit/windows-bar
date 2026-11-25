@@ -19,11 +19,11 @@ Item {
   visible: activo && cabe
 
   Timer {
-    interval: 90
+    interval: 90 * barra.paso
     repeat: true
     running: paseo.visible && paseo.andando && barra.animar
     onTriggered: {
-      var n = paseo.pos + 2 * paseo.sentido
+      var n = paseo.pos + 2 * barra.paso * paseo.sentido
       if (n >= paseo.tramo) { n = paseo.tramo; paseo.sentido = -1 }
       if (n <= 0) { n = 0; paseo.sentido = 1 }
       paseo.pos = n
@@ -37,6 +37,7 @@ Item {
     source: active ? barra.personaje : ""
     anchors.bottomMargin: barra.tema.compacto ? -3 : 0
     onLoaded: {
+      if ("minimo" in item) item.minimo = Qt.binding(function() { return barra.paso * (esPrimaria ? 1 : 2) })
       item.seasonHat = Qt.binding(function() { return barra.ropa.gorro })
       item.seasonOutfit = Qt.binding(function() { return barra.ropa.traje })
       item.mode = Qt.binding(function() { return paseo.andando ? "explore" : paseo.modo })

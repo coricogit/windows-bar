@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import ajustes, bandeja, cielo, claudito, panel_claude, sesiones, temas, vidrio, vista, win  # noqa: E402
+from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, selector, sesiones, sistema, temas, vidrio, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -127,6 +127,65 @@ class Contraste(unittest.TestCase):
             fondo = i / 100 * (1 - v) + 0.07 * v
             self.assertGreater(contraste([0.08] * 3 if clara else [0.96] * 3, [fondo] * 3), 4.1, i)
         self.assertEqual(vidrio.velo_justo([0.2, 0.4], False), 0)
+
+
+class Icono(unittest.TestCase):
+    def test_destaca_en_todos(self):
+        for ident, t in temas.cargar().items():
+            for m in cielo.MOMENTOS:
+                for f in temas.FORMATOS:
+                    n = temas.con_icono(temas.con_formato(temas.con_momento(t, m), f), None)
+                    if not (n["vidrio"] or n["adapta"] or n["dinamico"]):
+                        for c in n["logo"]["colores"]:
+                            self.assertGreaterEqual(temas.contraste(temas.rgb(c), temas.base_de(n)), 3, (ident, m, f))
+
+    def test_cualquier_color(self):
+        for i in range(24):
+            for base in ((0.02, 0.02, 0.03), (0.95, 0.95, 0.9), (0.45, 0.7, 0.9), (0.4, 0.2, 0.4)):
+                for tono in ((i / 24, 1), None):
+                    c = temas.tonos_icono(tono, base)
+                    self.assertEqual(len(c), 4)
+                    self.assertGreaterEqual(min(temas.contraste(temas.rgb(x), base) for x in c), 3, (i, base))
+
+    def test_predominante(self):
+        h, _ = temas.predominante(temas.cargar()["sakura"])
+        self.assertTrue(h > 0.85 or h < 0.05)           # rosa
+        h, _ = temas.predominante(temas.cargar()["tokyo"])
+        self.assertTrue(0.55 < h < 0.75)                # azul
+
+
+class Menu(unittest.TestCase):
+    def test_nada_se_sale_ni_se_pisa(self):
+        o = [{"texto": "x" * n} for n in (4, 20, 12, 30, 9)]
+        zonas, alto = selector.colocar([{"texto": str(i)} for i in range(7)], [("A", o), ("B", o + o)],
+                                       [{**x, "marcado": True} for x in o], o, lambda t: len(t) * 7)
+        for i, (r, _, _) in enumerate(zonas):
+            self.assertLessEqual(r.right(), selector.ANCHO - selector.MARGEN + 1)
+            self.assertLess(r.bottom(), alto)
+            for r2, _, _ in zonas[:i]:
+                self.assertFalse(r.intersects(r2))
+
+
+class Arranque(unittest.TestCase):
+    def test_orden(self):
+        self.assertIn("barra.pyw", arranque.orden())
+        self.assertTrue(os.path.exists(arranque.BARRA))
+        self.assertIn(arranque.activo(), (True, False))
+
+    def test_desactivada(self):
+        self.assertTrue(arranque.desactivada(bytes([3] + [0] * 11)))
+        self.assertFalse(arranque.desactivada(bytes([2] + [0] * 11)))
+        self.assertFalse(arranque.desactivada(None))
+
+
+class Recursos(unittest.TestCase):
+    def test_gpu(self):
+        g = sistema.Gpu()
+        v = g.percent()
+        self.assertTrue(v is None or 0 <= v <= 100)
+
+    def test_inactividad(self):
+        self.assertGreaterEqual(win.segundos_inactivo(), 0)
 
 
 class Cielo(unittest.TestCase):
@@ -257,6 +316,14 @@ class Previa(unittest.TestCase):
 
     def test_estructura_de_dwm(self):
         self.assertEqual(vista.ctypes.sizeof(vista.PROPS), 45)
+
+
+class Dibujo(unittest.TestCase):
+    def test_adaptar(self):
+        with open(claudito.PERSONAJE, encoding="utf-8") as f:
+            n = claudito.adaptar(f.read())
+        self.assertIn("Math.max(minimo", n)
+        self.assertIsNone(claudito.adaptar("otra cosa"))
 
 
 class Ropa(unittest.TestCase):

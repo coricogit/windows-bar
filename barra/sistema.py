@@ -1,5 +1,7 @@
 """CPU, memoria, gráfica y volumen, sin dependencias."""
 import ctypes
+import struct
+import time
 from ctypes import wintypes as w
 
 from .win import GUID, kernel32, method, ole32
@@ -34,25 +36,63 @@ def ram_percent():
     return int(m.dwMemoryLoad)
 
 
+class LUID(ctypes.Structure):
+    _fields_ = [("lo", w.DWORD), ("hi", w.LONG)]
+
+
+class ADAPTERINFO(ctypes.Structure):
+    _fields_ = [("h", w.UINT), ("luid", LUID), ("fuentes", w.ULONG), ("preciso", w.BOOL)]
+
+
+class ENUMADAPTERS2(ctypes.Structure):
+    _fields_ = [("n", w.ULONG), ("lista", ctypes.POINTER(ADAPTERINFO))]
+
+
+class QUERYSTATISTICS(ctypes.Structure):
+    _fields_ = [("tipo", ctypes.c_int), ("luid", LUID), ("proceso", ctypes.c_void_p),
+                ("res", ctypes.c_ubyte * 776), ("nodo", w.ULONG), ("_", w.ULONG)]
+
+
 class Gpu:
-    """Uso de la primera gráfica NVIDIA; None si no hay."""
+    """Uso de la gráfica, de cualquier marca: el del motor más ocupado, como en
+    el Administrador de tareas. Se lo pregunta a Windows; nvml.dll gasta 20 MB."""
 
     def __init__(self):
-        self._dev = None
+        self._nodos, self._old, self._cuando = [], {}, 0
         try:
-            self._lib = ctypes.CDLL("nvml.dll")
-            dev = ctypes.c_void_p()
-            if self._lib.nvmlInit_v2() == 0 and \
-                    self._lib.nvmlDeviceGetHandleByIndex_v2(0, ctypes.byref(dev)) == 0:
-                self._dev = dev
+            self._g = ctypes.WinDLL("gdi32")
+            e = ENUMADAPTERS2()
+            if self._g.D3DKMTEnumAdapters2(ctypes.byref(e)) != 0:
+                return
+            lista = (ADAPTERINFO * e.n)()
+            e.lista = lista
+            if self._g.D3DKMTEnumAdapters2(ctypes.byref(e)) != 0:
+                return
+            for ad in lista[:e.n]:
+                datos = self._pedir(ad.luid, 0, 0)
+                if datos:
+                    self._nodos += [(ad.luid, i) for i in range(min(struct.unpack_from("<II", datos)[1], 32))]
+                self._g.D3DKMTCloseAdapter(ctypes.byref(w.UINT(ad.h)))
+            self.percent()
         except (OSError, AttributeError):
-            pass
+            self._nodos = []
+
+    def _pedir(self, luid, tipo, nodo):
+        q = QUERYSTATISTICS(tipo=tipo, luid=luid, nodo=nodo)
+        return bytes(q.res[:16]) if self._g.D3DKMTQueryStatistics(ctypes.byref(q)) == 0 else None
 
     def percent(self):
-        if not self._dev:
+        if not self._nodos:
             return None
-        use = (ctypes.c_uint * 2)()
-        return int(use[0]) if self._lib.nvmlDeviceGetUtilizationRates(self._dev, use) == 0 else None
+        ahora, nuevo = time.perf_counter(), {}
+        for luid, i in self._nodos:
+            datos = self._pedir(luid, 5, i)
+            if datos:
+                nuevo[luid.lo, i] = struct.unpack_from("<q", datos)[0]
+        pasado = (ahora - self._cuando) * 1e7         # en unidades de 100 ns
+        uso = max((100 * (v - self._old[k]) / pasado for k, v in nuevo.items() if k in self._old), default=0)
+        self._old, self._cuando = nuevo, ahora
+        return max(0, min(100, round(uso)))
 
 
 class Volume:

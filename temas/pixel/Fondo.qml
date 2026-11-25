@@ -63,7 +63,7 @@ Item {
     }
   }
   Timer {
-    interval: 400; repeat: true; running: !f.deNoche && f.visible && barra.animar
+    interval: 400; repeat: true; running: !f.deNoche && f.visible && barra.mover
     onTriggered: {
       for (var i = 0; i < nubes.count; i++) { var o = nubes.itemAt(i); o.x = o.x > f.width ? -45 : o.x + 3 }
     }
@@ -80,7 +80,7 @@ Item {
     }
   }
   Timer {
-    interval: 700; repeat: true; running: f.momento === "noche" && f.visible && barra.animar
+    interval: 700; repeat: true; running: f.momento === "noche" && f.visible && barra.mover
     onTriggered: {
       var o = brillos.itemAt(Math.floor(Math.random() * brillos.count))
       if (o) o.opacity = o.opacity > 0.5 ? 0.1 : 0.9

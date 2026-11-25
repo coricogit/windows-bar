@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import shutil
 import sys
 import time
 import winreg
@@ -47,6 +48,43 @@ def elegir_ropa(estacion, gorro, traje, auto):
         estacion = auto
     si = ("true", "1")
     return {"gorro": estacion if gorro.lower() in si else "", "traje": estacion if traje.lower() in si else ""}
+
+
+# Su dibujo va a 10 cuadros por segundo. Se usa una copia en la que la barra
+# puede bajar el ritmo; si el original cambia y esto no encaja, se usa tal cual.
+CAMBIOS = (("  readonly property int frameStep: ", "  property int minimo: 1\n  readonly property int frameStep: Math.max(minimo, "),
+           ('mode === "idle" ? 2 : 1\n', 'mode === "idle" ? 2 : 1)\n'),
+           ("renderStrategy: Canvas.Cooperative", "renderStrategy: Canvas.Immediate"))
+
+
+def adaptar(texto):
+    """El dibujo con ritmo ajustable, o None si ya no es como se esperaba."""
+    for antes, despues in CAMBIOS:
+        if texto.count(antes) != 1:
+            return None
+        texto = texto.replace(antes, despues)
+    return texto
+
+
+def copia_personaje(carpeta):
+    """Deja la copia en `carpeta` y devuelve qué archivo cargar."""
+    try:
+        with open(PERSONAJE, encoding="utf-8") as f:
+            nuevo = adaptar(f.read())
+        if nuevo is None:
+            return PERSONAJE
+        codigo = os.path.join(os.path.dirname(os.path.dirname(PERSONAJE)), "code")
+        for sub in ("ui", "code"):
+            os.makedirs(os.path.join(carpeta, sub), exist_ok=True)
+        for n in os.listdir(codigo):
+            if n.endswith(".js"):
+                shutil.copyfile(os.path.join(codigo, n), os.path.join(carpeta, "code", n))
+        ruta = os.path.join(carpeta, "ui", "Character.qml")
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write(nuevo)
+        return ruta
+    except OSError:
+        return PERSONAJE
 
 
 def lista_sesiones(vistas, vivas):

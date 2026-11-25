@@ -143,14 +143,19 @@ class Fondo(QObject):
         self._despierta.set()
 
     def _seguir(self):
+        quieto = 0
         while True:
             if self.activo:
                 try:
                     if self.leer():
                         self.cambio.emit()
+                        quieto = 0
+                    else:
+                        quieto += 1
                 except Exception:          # un fallo aquí solo deja el fondo anterior
                     pass
-                self._despierta.wait(CADA)
+                # Fondo quieto: cada vez se mira menos, hasta cada 6 s.
+                self._despierta.wait(min(6, CADA * (1 + quieto / 2)))
             else:
                 if self._lienzo:
                     self._lienzo.cerrar()
@@ -227,7 +232,7 @@ class Vidrio(QQuickPaintedItem):
         super().__init__(parent)
         self._clara, self._luces, self._medido, self._pintar = False, [], None, True
         # Las piezas se mueven al crecer sus vecinas, y eso no las repinta.
-        self._t = QTimer(self, interval=200, timeout=self._medir)
+        self._t = QTimer(self, interval=450, timeout=self._medir)
         self._t.start()
         self.setAntialiasing(True)
         self._radio, self._luzX, self._origen = 20.0, -1.0, None

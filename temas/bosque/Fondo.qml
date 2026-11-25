@@ -91,8 +91,8 @@ Item {
     }
   }
   Timer {
-    interval: 80; repeat: true
-    running: f.visible && barra.animar
+    interval: barra.ritmo; repeat: true
+    running: f.visible && barra.mover
     onTriggered: {
       for (var i = 0; i < rep.count; i++) rep.itemAt(i).caer()
       for (var j = 0; j < luces.count; j++) luces.itemAt(j).volar()

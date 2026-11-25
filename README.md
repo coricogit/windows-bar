@@ -45,6 +45,12 @@ Píxel y Bosque cambian con la hora (noche, amanecer, día y atardecer, con hora
 Bosque, también con la estación. CPU, RAM y GPU tienen un dibujo propio en cada tema (`medidor` en `tema.json`:
 `texto`, `onda`, `flor`, `anillo`, `corazones`, `rama`, `linea` o `pildora`). Los colores por momento van en `momentos`.
 
+## Menú y recursos
+
+Clic derecho en el reloj: menú visual con los temas y todos los ajustes, también *Arrancar con Windows*. Las miniaturas
+se rehacen con `py barra.pyw --miniaturas`. *Animaciones* regula cuánto se redibuja; a los 90 s sin tocar el equipo, los
+fondos se paran solos. Claudito se dibuja desde una copia en `%LOCALAPPDATA%\barra-temas\claudito`, hecha al arrancar.
+
 ## Crear un tema
 
 Copia una carpeta de `temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.
