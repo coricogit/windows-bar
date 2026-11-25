@@ -21,9 +21,13 @@
     $archivo = Join-Path $temp 'barra.zip'
     Write-Host "Descargando $($zip.name)..."
     Invoke-WebRequest $zip.browser_download_url -OutFile $archivo -UseBasicParsing
-    if ("sha256:$((Get-FileHash $archivo -Algorithm SHA256).Hash)" -ne $zip.digest) { throw 'La descarga no coincide con la publicada.' }
+    # certutil y tar son de Windows y van tambien con PowerShell restringido.
+    $hash = (& "$env:SystemRoot\System32\certutil.exe" -hashfile $archivo SHA256)[1] -replace '\s', ''
+    if ("sha256:$hash" -ne $zip.digest) { throw 'La descarga no coincide con la publicada.' }
     $carpeta = Join-Path $temp 'barra'
-    Expand-Archive $archivo $carpeta
+    New-Item $carpeta -ItemType Directory | Out-Null
+    & "$env:SystemRoot\System32\tar.exe" -xf $archivo -C $carpeta
+    if ($LASTEXITCODE) { throw 'No se pudo descomprimir.' }
     Write-Host 'Instalando...'
     & (Join-Path $carpeta 'python\python.exe') (Join-Path $carpeta 'barra\instalado.py') --instalar
     if ($LASTEXITCODE) { throw "La instalacion no termino (codigo $LASTEXITCODE)." }
