@@ -1,0 +1,28 @@
+{
+  "nombre": "Sakura",
+  "orden": 3,
+  "forma": "completa",
+  "alto": 46,
+  "margen": 0,
+  "radio": 0,
+  "borde": 0,
+  "relleno": 12,
+  "fuente": "Yu Gothic UI",
+  "tamano": 14,
+  "indicador": "punto",
+  "inicio": "❀",
+  "fecha": "ddd d MMM",
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#FAF9DDE5",
+    "fondo2": "#FAFFF3F5",
+    "borde": "#FFE7B4C4",
+    "texto": "#4F2536",
+    "tenue": "#85566A",
+    "acento": "#C2385F",
+    "acento2": "#8A4FA3",
+    "alerta": "#B3261E",
+    "encima": "#33C2385F",
+    "fondoBandeja": "#E65B3246"
+  }
+}

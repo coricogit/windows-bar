@@ -1,0 +1,57 @@
+{
+  "nombre": "Minimalista",
+  "orden": 9,
+  "forma": "islas",
+  "alto": 38,
+  "margen": 0,
+  "radio": 0,
+  "borde": 0,
+  "relleno": 16,
+  "separacion": 18,
+  "fuente": "Segoe UI",
+  "tamano": 13,
+  "indicador": "linea",
+  "inicio": "●",
+  "fecha": "",
+  "colores": {
+    "isla": "#01000000",
+    "fondo": "#E6101010",
+    "fondo2": "#E6101010",
+    "texto": "#F5F5F5",
+    "tenue": "#A8A8A8",
+    "acento": "#FFFFFF",
+    "acento2": "#A8A8A8",
+    "alerta": "#FF8787",
+    "encima": "#22FFFFFF"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "inicio",
+        "tareas"
+      ]
+    ],
+    "centro": [
+      [
+        "titulo"
+      ]
+    ],
+    "derecha": [
+      [
+        "bandeja"
+      ],
+      [
+        "volumen"
+      ],
+      [
+        "claudito"
+      ],
+      [
+        "reloj"
+      ],
+      [
+        "temas"
+      ]
+    ]
+  }
+}

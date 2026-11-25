@@ -1,0 +1,38 @@
+{
+  "nombre": "Tokyo Night",
+  "orden": 1,
+  "forma": "islas",
+  "alto": 40,
+  "margen": 4,
+  "radio": 10,
+  "borde": 1,
+  "relleno": 6,
+  "separacion": 8,
+  "fuente": "JetBrainsMono Nerd Font",
+  "tamano": 13,
+  "indicador": "linea",
+  "inicio": "",
+  "fecha": "ddd d MMM",
+  "colores": {
+    "isla": "#F21A1B26",
+    "fondo": "#F21A1B26",
+    "fondo2": "#F224283B",
+    "borde": "#FF3B4261",
+    "texto": "#C0CAF5",
+    "tenue": "#7982A9",
+    "acento": "#7AA2F7",
+    "acento2": "#BB9AF7",
+    "alerta": "#F7768E",
+    "encima": "#FF292E42"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "inicio"
+      ],
+      [
+        "tareas"
+      ]
+    ]
+  }
+}

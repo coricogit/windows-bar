@@ -1,0 +1,25 @@
+{
+  "nombre": "Neón nocturno",
+  "orden": 2,
+  "forma": "completa",
+  "alto": 46,
+  "radio": 0,
+  "relleno": 12,
+  "fuente": "Bahnschrift",
+  "tamano": 14,
+  "indicador": "linea",
+  "inicio": "◢◤",
+  "fecha": "ddd d",
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#F2060410",
+    "fondo2": "#F2120722",
+    "borde": "#8000E5FF",
+    "texto": "#E9F7FF",
+    "tenue": "#8A7FB8",
+    "acento": "#FF2E97",
+    "acento2": "#00E5FF",
+    "alerta": "#FFD23F",
+    "encima": "#33FF2E97"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "nombre": "Píxel",
+  "orden": 7,
+  "forma": "completa",
+  "alto": 48,
+  "radio": 0,
+  "relleno": 10,
+  "fuente": "Consolas",
+  "tamano": 15,
+  "negrita": true,
+  "indicador": "linea",
+  "inicio": "▶",
+  "pixelado": true,
+  "paseo": true,
+  "fondo": "Fondo.qml",
+  "fecha": "d/M",
+  "colores": {
+    "fondo": "#FF2B2350",
+    "fondo2": "#FF4A3B7C",
+    "borde": "#FF17122E",
+    "texto": "#FFF4D6",
+    "tenue": "#B9A9E8",
+    "acento": "#FFD23F",
+    "acento2": "#63E6BE",
+    "alerta": "#FF6B6B",
+    "encima": "#40FFFFFF"
+  }
+}

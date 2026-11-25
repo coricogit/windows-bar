@@ -1,0 +1,38 @@
+{
+  "nombre": "Liquid Glass",
+  "orden": 4,
+  "forma": "islas",
+  "alto": 42,
+  "margen": 3,
+  "radio": 21,
+  "borde": 1,
+  "relleno": 8,
+  "separacion": 8,
+  "fuente": "Segoe UI Variable Text",
+  "tamano": 13,
+  "indicador": "gota",
+  "inicio": "❖",
+  "vidrio": true,
+  "colores": {
+    "isla": "#73202A38",
+    "borde": "#80FFFFFF",
+    "fondo": "#E62A3442",
+    "fondo2": "#E6384454",
+    "texto": "#FFFFFF",
+    "tenue": "#DCE6F0",
+    "acento": "#FFFFFF",
+    "acento2": "#BFE3FF",
+    "alerta": "#FFB3B3",
+    "encima": "#2EFFFFFF"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "inicio"
+      ],
+      [
+        "tareas"
+      ]
+    ]
+  }
+}

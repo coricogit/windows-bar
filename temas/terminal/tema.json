@@ -1,0 +1,38 @@
+{
+  "nombre": "Terminal retro",
+  "orden": 6,
+  "forma": "completa",
+  "alto": 44,
+  "radio": 0,
+  "borde": 1,
+  "relleno": 10,
+  "fuente": "Consolas",
+  "tamano": 15,
+  "indicador": "corchetes",
+  "inicio": ">_",
+  "reloj": "HH:mm:ss",
+  "fecha": "yyyy-MM-dd",
+  "corchetes": true,
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#FA020A04",
+    "fondo2": "#FA04120A",
+    "borde": "#1F7A3A",
+    "texto": "#4DFF88",
+    "tenue": "#2A9B52",
+    "acento": "#B6FFCB",
+    "acento2": "#FFB000",
+    "alerta": "#FFB000",
+    "encima": "#264DFF88"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "inicio"
+      ],
+      [
+        "tareas"
+      ]
+    ]
+  }
+}

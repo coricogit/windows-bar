@@ -1,0 +1,29 @@
+{
+  "nombre": "Camaleón",
+  "orden": 10,
+  "forma": "islas",
+  "alto": 42,
+  "margen": 3,
+  "radio": 12,
+  "borde": 1,
+  "relleno": 8,
+  "separacion": 8,
+  "fuente": "Segoe UI",
+  "tamano": 13,
+  "indicador": "relleno",
+  "inicio": "◆",
+  "dinamico": true,
+  "colores": {
+    "isla": "#B0282828"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "inicio"
+      ],
+      [
+        "tareas"
+      ]
+    ]
+  }
+}

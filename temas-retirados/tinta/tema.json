@@ -1,0 +1,27 @@
+{
+  "nombre": "Tinta japonesa",
+  "orden": 1,
+  "forma": "completa",
+  "alto": 46,
+  "margen": 0,
+  "radio": 3,
+  "borde": 0,
+  "relleno": 14,
+  "fuente": "Yu Gothic UI",
+  "tamano": 14,
+  "indicador": "linea",
+  "inicio": "◯",
+  "fecha": "ddd d MMM",
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#F2161B2C",
+    "fondo2": "#F21D2438",
+    "borde": "#33E8DCC4",
+    "texto": "#F0E6D2",
+    "tenue": "#9A957F",
+    "acento": "#C8553D",
+    "acento2": "#D9B36C",
+    "alerta": "#E5745B",
+    "encima": "#26E8DCC4"
+  }
+}

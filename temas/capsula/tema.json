@@ -1,0 +1,61 @@
+{
+  "nombre": "Cápsula",
+  "orden": 5,
+  "forma": "islas",
+  "alto": 30,
+  "margen": 3,
+  "radio": 15,
+  "borde": 0,
+  "relleno": 8,
+  "separacion": 6,
+  "fuente": "Segoe UI Variable Text",
+  "tamano": 12,
+  "indicador": "punto",
+  "inicio": "●",
+  "fecha": "d MMM",
+  "compacto": true,
+  "icono": 18,
+  "colores": {
+    "isla": "#FF0B0B0D",
+    "borde": "#FF222226",
+    "fondo": "#FF0B0B0D",
+    "fondo2": "#FF0B0B0D",
+    "texto": "#F2F2F4",
+    "tenue": "#8E8E96",
+    "acento": "#FFB454",
+    "acento2": "#7EE0C0",
+    "alerta": "#FF7A7A",
+    "encima": "#FF26262B"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "reloj"
+      ],
+      [
+        "claudito"
+      ],
+      [
+        "musica"
+      ]
+    ],
+    "centro": [
+      [
+        "inicio",
+        "tareas"
+      ]
+    ],
+    "derecha": [
+      [
+        "sistema"
+      ],
+      [
+        "bandeja",
+        "volumen"
+      ],
+      [
+        "temas"
+      ]
+    ]
+  }
+}

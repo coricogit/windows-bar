@@ -1,0 +1,38 @@
+{
+  "nombre": "Catppuccin",
+  "orden": 2,
+  "forma": "islas",
+  "alto": 40,
+  "margen": 4,
+  "radio": 14,
+  "borde": 1,
+  "relleno": 6,
+  "separacion": 8,
+  "fuente": "JetBrainsMono Nerd Font",
+  "tamano": 13,
+  "indicador": "linea",
+  "inicio": "",
+  "fecha": "ddd d MMM",
+  "colores": {
+    "isla": "#F21E1E2E",
+    "fondo": "#F2181825",
+    "fondo2": "#F21E1E2E",
+    "borde": "#FF45475A",
+    "texto": "#CDD6F4",
+    "tenue": "#A6ADC8",
+    "acento": "#CBA6F7",
+    "acento2": "#F5C2E7",
+    "alerta": "#F38BA8",
+    "encima": "#FF313244"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "inicio"
+      ],
+      [
+        "tareas"
+      ]
+    ]
+  }
+}

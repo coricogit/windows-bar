@@ -1,0 +1,38 @@
+{
+  "nombre": "Cristal",
+  "orden": 4,
+  "forma": "islas",
+  "alto": 42,
+  "margen": 3,
+  "radio": 16,
+  "borde": 1,
+  "relleno": 8,
+  "separacion": 8,
+  "fuente": "Segoe UI",
+  "tamano": 13,
+  "indicador": "punto",
+  "inicio": "❖",
+  "brillo": true,
+  "colores": {
+    "isla": "#B01C2836",
+    "borde": "#66FFFFFF",
+    "fondo": "#E61C2836",
+    "fondo2": "#E61C2836",
+    "texto": "#FFFFFF",
+    "tenue": "#C4D2E0",
+    "acento": "#8FD3FF",
+    "acento2": "#FFC6E8",
+    "alerta": "#FF9C9C",
+    "encima": "#33FFFFFF"
+  },
+  "modulos": {
+    "izquierda": [
+      [
+        "inicio"
+      ],
+      [
+        "tareas"
+      ]
+    ]
+  }
+}

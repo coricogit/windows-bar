@@ -1,0 +1,24 @@
+{
+  "nombre": "Bosque",
+  "orden": 8,
+  "forma": "completa",
+  "alto": 46,
+  "radio": 0,
+  "relleno": 12,
+  "fuente": "Georgia",
+  "tamano": 14,
+  "indicador": "punto",
+  "inicio": "❀",
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#F51C2416",
+    "fondo2": "#F52E3A22",
+    "borde": "#664F6B33",
+    "texto": "#F1EAD4",
+    "tenue": "#A9B08A",
+    "acento": "#9CCC65",
+    "acento2": "#E0A458",
+    "alerta": "#EF8354",
+    "encima": "#2B9CCC65"
+  }
+}
