@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu  # noqa: E402
 
-from barra import (ajustes as cfg, arranque, bandeja, cielo, claudito, musica, panel_claude, programas, selector, sesiones, sistema, temas,  # noqa: E402
+from barra import (ajustes as cfg, arranque, bandeja, cielo, claudito, musica, panel_claude, programas, selector, sesiones, sistema, sitio, temas,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -361,6 +361,7 @@ class Barra(QObject):
             t = {**t, "colores": {**t["colores"], **self._camaleon}}
         t = temas.con_momento(t, self._momento)
         t = temas.con_formato(t, self.ajustes["formatos"].get(self._elegido, "tema"))
+        t = temas.con_posicion(t, self.ajustes["posicion"])
         t = temas.con_icono(t, self._tono_fondo if self.ajustes["icono"] == "fondo" or t["vidrio"] or t["adapta"] else None)
         al = self.ajustes["alineacion"]
         return temas.con_alineacion(t, self._centrado if al == "windows" else al == "centro")
@@ -391,6 +392,29 @@ class Barra(QObject):
         self.ajustes.update(tema=ident, auto=False)
         self._guardar()
         self._aplicar_tema(self._tema_que_toca())
+
+    def sitio(self, x, y):
+        """Función que coloca una ventanita junto a la barra, frente a ese punto."""
+        g = (QGuiApplication.screenAt(QPoint(round(x), round(y))) or self.app.primaryScreen()).geometry().getRect()
+        return lambda an, al: sitio.colocar(self._get_tema()["lado"], (x, y), an, al, g, self.alto())
+
+    def _set_posicion(self, lado):
+        self.ajustes["posicion"] = lado
+        self._guardar()
+        self._quitar_previa()
+        self.temaCambio.emit()
+        if self.selector and self.selector.isVisible():
+            pos = self.selector.geometry().center()          # que no quede debajo de la barra
+            self.selector.abrir(self.sitio(pos.x(), pos.y()))
+
+    @Slot()
+    def mover_al_raton(self):
+        """Se soltó la barra tras arrastrarla: al lado más cercano."""
+        pos = QCursor.pos()
+        g = (QGuiApplication.screenAt(pos) or self.app.primaryScreen()).geometry().getRect()
+        lado = sitio.mas_cerca((pos.x(), pos.y()), g)
+        if lado != self.ajustes["posicion"]:
+            QTimer.singleShot(0, lambda: self._set_posicion(lado))
 
     def alto(self):
         return temas.alto_total(self._get_tema())
@@ -506,10 +530,7 @@ class Barra(QObject):
         x, y = self._sitio_claude
         if not self.panel_claude:
             self.panel_claude = panel_claude.Panel(self.ir_a_claude)
-        pantalla = QGuiApplication.screenAt(QPoint(round(x), round(y))) or self.app.primaryScreen()
-        g = pantalla.geometry()
-        self.panel_claude.mostrar(self.claudito.sesiones, self._uso_datos, x, g.y() + g.height() - self.alto(), g,
-                                  self._get_tema())
+        self.panel_claude.mostrar(self.claudito.sesiones, self._uso_datos, self.sitio(x, y), self._get_tema())
         self._pedir_uso()
 
     def _pedir_uso(self):
@@ -788,8 +809,8 @@ class Barra(QObject):
             self.previa = previa.Vista(win.activate, win.close)
         self._previa_desde = time.monotonic()
         pantalla = QGuiApplication.screenAt(QPoint(round(x), round(y))) or self.app.primaryScreen()
-        g = pantalla.geometry()
-        self.previa.mostrar(clave, ventanas, x, g.y() + g.height() - self.alto(), g, self._get_tema())
+        ancho = pantalla.geometry().width() - 24 - (self.alto() if self._get_tema()["vertical"] else 0)
+        self.previa.mostrar(clave, ventanas, self.sitio(x, y), ancho, self._get_tema())
 
     def _quitar_previa(self):
         self._apuntado = None
@@ -838,8 +859,7 @@ class Barra(QObject):
         if not self.selector:
             self.selector = selector.Selector(self._datos_selector)
         pos = QCursor.pos()
-        g = (QGuiApplication.screenAt(pos) or self.app.primaryScreen()).geometry()
-        self.selector.abrir(pos.x(), g.y() + g.height() - self.alto(), g)
+        self.selector.abrir(self.sitio(pos.x(), pos.y()))
         win.user32.SetForegroundWindow(int(self.selector.winId()))
 
     def _datos_selector(self):
@@ -848,7 +868,8 @@ class Barra(QObject):
         def fila(opciones, actual, poner):
             return [{"texto": n, "elegido": k == actual, "hacer": lambda k=k: poner(k)} for k, n in opciones.items()]
 
-        filas = [("Formato", fila(temas.FORMATOS, a["formatos"].get(self._elegido, "tema"), self._set_formato)
+        filas = [("Posición", fila(sitio.LADOS, a["posicion"], self._set_posicion)),
+                 ("Formato", fila(temas.FORMATOS, a["formatos"].get(self._elegido, "tema"), self._set_formato)
                   + [{"texto": "Usar en todos", "hacer": self._formato_para_todos}]),
                  ("Iconos", fila(temas.ALINEACIONES, a["alineacion"], self._set_alineacion)),
                  ("Icono de Windows", fila(temas.ICONO, a["icono"], self._set_icono)),
@@ -898,11 +919,8 @@ class Barra(QObject):
 
     def _abrir_menu(self, m):
         QTimer.singleShot(0, lambda: win.user32.SetForegroundWindow(int(m.winId())))
-        pos = QCursor.pos()
-        alto = m.sizeHint().height()
-        pantalla = QGuiApplication.screenAt(pos)
-        if pantalla:
-            pos.setY(pantalla.geometry().bottom() - self.alto() - alto)
+        pos, t = QCursor.pos(), m.sizeHint()
+        pos = QPoint(*self.sitio(pos.x(), pos.y())(t.width(), t.height()))
         m.exec(pos)
 
     def _set_auto(self, si):
@@ -953,17 +971,14 @@ class Panel:
             v.setContent(url, comp, raiz)
 
     def colocar(self):
-        g = self.pantalla.geometry()
-        alto = self.barra.alto()
-        self.view.setGeometry(QRect(g.x(), g.y() + g.height() - alto, g.width(), alto))
+        self.view.setGeometry(QRect(*self.zona_real()))
 
     def pantalla_real(self):
         return win.monitor_of(int(self.view.winId()))
 
     def zona_real(self):
         """(x, y, ancho, alto) en píxeles, como los da Qt."""
-        g = self.pantalla.geometry()
-        return g.x(), g.y() + g.height() - ALTO, g.width(), ALTO
+        return sitio.franja(self.barra.ajustes["posicion"], self.pantalla.geometry().getRect(), self.barra.alto())
 
     def mostrar(self, si, encima=True):
         if self.view.isVisible() != si:
@@ -1049,10 +1064,11 @@ class Reemplazo(QObject):
         self.ajustar()
 
     def ajustar(self):
-        """En compacto, las ventanas maximizadas ganan el espacio que sobra."""
+        """El sitio libre para las ventanas, según dónde esté la barra."""
         if self.activo:
-            alto = self.barra.alto()
-            win.ajustar_area(alto if alto != ALTO else None)
+            lado, grosor = self.barra.ajustes["posicion"], self.barra.alto()
+            # Abajo y en tamaño normal, justo el hueco que ya reserva Windows.
+            win.ajustar_area(None if (lado, grosor) == ("abajo", ALTO) else sitio.margenes(lado, grosor))
 
     def parar(self):
         if not self.activo:
@@ -1071,7 +1087,7 @@ class Reemplazo(QObject):
         win.show_taskbars()
 
 
-def preparar_vista(app):
+def preparar_vista(app, todo=False):
     """Una barra con datos de ejemplo, fuera de la pantalla."""
     barra = Barra(app, vista=True)
     barra._datos = {"cpu": 23, "ram": 58, "gpu": 41, "volumen": 64, "silencio": False,
@@ -1094,7 +1110,9 @@ def preparar_vista(app):
     panel.view.show()
     for e in panel.errores:
         print("QML:", e)
-    casos = [(t, f, a, m) for t in barra.temas for f in ("tema", "islas_compactas") for a in ("izquierda", "centro")
+    casos = [(t, f, a, "dia", p) for p in ("arriba", "izquierda", "derecha") for t in barra.temas
+             for f in ("tema", "islas_compactas", "completa") for a in ("centro", "izquierda")] if todo else []
+    casos += [(t, f, a, m, "abajo") for t in barra.temas for f in ("tema", "islas_compactas") for a in ("izquierda", "centro")
              for m in (cielo.MOMENTOS if barra.temas[t]["momentos"] and (f, a) == ("tema", "centro") else ("dia",))]
     return barra, panel, casos
 
@@ -1102,19 +1120,20 @@ def preparar_vista(app):
 def hacer_vista(app, carpeta):
     """Una imagen por tema, formato, posición y momento."""
     os.makedirs(carpeta, exist_ok=True)
-    barra, panel, casos = preparar_vista(app)
+    barra, panel, casos = preparar_vista(app, todo=True)
     g = app.primaryScreen().geometry()
 
     def siguiente(i):
         if i:
             img = panel.view.grabWindow()
-            fondo = QImage(img.width(), ALTO + 24, QImage.Format.Format_RGB32)
+            vertical = casos[i - 1][4] in sitio.VERTICALES
+            fondo = QImage(img.width(), img.height() + (0 if vertical else 72 - img.height()), QImage.Format.Format_RGB32)
             fondo.fill(QColor("#4A6B8A"))
             p = QPainter(fondo)
             _, f = barra.fondo.franja(g.x() + 1, g.y() + g.height() - 2)
-            if f:
-                p.drawImage(QPoint(0, 24 + ALTO - f["nitida"].height()), f["nitida"])
-            p.drawImage(QPoint(0, 24), img)
+            if f and not vertical:
+                p.drawImage(QPoint(0, fondo.height() - f["nitida"].height()), f["nitida"])
+            p.drawImage(QPoint(0, fondo.height() - img.height()), img)
             p.end()
             fondo.save(os.path.join(carpeta, "-".join(casos[i - 1]) + ".png"))
         if i == len(casos):
@@ -1123,6 +1142,9 @@ def hacer_vista(app, carpeta):
         barra.ajustes["formatos"] = {casos[i][0]: casos[i][1]}
         barra.ajustes["alineacion"] = casos[i][2]
         barra._poner_momento(casos[i][3])
+        barra.ajustes["posicion"] = casos[i][4]
+        n = barra.alto()
+        panel.view.setGeometry(-6000, -6000, *((n, 1080) if casos[i][4] in sitio.VERTICALES else (1920, n)))
         barra._aplicar_tema(casos[i][0])
         QTimer.singleShot(900, lambda: siguiente(i + 1))
 
@@ -1152,7 +1174,7 @@ def hacer_miniaturas(app):
             app.quit()
             return
         barra._elegido = ids[i]
-        barra.ajustes.update(formatos={}, alineacion="centro", icono="tema")
+        barra.ajustes.update(formatos={}, alineacion="centro", icono="tema", posicion="abajo")
         barra._momento = "dia"
         barra._aplicar_tema(ids[i])
         QTimer.singleShot(1200, lambda: siguiente(i + 1))

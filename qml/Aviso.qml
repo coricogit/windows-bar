@@ -1,18 +1,19 @@
 import QtQuick
 import QtQuick.Controls
 
-// Texto que sale encima de la barra, en su propia ventana. `fuente` es el MouseArea.
+// Texto que sale junto a la barra, en su propia ventana. `fuente` es el MouseArea.
 Item {
   id: aviso
   property string texto: ""
   property var fuente
+  readonly property string lado: barra.tema.lado
   anchors.fill: parent
   ToolTip {
     id: globo
     popupType: Popup.Window
     parent: aviso
-    y: -height - 6
-    x: (aviso.width - width) / 2
+    x: aviso.lado === "izquierda" ? aviso.width + 6 : aviso.lado === "derecha" ? -width - 6 : (aviso.width - width) / 2
+    y: aviso.lado === "arriba" ? aviso.height + 6 : aviso.lado === "abajo" ? -height - 6 : (aviso.height - height) / 2
     delay: 450
     visible: aviso.texto !== "" && aviso.fuente.containsMouse && !aviso.fuente.pressed
     contentItem: Text {

@@ -5,7 +5,7 @@ import os
 
 DEFECTO = {"tema": "tokyo", "formatos": {}, "auto": False, "tema_dia": "bosque", "tema_noche": "tokyo",
            "dia": 8, "noche": 19, "por_programa": {}, "modo_juego": True, "pincel": False,
-           "fijados": [], "quitados": [], "alineacion": "windows", "vidrio": "normal", "animaciones": "suaves", "icono": "tema", "agrupar": True, "orden": []}
+           "fijados": [], "quitados": [], "alineacion": "windows", "vidrio": "normal", "animaciones": "suaves", "icono": "tema", "agrupar": True, "orden": [], "posicion": "abajo"}
 
 
 def normalizar(d, temas, formatos):

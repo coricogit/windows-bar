@@ -8,7 +8,9 @@ Loader {
   property real alto: 40
   property real limite: 600
   readonly property var c: tema.colores
-  height: alto
+  readonly property bool v: tema.vertical
+  // Sin tamaño propio: cada módulo pone el suyo. Si el Loader lo impusiera,
+  // rompería sus enlaces y al girar la barra se quedaría con el anterior.
   sourceComponent: ({ inicio: inicio, tareas: tareasC, titulo: titulo, musica: musicaC, sistema: sistemaC,
                       bandeja: bandejaC, volumen: volumen, reloj: reloj, temas: temasC, claudito: clauditoC })[nombre]
 
@@ -29,11 +31,11 @@ Loader {
   Component {
     id: tareasC
     ListView {
-      orientation: ListView.Horizontal
-      width: Math.min(contentWidth, mod.limite)
-      height: mod.alto
+      orientation: mod.v ? ListView.Vertical : ListView.Horizontal
+      width: mod.v ? mod.alto : Math.min(contentWidth, mod.limite)
+      height: mod.v ? Math.min(contentHeight, mod.limite) : mod.alto
       clip: true
-      interactive: contentWidth > width
+      interactive: mod.v ? contentHeight > height : contentWidth > width
       spacing: 2
       model: tareas
       // La gota: sus dos bordes van a distinta velocidad, así se estira al moverse.
@@ -42,7 +44,7 @@ Loader {
         id: gota
         parent: contentItem
         z: -1
-        visible: mod.tema.indicador === "gota" && !!activaItem
+        visible: mod.tema.indicador === "gota" && !mod.v && !!activaItem
         property real izq: activaItem ? activaItem.x + 2 : 0
         property real der: activaItem ? activaItem.x + activaItem.width - 2 : 0
         Behavior on izq { SpringAnimation { spring: 3.6; damping: 0.36; epsilon: 0.3 } }
@@ -64,7 +66,7 @@ Loader {
         }
       }
       add: Transition { NumberAnimation { property: "scale"; from: 0.4; to: 1; duration: 160; easing.type: Easing.OutBack } }
-      displaced: Transition { NumberAnimation { property: "x"; duration: 160; easing.type: Easing.OutCubic } }
+      displaced: Transition { NumberAnimation { properties: "x,y"; duration: 160; easing.type: Easing.OutCubic } }
       delegate: Tarea {
         tema: mod.tema
         alto: mod.alto
@@ -102,21 +104,23 @@ Loader {
   Component {
     id: musicaC
     Row {
-      height: mod.alto
+      height: mod.v ? (hay ? implicitHeight : 0) : mod.alto
       // No `visible`: dentro de un grupo oculto siempre sería falso.
       readonly property bool hay: barra.cancion.titulo !== ""
-      width: hay ? implicitWidth : 0
+      width: mod.v ? mod.alto : hay ? implicitWidth : 0
       spacing: 0
-      Boton { alto: mod.alto; colores: mod.c; texto: "\uE892"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Anterior"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("anterior") }
+      Boton { visible: !mod.v; alto: mod.alto; colores: mod.c; texto: "\uE892"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Anterior"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("anterior") }
       Boton {
         alto: mod.alto
         colores: mod.c
         texto: barra.cancion.sonando ? "\uE769" : "\uE768"; fuente: "Segoe Fluent Icons"; tam: 13; ancho: 28; colorTexto: mod.c.acento
-        ayuda: barra.cancion.sonando ? "Pausar" : "Reproducir"
+        ayuda: mod.v ? barra.cancion.titulo + (barra.cancion.artista ? " — " + barra.cancion.artista : "") : barra.cancion.sonando ? "Pausar" : "Reproducir"
+        onRueda: function(p) { barra.accion(p > 0 ? "anterior" : "siguiente") }
         onPulsado: barra.accion("pausa")
       }
-      Boton { alto: mod.alto; colores: mod.c; texto: "\uE893"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Siguiente"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("siguiente") }
+      Boton { visible: !mod.v; alto: mod.alto; colores: mod.c; texto: "\uE893"; fuente: "Segoe Fluent Icons"; tam: 13; ayuda: "Siguiente"; ancho: 28; colorTexto: mod.c.tenue; onPulsado: barra.accion("siguiente") }
       Texto {
+        visible: !mod.v
         height: mod.alto
         width: Math.min(implicitWidth, mod.tema.centrado ? 190 : 300)
         elide: Text.ElideRight
@@ -130,11 +134,13 @@ Loader {
 
   Component {
     id: sistemaC
-    Row {
-      height: mod.alto
-      spacing: mod.tema.compacto ? 7 : 9
-      leftPadding: 4
-      rightPadding: 4
+    Grid {
+      columns: mod.v ? 1 : 3
+      spacing: mod.v ? 6 : mod.tema.compacto ? 7 : 9
+      leftPadding: mod.v ? 0 : 4
+      rightPadding: mod.v ? 0 : 4
+      topPadding: mod.v ? 4 : 0
+      bottomPadding: mod.v ? 4 : 0
       Repeater {
         model: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]]
         Medidor {
@@ -161,21 +167,23 @@ Loader {
 
   Component {
     id: bandejaC
-    Row {
-      height: mod.alto
+    Grid {
+      id: rejilla
+      readonly property real celda: mod.tema.compacto ? 24 : 28
+      columns: mod.v ? Math.max(1, Math.floor(mod.alto / celda)) : 99
       Rectangle {      // en temas claros, para que se vean los iconos blancos
         z: -1
         parent: mod
         visible: mod.item && mod.item.width > 0
-        anchors { fill: parent; topMargin: 5; bottomMargin: 5 }
-        radius: height / 2
+        anchors { fill: parent; topMargin: mod.v ? -2 : 5; bottomMargin: mod.v ? -2 : 5; leftMargin: mod.v ? 1 : 0; rightMargin: mod.v ? 1 : 0 }
+        radius: mod.v ? 12 : height / 2
         color: mod.c.fondoBandeja
       }
       Repeater {
         model: bandeja
         Item {
-          width: mod.tema.compacto ? 24 : 28
-          height: mod.alto
+          width: rejilla.celda
+          height: mod.v ? width : mod.alto
           Rectangle {
             anchors.centerIn: parent
             width: parent.width; height: width
@@ -209,7 +217,7 @@ Loader {
     Boton {
       alto: mod.alto
       colores: mod.c
-      texto: (barra.datos.silencio ? "✕" : "♪") + " " + barra.datos.volumen + "%"
+      texto: (barra.datos.silencio ? "✕" : "♪") + (mod.v ? "\n" : " ") + barra.datos.volumen + "%"
       ayuda: "Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio"
       onPulsado: function(b) {
         if (b === Qt.RightButton) barra.menu()
@@ -226,7 +234,10 @@ Loader {
       colores: mod.c
       id: hora
       property date ahora: new Date()
-      texto: Qt.formatTime(ahora, mod.tema.reloj) + (mod.tema.fecha ? "  " + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha) : "")
+      texto: Qt.formatTime(ahora, mod.v ? "HH:mm" : mod.tema.reloj) + (!mod.tema.fecha ? ""
+             : mod.v ? "\n" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM")
+             : "  " + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha))
+      tam: mod.v ? Math.min(mod.tema.tamano, 13) : mod.tema.tamano
       ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat)
       onPulsado: function(b) { if (b === Qt.RightButton) barra.menu(); else barra.accion("avisos") }
       Timer { interval: 1000; running: true; repeat: true; onTriggered: hora.ahora = new Date() }
@@ -251,8 +262,8 @@ Loader {
   Component {
     id: clauditoC
     Item {
-      width: 60
-      height: mod.alto
+      width: mod.v ? mod.alto : 60
+      height: mod.v ? 50 : mod.alto
       clip: true
       Rectangle {       // late cuando Claude te necesita
         anchors { fill: parent; margins: 2 }
@@ -269,7 +280,7 @@ Loader {
         }
       }
       Loader {
-        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: mod.tema.compacto ? -3 : 0 }
+        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: mod.tema.compacto && !mod.v ? -3 : 0 }
         width: 60; height: 50
         source: barra.personaje
         onLoaded: {

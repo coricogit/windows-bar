@@ -36,9 +36,10 @@ class Panel(QWidget):
         self._encima, self._sitio = -1, None
         self._esconder = QTimer(self, singleShot=True, interval=260, timeout=self.hide)
 
-    def mostrar(self, sesiones, uso, centro_x, abajo, pantalla, tema):
+    def mostrar(self, sesiones, uso, poner, tema):
+        """`poner(ancho, alto)` da la esquina."""
         self._esconder.stop()
-        self._sitio = (centro_x, abajo, pantalla)
+        self._sitio = poner
         self._col, self._fuente = tema["colores"], tema["fuente"]
         self.poner(sesiones, uso)
         self.show()
@@ -48,12 +49,10 @@ class Panel(QWidget):
         self._sesiones, self._uso = sesiones[:MAX_SESIONES], uso
         if not self._sitio:
             return
-        x, abajo, g = self._sitio
         n = max(1, len(self._sesiones))
         limites = len(uso["limites"]) if uso else 0
         alto = CABEZA + n * FILA + 10 + limites * 34 + 26
-        x = round(min(max(x - ANCHO / 2, g.left() + 6), g.right() - ANCHO - 6))
-        self.setGeometry(QRect(x, round(abajo - alto - 8), ANCHO, alto))
+        self.setGeometry(QRect(*self._sitio(ANCHO, alto), ANCHO, alto))
         self.update()
 
     def pronto(self):

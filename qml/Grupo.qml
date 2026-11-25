@@ -14,9 +14,9 @@ Rectangle {
   readonly property var temaPieza: clara ? Object.assign({}, tema, { colores: Object.assign({}, tema.colores, tema.coloresClaros),
     logo: Object.assign({}, tema.logo, { colores: tema.logoClaros }) }) : tema
 
-  anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-  height: alto
-  width: fila.width + (isla ? 12 : 0)
+  readonly property bool v: tema.vertical
+  width: v ? alto : fila.width + (isla ? 12 : 0)
+  height: v ? fila.height + (isla ? 12 : 0) : alto
   opacity: modulos.length === 1 && modulos[0] === "musica" && barra.cancion.titulo === "" ? 0 : 1
   enabled: opacity > 0
   radius: Math.min(tema.radio, alto / 2)
@@ -41,16 +41,18 @@ Rectangle {
   // Clic derecho donde no hay botón: menú de temas.
   MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: barra.menu() }
 
-  Row {
+  Grid {
     id: fila
     anchors.centerIn: parent
-    height: grupo.alto
+    columns: grupo.v ? 1 : 99
     spacing: 2
-    Texto { text: "["; height: grupo.alto; color: grupo.tema.colores.tenue; visible: grupo.tema.corchetes }
+    horizontalItemAlignment: Grid.AlignHCenter
+    verticalItemAlignment: Grid.AlignVCenter
+    Texto { text: "["; height: grupo.alto; color: grupo.tema.colores.tenue; visible: grupo.tema.corchetes && !grupo.v }
     Repeater {
       model: grupo.modulos
       Modulo { nombre: modelData; tema: grupo.temaPieza; alto: grupo.alto; limite: grupo.limite }
     }
-    Texto { text: "]"; height: grupo.alto; color: grupo.tema.colores.tenue; visible: grupo.tema.corchetes }
+    Texto { text: "]"; height: grupo.alto; color: grupo.tema.colores.tenue; visible: grupo.tema.corchetes && !grupo.v }
   }
 }

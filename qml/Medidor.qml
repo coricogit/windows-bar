@@ -15,8 +15,9 @@ Row {
   readonly property bool conNombre: estilo !== "pildora"
   readonly property bool conNumero: ["anillo", "corazones", "pildora"].indexOf(estilo) < 0
   readonly property var anchos: ({ onda: 34, flor: 22, anillo: 26, corazones: 62, rama: 36 })
-  height: alto
-  spacing: 4
+  readonly property bool v: tema.vertical
+  height: v ? pila.height : alto
+  spacing: v ? 0 : 4
 
   onValorChanged: lienzo.requestPaint()
   onHistoriaChanged: if (estilo === "onda") lienzo.requestPaint()
@@ -24,7 +25,7 @@ Row {
   onTonoChanged: lienzo.requestPaint()
 
   Texto {
-    visible: med.conNombre
+    visible: med.conNombre && !med.v
     text: med.nombre
     height: med.alto
     color: med.c.tenue
@@ -34,7 +35,7 @@ Row {
   Canvas {
     id: lienzo
     visible: width > 0
-    width: med.anchos[med.estilo] || 0
+    width: med.v ? 0 : med.anchos[med.estilo] || 0
     height: med.alto
     renderStrategy: Canvas.Cooperative
     onWidthChanged: requestPaint()
@@ -108,7 +109,7 @@ Row {
   }
 
   Texto {
-    visible: med.conNumero
+    visible: med.conNumero && !med.v
     text: med.valor + "%"
     width: medida.width
     height: med.alto
@@ -124,8 +125,28 @@ Row {
     }
   }
 
+  Column {             // barra vertical: nombre, número y raya
+    id: pila
+    visible: med.v
+    width: med.v ? med.alto : 0
+    spacing: 0
+    Texto { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: med.nombre; color: med.c.tenue; font.pixelSize: 9 }
+    Texto {
+      width: parent.width
+      horizontalAlignment: Text.AlignHCenter
+      text: med.valor + "%"
+      font.pixelSize: Math.min(med.tema.tamano, 12)
+      color: med.valor >= 85 ? med.c.alerta : med.c.texto
+    }
+    Item {
+      width: parent.width; height: 5
+      Rectangle { x: 10; y: 1; width: parent.width - 20; height: 3; radius: med.tema.pixelado ? 0 : 1.5; color: med.c.tenue; opacity: 0.3 }
+      Rectangle { x: 10; y: 1; width: Math.max(3, (parent.width - 20) * med.valor / 100); height: 3; radius: med.tema.pixelado ? 0 : 1.5; color: med.tono }
+    }
+  }
+
   Item {               // Camaleón: píldora que se llena
-    visible: med.estilo === "pildora"
+    visible: med.estilo === "pildora" && !med.v
     width: visible ? letra.implicitWidth + 18 : 0
     height: med.alto
     Rectangle {

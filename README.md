@@ -30,6 +30,11 @@ Las compactas agrandan el área de trabajo, y las ventanas maximizadas ganan ese
 Pasa el ratón para ver tus sesiones de Claude, los límites del plan y el uso de hoy. Un clic trae al frente la ventana
 de la sesión que toca (la que te necesita, si la hay). Late cuando Claude te está esperando.
 
+## Posición de la barra
+
+Abajo, arriba, a la izquierda o a la derecha: en el menú o arrastrando un hueco vacío de la barra hacia ese borde. En
+vertical los temas no llevan paisaje y la música se reduce a un botón (rueda: anterior o siguiente).
+
 ## Posición de los iconos
 
 Sigue lo elegido en Windows (izquierda o centro) y cambia al momento. Se puede fijar en el menú.

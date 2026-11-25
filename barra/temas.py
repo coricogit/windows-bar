@@ -4,6 +4,8 @@ import json
 import os
 import winreg
 
+from . import sitio
+
 RAIZ = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temas")
 
 BASE = {
@@ -11,7 +13,7 @@ BASE = {
     "separacion": 8, "fuente": "Segoe UI", "tamano": 13, "negrita": False, "borde": 0, "indicador": "linea",
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "vidrio": False,
-    "compacto": False, "centrado": False, "coloresClaros": {}, "adapta": False,
+    "compacto": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
     "medidor": "texto", "momentos": {}, "logoClaros": [],
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
@@ -81,7 +83,20 @@ def con_formato(t, formato):
     return t
 
 
-ALINEACIONES = {"windows": "Como en Windows", "izquierda": "A la izquierda", "centro": "En el centro"}
+def con_posicion(t, lado):
+    """El tema en ese lado de la pantalla. En vertical `alto` es el grosor, y no
+    lleva paisaje: están dibujados a lo ancho."""
+    lado = lado if lado in sitio.LADOS else "abajo"
+    if lado not in sitio.VERTICALES:
+        return {**t, "lado": lado, "vertical": False}
+    islas = t["forma"] == "islas"
+    margen = (3 if t["compacto"] else 4) if islas else 0
+    total = 46 if t["compacto"] else 60
+    return {**t, "lado": lado, "vertical": True, "fondoUrl": "", "alto": total - 2 * margen, "margen": margen,
+            "relleno": 4 if islas else 8, "separacion": min(t["separacion"], 8)}
+
+
+ALINEACIONES = {"windows": "Como en Windows", "izquierda": "Al principio", "centro": "En el centro"}
 
 
 def windows_centrado():
@@ -185,7 +200,7 @@ def con_icono(t, tono):
 
 def alto_total(t):
     """Alto de la ventana. Los normales usan todo el hueco de la barra de Windows."""
-    return t["alto"] + 2 * t["margen"] if t["compacto"] else NORMAL
+    return t["alto"] + 2 * t["margen"] if t["compacto"] or t["vertical"] else NORMAL
 
 
 # ----- Camaleón -------------------------------------------------------------

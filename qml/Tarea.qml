@@ -16,14 +16,19 @@ Item {
   property var lista
   // Arrastre: el botón sigue al ratón y los demás se apartan.
   property bool arrastrando: false
-  property real ratonX: 0          // en la lista
+  readonly property bool v: tema.vertical
+  property real ratonX: 0          // en la lista, a lo largo de la barra
   property real agarre: 0          // dónde se cogió, dentro del botón
   z: arrastrando ? 10 : 0
-  transform: Translate { x: tarea.arrastrando ? tarea.ratonX - tarea.agarre - tarea.x : 0 }
+  transform: Translate {
+    x: tarea.arrastrando && !tarea.v ? tarea.ratonX - tarea.agarre - tarea.x : 0
+    y: tarea.arrastrando && tarea.v ? tarea.ratonX - tarea.agarre - tarea.y : 0
+  }
   readonly property var c: tema.colores
   readonly property string estilo: tema.indicador
-  width: tema.compacto ? 32 : 42
-  height: alto
+  readonly property real paso: tema.compacto ? 32 : 42
+  width: v ? alto : paso
+  height: v ? paso : alto
 
   Rectangle {
     anchors { fill: parent; margins: tarea.tema.compacto ? 1 : 3 }
@@ -99,8 +104,8 @@ Item {
     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
     property bool movido: false
     property real inicio: 0
-    function enLista(e) { return raton.mapToItem(tarea.lista.contentItem, e.x, 0).x }
-    onPressed: function(e) { movido = false; inicio = enLista(e); tarea.agarre = e.x }
+    function enLista(e) { var p = raton.mapToItem(tarea.lista.contentItem, e.x, e.y); return tarea.v ? p.y : p.x }
+    onPressed: function(e) { movido = false; inicio = enLista(e); tarea.agarre = tarea.v ? e.y : e.x }
     onPositionChanged: function(e) {
       if (!(pressedButtons & Qt.LeftButton)) return
       var x = enLista(e)
@@ -112,8 +117,7 @@ Item {
         barra.empezar_arrastre()
       }
       tarea.ratonX = x
-      var paso = tarea.width + tarea.lista.spacing
-      var destino = Math.floor((x - tarea.agarre + tarea.width / 2) / paso)
+      var destino = Math.floor((x - tarea.agarre + tarea.paso / 2) / (tarea.paso + tarea.lista.spacing))
       destino = Math.max(0, Math.min(tarea.lista.count - 1, destino))
       if (destino !== tarea.indice) tareas.mover(tarea.indice, destino)
     }
@@ -126,7 +130,7 @@ Item {
     onCanceled: acabar()
     onContainsMouseChanged: {
       if (!containsMouse) { barra.soltar(tarea.clave); return }
-      var p = tarea.mapToGlobal(tarea.width / 2, 0)
+      var p = tarea.mapToGlobal(tarea.width / 2, tarea.height / 2)
       barra.apuntar(tarea.clave, p.x, p.y)
     }
     onWheel: function(e) { if (!tarea.arrastrando) barra.rodar_tarea(tarea.clave, e.angleDelta.y > 0 ? -1 : 1) }

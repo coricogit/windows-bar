@@ -53,8 +53,9 @@ class Selector(QWidget):
         self._d, self._zonas, self._encima, self._minis = None, [], -1, {}
         self._sitio = None
 
-    def abrir(self, centro_x, abajo, pantalla):
-        self._sitio = (centro_x, abajo, pantalla)
+    def abrir(self, poner):
+        """`poner(ancho, alto)` da la esquina."""
+        self._sitio = poner
         self.refrescar()
         self.show()
         self.raise_()
@@ -65,9 +66,7 @@ class Selector(QWidget):
         f = QFontMetrics(self._fuente())
         self._zonas, alto = colocar(self._d["temas"], self._d["filas"], self._d["interruptores"], self._d["botones"],
                                     f.horizontalAdvance)
-        x, abajo, g = self._sitio
-        x = round(min(max(x - ANCHO / 2, g.left() + 8), g.right() - ANCHO - 8))
-        self.setGeometry(QRect(x, round(max(g.top() + 8, abajo - alto - 10)), ANCHO, alto))
+        self.setGeometry(QRect(*self._sitio(ANCHO, alto), ANCHO, alto))
         self.update()
 
     def _fuente(self, px=12, negrita=False):

@@ -13,15 +13,16 @@ Item {
   readonly property alias encima: raton.containsMouse
   signal pulsado(int b)
   signal rueda(int paso)
-  width: ancho
-  height: alto
+  readonly property bool v: barra.tema.vertical
+  width: v ? alto : ancho
+  height: v ? (et.text === "" ? ancho : et.implicitHeight + 12) : alto
   Rectangle {
     anchors { fill: parent; topMargin: barra.tema.compacto ? 2 : 4; bottomMargin: barra.tema.compacto ? 2 : 4 }
     radius: Math.min(barra.tema.radio, 8)
     color: raton.containsMouse ? boton.colores.encima : "transparent"
     Behavior on color { ColorAnimation { duration: 120 } }
   }
-  Texto { id: et; anchors.centerIn: parent; color: boton.colores.texto; font.pixelSize: boton.tam; font.family: boton.fuente }
+  Texto { id: et; anchors.centerIn: parent; horizontalAlignment: Text.AlignHCenter; color: boton.colores.texto; font.pixelSize: boton.tam; font.family: boton.fuente }
   Aviso { texto: boton.ayuda; fuente: raton }
   MouseArea {
     id: raton

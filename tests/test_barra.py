@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, programas, selector, sesiones, sistema, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -216,6 +216,41 @@ class Programas(unittest.TestCase):
         self.assertEqual([(x["key"], x["abierta"], x["cuenta"]) for x in f], [("g:zen", False, 0), ("g:disc", True, 1)])
         f = programas.agrupar([self.v(1, "disc"), self.v(2, "zen")], [fijo], True, {})
         self.assertEqual([x["key"] for x in f], ["g:zen", "g:disc"])       # misma clave: el botón no salta
+
+
+class Sitio(unittest.TestCase):
+    P = (1920, -468, 1200, 1920)
+
+    def test_franja_y_margenes(self):
+        self.assertEqual(sitio.franja("abajo", (0, 0, 1920, 1080), 48), (0, 1032, 1920, 48))
+        self.assertEqual(sitio.franja("derecha", self.P, 60), (3060, -468, 60, 1920))
+        self.assertEqual(sitio.margenes("arriba", 48), (0, 48, 0, 0))
+        self.assertEqual(sitio.margenes("derecha", 60), (0, 0, 60, 0))
+
+    def test_ventanitas_dentro_y_sin_tapar_la_barra(self):
+        for lado in sitio.LADOS:
+            bx, by, ban, bal = sitio.franja(lado, self.P, 60)
+            for ancla in ((1920, -468), (3119, 1451), (2500, 500)):
+                for an, al in ((200, 100), (730, 640)):
+                    x, y = sitio.colocar(lado, ancla, an, al, self.P, 60)
+                    self.assertTrue(1920 <= x and x + an <= 3120 and -468 <= y and y + al <= 1452, (lado, ancla))
+                    self.assertFalse(x < bx + ban and bx < x + an and y < by + bal and by < y + al, (lado, ancla))
+
+    def test_mas_cerca(self):
+        p = (0, 0, 1920, 1080)
+        self.assertEqual([sitio.mas_cerca(q, p) for q in ((960, 1070), (960, 5), (4, 500), (1915, 500))],
+                         ["abajo", "arriba", "izquierda", "derecha"])
+
+    def test_temas_en_cada_lado(self):
+        for t in temas.cargar().values():
+            for f in temas.FORMATOS:
+                for lado in sitio.LADOS:
+                    n = temas.con_posicion(temas.con_formato(t, f), lado)
+                    self.assertEqual(n["vertical"], lado in ("izquierda", "derecha"))
+                    self.assertLessEqual(n["alto"] + n["margen"], temas.alto_total(n))
+                    if n["vertical"]:
+                        self.assertEqual((temas.alto_total(n), n["fondoUrl"]), (46 if n["compacto"] else 60, ""))
+        self.assertEqual(temas.con_posicion(t, "raro")["lado"], "abajo")
 
 
 class Orden(unittest.TestCase):
@@ -435,11 +470,20 @@ class Pantalla(unittest.TestCase):
         self.assertIsNone(win.alto_reservado((0, 1078, 1920, 1126), (0, 0, 1920, 1080)))   # ocultación automática
         self.assertIsNone(win.alto_reservado((0, 0, 1920, 48), (0, 0, 1920, 1080)))        # arriba
 
-    def test_borde_maximizada(self):
-        area = (0, 0, 1920, 1044)
-        self.assertEqual(win.borde_maximizada((-8, -8, 1928, 1040), area), 1052)
-        self.assertIsNone(win.borde_maximizada((-8, -8, 1928, 1052), area))
-        self.assertIsNone(win.borde_maximizada((100, 100, 900, 700), area))
+    def test_sitio_maximizada(self):
+        p = (0, 0, 1920, 1080)
+        areas = {"abajo": (0, 0, 1920, 1032), "arriba": (0, 48, 1920, 1080), "izquierda": (60, 0, 1920, 1080),
+                 "derecha": (0, 0, 1860, 1080), "compacta": (0, 0, 1920, 1050)}
+        for sobra in (0, 7, 8):
+            for a in areas.values():
+                antes = (a[0] - sobra, a[1] - sobra, a[2] + sobra, a[3] + sobra)
+                for b in areas.values():
+                    n = (b[0] - sobra, b[1] - sobra, b[2] + sobra, b[3] + sobra)
+                    self.assertEqual(win.sitio_maximizada(antes, b, p), n if n != antes else None)
+        self.assertIsNone(win.sitio_maximizada((100, 100, 900, 700), areas["abajo"], p))
+        # segunda pantalla, con coordenadas negativas
+        self.assertEqual(win.sitio_maximizada((1912, -476, 3128, 1412), (1980, -468, 3120, 1452), (1920, -468, 3120, 1452)),
+                         (1972, -476, 3128, 1460))
 
     def test_encuentra_la_barra_de_explorer(self):
         self.assertTrue(win.taskbars())

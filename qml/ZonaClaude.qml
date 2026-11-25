@@ -8,7 +8,7 @@ MouseArea {
   cursorShape: Qt.PointingHandCursor
   onContainsMouseChanged: {
     if (!containsMouse) { barra.claude_salir(); return }
-    var p = zona.mapToGlobal(zona.width / 2, 0)
+    var p = zona.mapToGlobal(zona.width / 2, zona.height / 2)
     barra.claude_entrar(p.x, p.y)
   }
   onClicked: function(e) { if (e.button === Qt.RightButton) barra.menu(); else barra.ir_a_claude() }

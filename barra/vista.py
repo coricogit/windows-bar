@@ -75,11 +75,11 @@ class Vista(QWidget):
         self._esconder = QTimer(self, singleShot=True, interval=220, timeout=self.ocultar)
 
     # ----- mostrar y ocultar -----
-    def mostrar(self, clave, ventanas, centro_x, abajo, pantalla, tema):
-        """`ventanas` es [(hwnd, título)]; `centro_x` y `abajo`, globales."""
+    def mostrar(self, clave, ventanas, poner, max_ancho, tema):
+        """`ventanas` es [(hwnd, título)]; `poner(ancho, alto)` da la esquina."""
         self._esconder.stop()
         self._soltar()
-        self.clave, self._sitio = clave, (centro_x, abajo, pantalla, tema)
+        self.clave, self._sitio = clave, (poner, max_ancho, tema)
         self.hwnds, self._titulos = [h for h, _ in ventanas], [t for _, t in ventanas]
         self._col, self._fuente = tema["colores"], tema["fuente"]
         self._encima = -1
@@ -93,9 +93,8 @@ class Vista(QWidget):
                 self._minis.append(None)
             # Las minimizadas a veces solo dan su barra de título: mejor sin imagen.
             tamanos.append((tam.cx, tam.cy) if tam.cy > 60 else (0, 0))
-        self._tarjetas, rects, ancho, alto = disponer(tamanos, pantalla.width() - 24)
-        x = round(min(max(centro_x - ancho / 2, pantalla.left() + 6), pantalla.right() - ancho - 6))
-        self.setGeometry(QRect(x, round(max(pantalla.top() + 6, abajo - alto - 8)), ancho, alto))
+        self._tarjetas, rects, ancho, alto = disponer(tamanos, max_ancho)
+        self.setGeometry(QRect(*poner(ancho, alto), ancho, alto))
         self.show()
         r = self.devicePixelRatioF()
         for mini, q in zip(self._minis, rects):

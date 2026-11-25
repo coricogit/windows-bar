@@ -238,11 +238,12 @@ def alto_reservado(barra, pantalla):
     return alto if fija and 20 <= alto <= 120 else None
 
 
-def ajustar_area(alto=None):
-    """Deja `alto` píxeles libres abajo en cada pantalla; sin `alto`, los de la
-    barra de Windows. No se guarda: se pierde al cerrar sesión. No se avisa al
-    sistema (SENDCHANGE) porque Explorer desharía el cambio; a cambio hay que
-    recolocar aquí las ventanas maximizadas."""
+def ajustar_area(margenes=None):
+    """Deja libres esos píxeles en los bordes de cada pantalla (izquierda,
+    arriba, derecha, abajo); sin `margenes`, lo que ocupa la barra de Windows.
+    No se guarda: se pierde al cerrar sesión. No se avisa al sistema
+    (SENDCHANGE) porque Explorer desharía el cambio; a cambio hay que recolocar
+    aquí las ventanas maximizadas."""
     cambio = False
     for h in taskbars():
         info, r = _info(h), w.RECT()
@@ -251,32 +252,42 @@ def ajustar_area(alto=None):
         suyo = alto_reservado((r.left, r.top, r.right, r.bottom), (m.left, m.top, m.right, m.bottom))
         if suyo is None:
             continue
-        abajo = m.bottom - (suyo if alto is None else alto)
-        if t.bottom != abajo:
-            nueva = w.RECT(t.left, t.top, t.right, abajo)
-            user32.SystemParametersInfoW(0x2F, 0, ctypes.byref(nueva), 0)   # SPI_SETWORKAREA
+        izq, arr, der, aba = margenes or (0, 0, 0, suyo)
+        nueva = (m.left + izq, m.top + arr, m.right - der, m.bottom - aba)
+        if (t.left, t.top, t.right, t.bottom) != nueva:
+            user32.SystemParametersInfoW(0x2F, 0, ctypes.byref(w.RECT(*nueva)), 0)   # SPI_SETWORKAREA
             cambio = True
     if cambio:
         recolocar_maximizadas()
 
 
-def borde_maximizada(ventana, area):
-    """Dónde debe acabar una ventana maximizada, o None si ya está bien o no
-    sigue las reglas. Sobresale por abajo lo mismo que por arriba."""
-    sobra = area[1] - ventana[1]
-    abajo = area[3] + sobra
-    return abajo if 0 <= sobra <= 16 and ventana[3] != abajo else None
+def sitio_maximizada(ventana, area, pantalla):
+    """Dónde debe quedar una ventana maximizada, o None si ya está bien o no
+    sigue las reglas. Sobresale lo mismo por los cuatro lados; cuánto, se ve en
+    los dos bordes opuestos que llegan hasta la pantalla."""
+    sobra = None
+    for i in (0, 1):
+        s = pantalla[i] - ventana[i]
+        if 0 <= s <= 16 and ventana[i + 2] - pantalla[i + 2] == s:
+            sobra = s
+            break
+    if sobra is None:
+        return None
+    nueva = (area[0] - sobra, area[1] - sobra, area[2] + sobra, area[3] + sobra)
+    return nueva if nueva != tuple(ventana) else None
 
 
 def recolocar_maximizadas():
     def each(hwnd, _):
         if user32.IsZoomed(hwnd) and in_taskbar(hwnd) and not is_fullscreen(hwnd):
-            r, a = w.RECT(), _info(hwnd).rcWork
+            r, i = w.RECT(), _info(hwnd)
             user32.GetWindowRect(hwnd, ctypes.byref(r))
-            abajo = borde_maximizada((r.left, r.top, r.right, r.bottom), (a.left, a.top, a.right, a.bottom))
-            if abajo is not None:
+            a, m = i.rcWork, i.rcMonitor
+            n = sitio_maximizada((r.left, r.top, r.right, r.bottom), (a.left, a.top, a.right, a.bottom),
+                                 (m.left, m.top, m.right, m.bottom))
+            if n is not None:
                 # NOZORDER | NOACTIVATE | ASYNCWINDOWPOS
-                user32.SetWindowPos(hwnd, None, r.left, r.top, r.right - r.left, abajo - r.top, 0x4014)
+                user32.SetWindowPos(hwnd, None, n[0], n[1], n[2] - n[0], n[3] - n[1], 0x4014)
         return True
     user32.EnumWindows(ENUMPROC(each), 0)
 
