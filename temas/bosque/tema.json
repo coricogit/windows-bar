@@ -8,7 +8,6 @@
   "fuente": "Georgia",
   "tamano": 14,
   "indicador": "punto",
-  "inicio": "❀",
   "fondo": "Fondo.qml",
   "colores": {
     "fondo": "#F51C2416",
@@ -20,5 +19,17 @@
     "acento2": "#E0A458",
     "alerta": "#EF8354",
     "encima": "#2B9CCC65"
+  },
+  "logo": {
+    "colores": [
+      "#9CCC65",
+      "#7CB342",
+      "#8BC34A",
+      "#E0A458"
+    ],
+    "fuera": 0,
+    "dentro": 0,
+    "lados": 1.5,
+    "hueco": 1
   }
 }

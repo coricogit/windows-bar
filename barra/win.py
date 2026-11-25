@@ -138,6 +138,25 @@ def app_exe(hwnd):
     return exe_of(pid)
 
 
+def clave_exe(exe):
+    """Identifica un programa. Las apps de la Tienda cambian de carpeta al
+    actualizarse: de ellas solo cuenta el nombre."""
+    exe = exe.lower()
+    return "tienda:" + os.path.basename(exe) if "\\windowsapps\\" in exe else exe
+
+
+def de_la_tienda(hwnd, exe):
+    return class_name(hwnd) == "ApplicationFrameWindow" or "\\windowsapps\\" in exe.lower()
+
+
+def maximize(hwnd):
+    user32.ShowWindowAsync(hwnd, 3)
+
+
+def restore(hwnd):
+    user32.ShowWindowAsync(hwnd, 9)
+
+
 def windows():
     """Las ventanas de la barra, de la más reciente a la más antigua."""
     out, own = [], os.getpid()

@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import bandeja, claudito, temas, win  # noqa: E402
+from barra import ajustes, bandeja, claudito, temas, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -72,6 +72,56 @@ class Temas(unittest.TestCase):
         self.assertTrue(r > g and r > b)
         self.assertEqual(temas.paleta([]), {})
         self.assertIn("acento", temas.paleta([(90, 90, 90)] * 10))
+
+
+class Ajustes(unittest.TestCase):
+    T = {"tokyo": 1, "bosque": 1, "liquid": 1}
+    F = temas.FORMATOS
+
+    def test_pasa_el_formato_antiguo(self):
+        a = ajustes.normalizar({"tema": "liquid", "formato": "compacta"}, self.T, self.F)
+        self.assertEqual(a["formatos"], {"liquid": "compacta"})
+        self.assertNotIn("formato", a)
+        a = ajustes.normalizar({"tema": "liquid", "formato": "tema"}, self.T, self.F)
+        self.assertEqual(a["formatos"], {})
+
+    def test_aguanta_basura(self):
+        for d in (None, [], "x", {"tema": 3, "formatos": [], "fijados": ["x", {}], "quitados": [1]},
+                  {"tema": "neon", "formatos": {"neon": "islas", "tokyo": "raro"}}):
+            a = ajustes.normalizar(d, self.T, self.F)
+            self.assertEqual((a["tema"], a["formatos"], a["fijados"], a["quitados"]), ("tokyo", {}, [], []))
+
+    def test_no_comparte_los_valores_por_defecto(self):
+        ajustes.normalizar(None, self.T, self.F)["formatos"]["x"] = 1
+        self.assertEqual(ajustes.DEFECTO["formatos"], {})
+
+    def test_anclar_y_desanclar(self):
+        a = ajustes.normalizar(None, self.T, self.F)
+        w = [{"clave": "zen"}]
+        ajustes.fijar(a, {"clave": "steam", "exe": "s"}, ["zen"])
+        ajustes.fijar(a, {"clave": "steam", "exe": "s"}, ["zen"])
+        self.assertEqual([f["clave"] for f in ajustes.lista_fijos(a, w)], ["zen", "steam"])
+        ajustes.soltar(a, "zen", ["zen"])
+        ajustes.soltar(a, "steam", ["zen"])
+        self.assertEqual(ajustes.lista_fijos(a, w), [])
+        ajustes.fijar(a, {"clave": "zen", "exe": "z"}, ["zen"])
+        self.assertEqual([f["clave"] for f in ajustes.lista_fijos(a, w)], ["zen"])
+
+    def test_clave_de_la_tienda(self):
+        v = "C:\\Program Files\\WindowsApps\\Spotify_1.%d_x64\\Spotify.exe"
+        self.assertEqual(win.clave_exe(v % 1), win.clave_exe(v % 2))
+        self.assertEqual(win.clave_exe("C:\\A.EXE"), "c:\\a.exe")
+
+
+class Previa(unittest.TestCase):
+    def test_encajar(self):
+        self.assertEqual(vista.encajar(1920, 1080), (240, 135))
+        self.assertEqual(vista.encajar(600, 1200), (75, 150))
+        self.assertEqual(vista.encajar(100, 80), (100, 80))
+        self.assertEqual(vista.encajar(0, 0), (0, 0))
+
+    def test_estructura_de_dwm(self):
+        self.assertEqual(vista.ctypes.sizeof(vista.PROPS), 45)
 
 
 class Ropa(unittest.TestCase):

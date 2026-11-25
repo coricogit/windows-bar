@@ -11,7 +11,6 @@
   "fuente": "JetBrainsMono Nerd Font",
   "tamano": 13,
   "indicador": "linea",
-  "inicio": "",
   "fecha": "ddd d MMM",
   "colores": {
     "isla": "#F21E1E2E",
@@ -34,5 +33,17 @@
         "tareas"
       ]
     ]
+  },
+  "logo": {
+    "colores": [
+      "#CBA6F7",
+      "#F5C2E7",
+      "#89DCEB",
+      "#FAB387"
+    ],
+    "fuera": 1,
+    "dentro": 0.35,
+    "lados": 0.35,
+    "hueco": 2
   }
 }

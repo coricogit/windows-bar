@@ -74,12 +74,20 @@ Item {
     }
   }
 
-  Aviso { texto: tarea.titulo; fuente: raton }
+  Aviso { texto: tarea.abierta ? "" : tarea.titulo; fuente: raton }   // abierta: vista previa
   MouseArea {
     id: raton
     anchors.fill: parent
     hoverEnabled: true
-    acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-    onClicked: function(e) { barra.pulsar_tarea(tarea.clave, e.button === Qt.MiddleButton) }
+    acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+    onContainsMouseChanged: {
+      if (!containsMouse) { barra.soltar(tarea.clave); return }
+      var p = tarea.mapToGlobal(tarea.width / 2, 0)
+      barra.apuntar(tarea.clave, p.x, p.y)
+    }
+    onClicked: function(e) {
+      if (e.button === Qt.RightButton) barra.menu_tarea(tarea.clave)
+      else barra.pulsar_tarea(tarea.clave, e.button === Qt.MiddleButton)
+    }
   }
 }

@@ -74,6 +74,9 @@ Rectangle {
     }
   }
 
+  // Clic derecho donde no hay botón: menú de temas.
+  MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: barra.menu() }
+
   Row {
     id: fila
     anchors.centerIn: parent

@@ -11,7 +11,6 @@
   "fuente": "Segoe UI",
   "tamano": 13,
   "indicador": "linea",
-  "inicio": "●",
   "fecha": "",
   "colores": {
     "isla": "#01000000",
@@ -53,5 +52,14 @@
         "temas"
       ]
     ]
+  },
+  "logo": {
+    "colores": [
+      "texto"
+    ],
+    "fuera": 0,
+    "dentro": 0,
+    "lados": 0,
+    "hueco": 2
   }
 }

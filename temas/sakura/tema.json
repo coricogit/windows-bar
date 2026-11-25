@@ -10,7 +10,6 @@
   "fuente": "Yu Gothic UI",
   "tamano": 14,
   "indicador": "punto",
-  "inicio": "❀",
   "fecha": "ddd d MMM",
   "fondo": "Fondo.qml",
   "colores": {
@@ -24,5 +23,17 @@
     "alerta": "#B3261E",
     "encima": "#33C2385F",
     "fondoBandeja": "#E65B3246"
+  },
+  "logo": {
+    "colores": [
+      "#E06C92",
+      "#D6517D",
+      "#F08FAE",
+      "#C2385F"
+    ],
+    "fuera": 0.25,
+    "dentro": 1,
+    "lados": 1,
+    "hueco": 1
   }
 }

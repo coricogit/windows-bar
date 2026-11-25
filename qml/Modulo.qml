@@ -15,12 +15,13 @@ Loader {
   Component {
     id: inicio
     Boton {
+      id: botonInicio
       alto: mod.alto
-      texto: mod.tema.inicio
-      tam: mod.tema.tamano + 6
-      colorTexto: mod.c.acento
-      ayuda: "Inicio"
+      ancho: mod.tema.compacto ? 30 : 38
+      ayuda: "Inicio · Rueda: cambiar de tema (" + mod.tema.nombre + ")"
       onPulsado: function(b) { barra.accion(b === Qt.RightButton ? "menu_inicio" : "inicio") }
+      onRueda: function(p) { barra.girar_tema(-p) }
+      Logo { anchors.centerIn: parent; tema: mod.tema; encima: botonInicio.encima }
     }
   }
 
@@ -188,7 +189,10 @@ Loader {
       alto: mod.alto
       texto: (barra.datos.silencio ? "✕" : "♪") + " " + barra.datos.volumen + "%"
       ayuda: "Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio"
-      onPulsado: function(b) { barra.accion(b === Qt.MiddleButton ? "silencio" : "rapidos") }
+      onPulsado: function(b) {
+        if (b === Qt.RightButton) barra.menu()
+        else barra.accion(b === Qt.MiddleButton ? "silencio" : "rapidos")
+      }
       onRueda: function(p) { barra.accion(p > 0 ? "mas" : "menos") }
     }
   }
@@ -201,7 +205,7 @@ Loader {
       property date ahora: new Date()
       texto: Qt.formatTime(ahora, mod.tema.reloj) + (mod.tema.fecha ? "  " + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha) : "")
       ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat)
-      onPulsado: barra.accion("avisos")
+      onPulsado: function(b) { if (b === Qt.RightButton) barra.menu(); else barra.accion("avisos") }
       Timer { interval: 1000; running: true; repeat: true; onTriggered: hora.ahora = new Date() }
     }
   }

@@ -9,9 +9,11 @@ RAIZ = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 BASE = {
     "nombre": "", "orden": 99, "forma": "completa", "alto": 48, "margen": 0, "radio": 0, "relleno": 6,
     "separacion": 8, "fuente": "Segoe UI", "tamano": 13, "negrita": False, "borde": 0, "indicador": "linea",
-    "inicio": "⊞", "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
+    "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "vidrio": False,
     "compacto": False,
+    "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
+             "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
                 "texto": "#FFFFFF", "tenue": "#A0A0A0", "acento": "#4CC2FF", "acento2": "#4CC2FF",
                 "alerta": "#FF6B6B", "encima": "#22FFFFFF", "fondoBandeja": "transparent"},
@@ -33,6 +35,7 @@ def cargar(raiz=RAIZ):
             t = {**BASE, **d, "id": nombre}
             t["colores"] = {**BASE["colores"], **d.get("colores", {})}
             t["modulos"] = {**BASE["modulos"], **d.get("modulos", {})}
+            t["logo"] = {**BASE["logo"], **d.get("logo", {})}
         except (OSError, ValueError, TypeError, AttributeError) as e:
             print(f"tema {nombre}: {e}")
             continue

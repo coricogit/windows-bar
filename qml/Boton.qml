@@ -9,6 +9,7 @@ Item {
   property string fuente: barra.tema.fuente
   property string ayuda: ""
   property real ancho: et.implicitWidth + (barra.tema.compacto ? 12 : 16)
+  readonly property alias encima: raton.containsMouse
   signal pulsado(int b)
   signal rueda(int paso)
   width: ancho

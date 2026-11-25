@@ -11,7 +11,6 @@
   "fuente": "Segoe UI Variable Text",
   "tamano": 13,
   "indicador": "gota",
-  "inicio": "❖",
   "vidrio": true,
   "colores": {
     "isla": "#73202A38",
@@ -34,5 +33,16 @@
         "tareas"
       ]
     ]
+  },
+  "logo": {
+    "colores": [
+      "#FFFFFF"
+    ],
+    "fuera": 0.8,
+    "dentro": 0.3,
+    "lados": 0.3,
+    "hueco": 2,
+    "opacidad": 0.45,
+    "filo": "#E6FFFFFF"
   }
 }

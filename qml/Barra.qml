@@ -38,6 +38,7 @@ Item {
     anchors.fill: parent
     acceptedButtons: Qt.RightButton
     onClicked: barra.menu()
+    onWheel: function(e) { barra.girar_tema(e.angleDelta.y > 0 ? -1 : 1) }
   }
 
   // ---------- Módulos ----------
@@ -48,6 +49,7 @@ Item {
       for (var j = 0; j < grupos[i].length; j++) {
         var m = grupos[i][j]
         if (m === "claudito" && (!barra.personaje || t.paseo)) continue
+        if (m === "temas" && !barra.pincel) continue
         if (estrecha && (m === "sistema" || m === "musica" || m === "titulo")) continue
         if (!esPrimaria && m === "bandeja") continue
         g.push(m)

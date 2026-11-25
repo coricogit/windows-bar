@@ -9,7 +9,6 @@
   "fuente": "Consolas",
   "tamano": 15,
   "indicador": "corchetes",
-  "inicio": ">_",
   "reloj": "HH:mm:ss",
   "fecha": "yyyy-MM-dd",
   "corchetes": true,
@@ -34,5 +33,15 @@
         "tareas"
       ]
     ]
+  },
+  "logo": {
+    "colores": [
+      "texto"
+    ],
+    "fuera": 0,
+    "dentro": 0,
+    "lados": 0,
+    "hueco": 3,
+    "contorno": true
   }
 }

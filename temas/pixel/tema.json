@@ -9,7 +9,6 @@
   "tamano": 15,
   "negrita": true,
   "indicador": "linea",
-  "inicio": "▶",
   "pixelado": true,
   "paseo": true,
   "fondo": "Fondo.qml",
@@ -24,5 +23,18 @@
     "acento2": "#63E6BE",
     "alerta": "#FF6B6B",
     "encima": "#40FFFFFF"
+  },
+  "logo": {
+    "colores": [
+      "#FF6B6B",
+      "#63E6BE",
+      "#74C0FC",
+      "#FFD23F"
+    ],
+    "fuera": 0,
+    "dentro": 0,
+    "lados": 0,
+    "hueco": 2,
+    "bisel": true
   }
 }
