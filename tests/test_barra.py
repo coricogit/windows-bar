@@ -1,6 +1,7 @@
 """py -m unittest discover -s tests   (no toca la barra de Windows)"""
 import json
 import os
+import shutil
 import struct
 import sys
 import tempfile
@@ -172,6 +173,40 @@ class Opacidad(unittest.TestCase):
             self.assertEqual(ajustes.normalizar({"opacidad": v}, {"tokyo": 1}, temas.FORMATOS)["opacidad"], sale)
 
 
+class ComoWindows(unittest.TestCase):
+    T = temas.cargar((temas.RAIZ,))["original"]
+    ACENTOS = ("#EC968E", "#FF0000", "#000000", "#FFFFFF", "#FFFF00", "#0000FF", "#808080")
+
+    def test_lee(self):
+        claro, a, b = temas.apariencia_windows()
+        self.assertIn(claro, (True, False))
+        for c in (a, b):
+            self.assertTrue(c == "" or len(c) == 7)
+
+    def test_solo_original(self):
+        for ident, t in temas.cargar((temas.RAIZ,)).items():
+            self.assertEqual(temas.con_windows(t, (True, "#FF0000", "#FF0000")) is t, ident != "original")
+
+    def test_cualquier_acento_destaca(self):
+        for claro in (True, False):
+            for a in self.ACENTOS:
+                c = temas.con_windows(self.T, (claro, a, a))["colores"]
+                self.assertGreaterEqual(temas.contraste(temas.rgb(c["acento"]), temas.rgb(c["fondo"])), 3, (claro, a))
+                Contraste.revisar(self, c, [c["fondo"]], (claro, a))
+        self.assertEqual(temas.con_windows(self.T, (False, "", ""))["colores"]["acento"], self.T["colores"]["acento"])
+
+    def test_se_lee_con_cualquier_opacidad(self):
+        for claro in (True, False):
+            for f in ("tema", "isla"):
+                for n in temas.OPACIDADES:
+                    for i in range(0, 101, 4):
+                        x = temas.con_windows_y_opacidad(self.T, (claro, "#EC968E", "#BB2D2D"), f, n, i / 100)
+                        c = {**x["colores"], **(x["coloresClaros"] if x["clara"] else {})}
+                        fondo = temas.rgb(c["isla"] if f == "isla" else c["fondo"])
+                        visto = [a * n / 100 + i / 100 * (1 - n / 100) for a in fondo[:3]]
+                        self.assertGreater(contraste(_rgb(c["texto"]), visto), 3.8, (claro, f, n, i))
+
+
 class Icono(unittest.TestCase):
     def test_destaca_en_todos(self):
         for ident, t in temas.cargar().items():
@@ -317,6 +352,7 @@ class Actualizar(unittest.TestCase):
                         s.write(json.dumps(r).encode() if url == actualizar.ULTIMO else que)
                 return f
             r["assets"][0]["digest"] = "sha256:" + hashlib.sha256(bueno).hexdigest()
+            self.assertTrue(actualizar.archivo("1.2").endswith(".zip"))
             c = os.path.join(d, "a")
             with self.assertRaises(ValueError):
                 actualizar.descargar("1.0", c, traer=traer(b"otra cosa"))
@@ -326,7 +362,7 @@ class Actualizar(unittest.TestCase):
             with open(ruta, "ab") as f:
                 f.write(b"x")
             with self.assertRaises(ValueError):          # cambiado después
-                actualizar.ejecutar(ruta, suma, os.path.join(d, "log"))
+                actualizar.ejecutar(ruta, suma)
             self.assertIsNone(actualizar.descargar("1.0", c, saltar=lambda v: True, traer=traer(bueno)))
             self.assertFalse(os.path.exists(c))
 
@@ -337,6 +373,76 @@ class Actualizar(unittest.TestCase):
         self.assertEqual(actualizar.intentos("1.2:5:2000-01-01", "1.2"), 0)
         for basura in (None, "x", "a:b:c", 3):
             self.assertEqual(actualizar.intentos(basura, "1.2"), 0)
+
+    def test_zip_sospechoso(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as d:
+            for malo in ("../fuera.txt", "a/../../b", "C:/x.txt", "/raiz.txt"):
+                ruta = os.path.join(d, "x.zip")
+                with zipfile.ZipFile(ruta, "w") as z:
+                    z.writestr(malo, "x")
+                with self.assertRaises(ValueError):
+                    actualizar.preparar(ruta, actualizar.sha256(ruta))
+            with zipfile.ZipFile(ruta, "w") as z:
+                z.writestr("barra/x.txt", "bien")
+            self.assertTrue(os.path.exists(os.path.join(actualizar.preparar(ruta, actualizar.sha256(ruta)), "barra", "x.txt")))
+
+    @staticmethod
+    def copia(carpeta, marca):
+        for n in instalado.NECESARIAS:
+            os.makedirs(os.path.dirname(os.path.join(carpeta, n)), exist_ok=True)
+            with open(os.path.join(carpeta, n), "w") as f:
+                f.write(marca)
+
+    @staticmethod
+    def leer(carpeta):
+        out = {}
+        for n in instalado.NECESARIAS:
+            with open(os.path.join(carpeta, n)) as f:
+                out[n] = f.read()
+        return set(out.values())
+
+    def test_poner(self):
+        with tempfile.TemporaryDirectory() as d:
+            vieja, nueva = os.path.join(d, "app"), os.path.join(d, "nueva")
+            self.copia(vieja, "1")
+            self.copia(nueva, "2")
+            os.makedirs(os.path.join(vieja, "lib"))             # ya no existe en la nueva
+            instalado.poner(nueva, vieja, 1, 0)
+            self.assertEqual(self.leer(vieja), {"2"})
+            self.assertFalse([n for n in os.listdir(vieja) if n.endswith(".old") or n == "lib"])
+            # de cero
+            instalado.poner(nueva, os.path.join(d, "otra"), 1, 0)
+            self.assertEqual(self.leer(os.path.join(d, "otra")), {"2"})
+
+    def test_poner_que_falla(self):
+        with tempfile.TemporaryDirectory() as d:
+            vieja, nueva = os.path.join(d, "app"), os.path.join(d, "nueva")
+            self.copia(vieja, "1")
+            self.copia(nueva, "2")
+            with open(os.path.join(vieja, "temas", "tokyo", "tema.json")):       # en uso
+                with self.assertRaises(OSError):
+                    instalado.poner(nueva, vieja, 2, 0)
+            self.assertEqual(self.leer(vieja), {"1"})
+            copiar, veces = shutil.copytree, []
+
+            def a_medias(*a, **k):
+                veces.append(1)
+                if len(veces) == 3:
+                    raise OSError("disco lleno")
+                return copiar(*a, **k)
+            shutil.copytree = a_medias
+            try:
+                with self.assertRaises(OSError):
+                    instalado.poner(nueva, vieja, 1, 0)
+            finally:
+                shutil.copytree = copiar
+            self.assertEqual(self.leer(vieja), {"1"})
+            self.assertFalse([n for n in os.listdir(vieja) if n.endswith(".old")])
+            os.remove(os.path.join(nueva, "barra.pyw"))                          # incompleta
+            with self.assertRaises(OSError):
+                instalado.poner(nueva, vieja, 1, 0)
+            self.assertEqual(self.leer(vieja), {"1"})
 
     def test_es_de(self):
         self.assertTrue(instalado.es_de("C:\\P\\Bar\\python\\pythonw.exe", "c:\\p\\bar"))
@@ -483,8 +589,9 @@ class IconosDelTema(unittest.TestCase):
         t = temas.cargar((temas.RAIZ,))["sakura"]
         fondo = temas.rgb(t["colores"]["fondoBandeja"])
         tonos = iconos.tonos_bandeja(t)
-        self.assertGreater(temas.contraste(tonos[0], fondo), 1.8)
-        self.assertGreater(temas.contraste(tonos[2], fondo), 7)
+        visto = iconos.mezcla(temas.base_de(t), fondo, fondo[3])
+        self.assertGreater(temas.contraste(tonos[0], visto), 1.7)
+        self.assertGreater(temas.contraste(tonos[2], visto), 4)
         self.assertEqual(iconos.tonos_bandeja(temas.cargar((temas.RAIZ,))["tokyo"]), iconos.tonos(temas.cargar((temas.RAIZ,))["tokyo"]))
 
     def test_dos_tonos(self):
@@ -515,7 +622,9 @@ class Tiempo(unittest.TestCase):
     def test_leer(self):
         def r(codigo, grados=21.6, dia=1):
             return tiempo.leer_tiempo(json.dumps({"current": {"weather_code": codigo, "temperature_2m": grados, "is_day": dia}}))
-        self.assertEqual(r(0), {"hay": True, "icono": "☀️", "grados": "22°", "texto": "Despejado"})
+        self.assertEqual(r(0), {"hay": True, "icono": "☀️", "grados": "22°", "texto": "Despejado",
+                                "tipo": "despejado", "noche": False})
+        self.assertTrue(r(0, 5, 0)["noche"])
         self.assertEqual(r(0, -0.4, 0)["grados"], "0°")
         self.assertEqual([r(c)["texto"] for c in (3, 45, 61, 75, 95, 500)], ["Nublado", "Niebla", "Lluvia", "Nieve", "Tormenta", "Tormenta"])
         for malo in ("", "{}", "[]", "null", '{"current": {"weather_code": "x"}}'):

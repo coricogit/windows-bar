@@ -3,6 +3,8 @@ import QtQuick
 // Una rama en flor a la izquierda y pétalos que caen con el viento.
 Item {
   id: f
+  readonly property bool deNoche: barra.momento === "noche"
+  onDeNocheChanged: rama.requestPaint()
   // Dentro de una isla: sus esquinas, y qué trozo del paisaje le toca.
   property real radio: 0
   property real desde: 0
@@ -17,6 +19,7 @@ Item {
     x.closePath(); x.clip()
   }
   Canvas {
+    id: rama
     anchors.fill: parent
     renderStrategy: Canvas.Cooperative
     onWidthChanged: requestPaint()
@@ -33,7 +36,7 @@ Item {
       var fin = f.largo * (barra.tema.unica ? 0.22 : 0.34)
       for (var i = 0; i < 60; i++) {
         var a = i / 60, b = (i + 1) / 60
-        x.strokeStyle = "rgba(110,70,75,0.35)"
+        x.strokeStyle = f.deNoche ? "rgba(190,140,160,0.45)" : "rgba(110,70,75,0.35)"
         x.lineWidth = 3.2 * (1 - a) + 0.6
         x.beginPath()
         x.moveTo(a * fin, 2 + 4 * Math.sin(a * 9)); x.lineTo(b * fin, 2 + 4 * Math.sin(b * 9))
@@ -57,6 +60,31 @@ Item {
     id: marco
     anchors { fill: parent; leftMargin: f.radio * 0.55; rightMargin: f.radio * 0.55; topMargin: f.radio > 0 ? 1 : 0; bottomMargin: f.radio > 0 ? 1 : 0 }
     clip: f.dentro
+    // De noche: luna con halo y farolillos de papel que cuelgan de la rama.
+    Repeater {
+      model: f.deNoche ? [[34, "#0DFFE3EE"], [25, "#18FFE3EE"], [16, "#F2FBEFE0"]] : []
+      Rectangle {
+        width: modelData[0]; height: width; radius: width / 2
+        color: modelData[1]
+        x: f.largo * 0.64 - f.desde - marco.x - width / 2
+        y: 12 - height / 2
+      }
+    }
+    Repeater {
+      id: faroles
+      model: f.deNoche ? 3 : 0
+      Item {
+        property real fase: index * 1.3
+        x: f.largo * (barra.tema.unica ? 0.21 : 0.33) * (index + 0.62) / 3 - f.desde - marco.x
+        y: 4
+        width: 8; height: 18
+        transformOrigin: Item.Top
+        rotation: 5 * Math.sin(fase)
+        Rectangle { x: 3.5; width: 1; height: 6; color: "#99BE8CA0" }
+        Rectangle { x: -4; y: 2; width: 16; height: 16; radius: 8; color: "#1FFFC48A" }
+        Rectangle { y: 6; width: 8; height: 9; radius: 4; color: index % 2 ? "#FF9E80" : "#FFC48A"; border.width: 1; border.color: "#B3D0605E" }
+      }
+    }
     Repeater {
       id: rep
       model: Math.max(f.dentro ? 1 : 6, Math.round(f.width / 120))
@@ -78,7 +106,7 @@ Item {
     Timer {
       interval: barra.ritmo; repeat: true
       running: f.visible && barra.mover
-      onTriggered: { for (var i = 0; i < rep.count; i++) rep.itemAt(i).caer() }
+      onTriggered: { for (var i = 0; i < rep.count; i++) rep.itemAt(i).caer(); for (var j = 0; j < faroles.count; j++) faroles.itemAt(j).fase += 0.08 }
     }
   }
 }

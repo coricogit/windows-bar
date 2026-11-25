@@ -42,5 +42,18 @@
     "alerta": "#8E0B12",
     "encima": "#26000000",
     "fondoBandeja": "#8C1A212B"
+  },
+  "windows": true,
+  "claro": {
+    "fondo": "#FFF3F3F3",
+    "fondo2": "#FFF3F3F3",
+    "borde": "#FFD6D6D6",
+    "texto": "#1A1A1A",
+    "tenue": "#5A5A5A",
+    "acento": "#005FB8",
+    "acento2": "#005FB8",
+    "alerta": "#B3261E",
+    "encima": "#16000000",
+    "fondoBandeja": "#A63A3A3A"
   }
 }

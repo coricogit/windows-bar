@@ -5,12 +5,21 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 
 ## Instalar
 
-Descarga `Windows-Bar-Setup-<versión>.exe` de [Releases](https://github.com/coricogit/windows-bar/releases/latest) y
-ejecútalo. Necesita Windows 11 de 64 bits; no pide administrador y trae Python y Qt. No está firmado: si Windows avisa,
-*Más información > Ejecutar de todas formas*. Se desinstala desde *Configuración > Aplicaciones*.
+Necesita Windows 11 de 64 bits; no pide administrador y trae Python y Qt. Se desinstala desde *Configuración > Aplicaciones*.
 
-La copia instalada se actualiza sola: mira este repositorio cada pocas horas, comprueba la descarga y la instala cuando
-llevas un par de minutos sin tocar el equipo. Si falla, vuelve la versión anterior. Se quita en el menú (*Actualizar sola*).
+**Con Smart App Control activado**, o si lo prefieres, en PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/coricogit/windows-bar/main/instalar.ps1 | iex
+```
+
+**Con el instalador**: `Windows-Bar-Setup-<versión>.exe` de
+[Releases](https://github.com/coricogit/windows-bar/releases/latest). No está firmado: Smart App Control lo bloquea, y sin él
+Windows puede avisar (*Más información > Ejecutar de todas formas*).
+
+Las dos dejan lo mismo. Lo que se ejecuta después va firmado por sus autores (Python y Qt). La copia instalada se actualiza
+sola: mira este repositorio cada pocas horas, comprueba la descarga y la instala cuando llevas un par de minutos sin tocar el
+equipo. Si falla, vuelve la versión anterior. Se quita en el menú (*Actualizar sola*).
 
 Claudito sale si está [instalado](https://github.com/coricogit/claudito) o en `~/src/claudito`.
 
@@ -66,7 +75,7 @@ Las compactas agrandan el área de trabajo, y las ventanas maximizadas ganan ese
 
 ## Original y opacidad
 
-El tema Original imita la barra de Windows 11. En el menú, *Opacidad* va de opaca a transparente. Por debajo del 60 % el
+El tema Original imita la barra de Windows 11 y sigue su modo claro u oscuro y su color de acento. En el menú, *Opacidad* va de opaca a transparente. Por debajo del 60 % el
 texto lleva contorno, y si la imagen de fondo es clara tras la barra pasa a oscuro. Cualquier tema puede tener esa fila
 con `"translucida": true` (y `coloresClaros` para el texto oscuro).
 
@@ -97,9 +106,11 @@ para los programas y la bandeja; no cambia ningún archivo.
 
 ## Ambiente
 
-Píxel y Bosque cambian con la hora (noche, amanecer, día y atardecer, con horas aproximadas del hemisferio norte) y
+Píxel, Bosque y Sakura cambian con la hora (noche, amanecer, día y atardecer, con horas aproximadas del hemisferio norte) y
 Bosque, también con la estación. CPU, RAM y GPU tienen un dibujo propio en cada tema (`medidor` en `tema.json`:
-`texto`, `onda`, `flor`, `anillo`, `corazones`, `rama`, `linea` o `pildora`). Los colores por momento van en `momentos`.
+`texto`, `onda`, `flor`, `anillo`, `corazones`, `rama`, `linea` o `pildora`). Los colores por momento van en `momentos`. También son de cada
+tema la forma del visualizador (`cava`: `barras`, `neon`, `petalos`, `hojas` o `bloques`) y el dibujo del tiempo (`clima`:
+`emoji`, `neon`, `flor`, `hoja` o `pixel`). En Tokyo Night, las ventanas de la ciudad laten con el sonido.
 
 ## Menú y recursos
 
@@ -136,11 +147,9 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 - `barra/programas.py`: nombre real de los programas y agrupación.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.
-- `lib/`: paquetes `winrt-*` para la música. Se regenera con
-  `py -m pip install --target lib winrt-runtime winrt-Windows.Media.Control winrt-Windows.Foundation winrt-Windows.Foundation.Collections`
 
 Pruebas: `py -m unittest discover -s tests`
 
 ## Licencia
 
-[MIT](LICENSE). El instalador incluye Python, Qt/PySide6 y PyWinRT, con sus licencias en `licenses`.
+[MIT](LICENSE). El instalador incluye Python y Qt/PySide6, con sus licencias en `licenses`.

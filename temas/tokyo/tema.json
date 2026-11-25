@@ -50,5 +50,7 @@
     "hueco": 2
   },
   "medidor": "onda",
-  "fondo": "Fondo.qml"
+  "fondo": "Fondo.qml",
+  "cava": "neon",
+  "clima": "neon"
 }

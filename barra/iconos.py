@@ -38,9 +38,10 @@ def tonos_bandeja(t):
     """Los de la bandeja: claros si lleva su propio fondo oscuro."""
     c = {**t["colores"], **(t["coloresClaros"] if t["clara"] else {})}
     fondo, acento = temas.rgb(c["fondoBandeja"]), temas.rgb(c["acento"])
-    if fondo[3] < 0.3 or temas.luz(fondo) > 0.3:
+    visto = mezcla(temas.base_de(t), fondo, fondo[3])       # con lo que deja pasar
+    if fondo[3] < 0.3 or temas.luz(visto) > 0.3:
         return tonos(t)
-    return tuple(mezcla(acento, (1, 1, 1), x) for x in (0.35, 0.62, 0.94))
+    return tuple(mezcla(acento, (1, 1, 1), x) for x in (0.6, 0.8, 0.97))
 
 
 def _hex(c):

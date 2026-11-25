@@ -22,7 +22,7 @@
     "acento2": "#8A4FA3",
     "alerta": "#B3261E",
     "encima": "#33C2385F",
-    "fondoBandeja": "#E65B3246"
+    "fondoBandeja": "#B36B3A54"
   },
   "logo": {
     "colores": [
@@ -36,5 +36,35 @@
     "lados": 1,
     "hueco": 1
   },
-  "medidor": "flor"
+  "medidor": "flor",
+  "cava": "petalos",
+  "clima": "flor",
+  "momentos": {
+    "dia": {},
+    "amanecer": {
+      "fondo": "#FAFBDCCB",
+      "fondo2": "#FAFFF1E6",
+      "tenue": "#7F4F56",
+      "acento": "#B8394F"
+    },
+    "atardecer": {
+      "fondo": "#FAF1B9BE",
+      "fondo2": "#FAFAD9CC",
+      "tenue": "#74404F",
+      "acento": "#A3264A",
+      "acento2": "#74398F"
+    },
+    "noche": {
+      "fondo": "#FA241627",
+      "fondo2": "#FA3A2340",
+      "borde": "#FF5E3A5C",
+      "texto": "#FBE4EC",
+      "tenue": "#CFA9BC",
+      "acento": "#F48FB1",
+      "acento2": "#C79BE8",
+      "alerta": "#FF8A80",
+      "encima": "#33F48FB1",
+      "fondoBandeja": "#00000000"
+    }
+  }
 }

@@ -17,7 +17,7 @@ BASE = {
     "corchetes": False, "dinamico": False, "icono": 24, "estiloIconos": "", "estiloBandeja": "", "vidrio": False,
     "compacto": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
     "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "dentro": False,
-    "glifos": False, "translucida": False, "opacidad": 100, "aire": 0, "clara": False, "contorno": False,
+    "glifos": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False,
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
@@ -135,6 +135,50 @@ def con_opacidad(t, nivel, detras):
         col["tenue"] = "#%02X%02X%02X" % tuple(round((0.75 * i + 0.25 * j) * 255) for i, j in zip(x[:3], y[:3]))
     return {**t, "colores": col, "opacidad": nivel, "contorno": nivel < 60,
             "clara": base * a + detras * (1 - a) > 0.5}
+
+
+def apariencia_windows():
+    """(¿modo claro?, acento para fondo oscuro, acento para fondo claro), como los
+    usa la barra de Windows. Los acentos, o "" si no se pueden leer."""
+    claro = _valor(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme") == 1
+    p = _valor(r"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent", "AccentPalette")
+    if not isinstance(p, bytes) or len(p) < 32:
+        return claro, "", ""
+    return claro, "#%02X%02X%02X" % tuple(p[4:7]), "#%02X%02X%02X" % tuple(p[16:19])
+
+
+def _legible(c, fondo, minimo=3.2):
+    """El color, aclarado u oscurecido lo justo para destacar sobre `fondo`."""
+    v, hacia = rgb(c)[:3], (0, 0, 0) if luz(fondo) > 0.3 else (1, 1, 1)
+    for i in range(21):
+        x = tuple(a + (b - a) * i / 20 for a, b in zip(v, hacia))
+        if contraste(x, fondo) >= minimo:
+            break
+    return "#%02X%02X%02X" % tuple(round(a * 255) for a in x)
+
+
+def con_windows(t, apariencia):
+    """El tema con el modo y el acento elegidos en Windows."""
+    if not t["windows"]:
+        return t
+    claro, en_oscuro, en_claro = apariencia
+    col = {**t["colores"], **(t["claro"] if claro else {})}
+    acento = en_claro if claro else en_oscuro
+    if acento:
+        col["acento"] = col["acento2"] = _legible(acento, rgb(col["fondo"]))
+    otros = dict(t["coloresClaros"])
+    if en_claro and otros:
+        otros["acento"] = otros["acento2"] = en_claro
+    return {**t, "colores": col, "coloresClaros": otros}
+
+
+def con_windows_y_opacidad(t, apariencia, formato, nivel, detras):
+    """Modo de Windows, formato y opacidad. En modo claro y casi transparente
+    sobre un fondo oscuro, el texto negro no se leería: ahí va el modo oscuro."""
+    x = con_opacidad(con_formato(con_windows(t, apariencia), formato), nivel, detras)
+    if t["windows"] and apariencia[0] and x["opacidad"] < 100 and not x["clara"]:
+        x = con_opacidad(con_formato(con_windows(t, (False, *apariencia[1:])), formato), nivel, detras)
+    return x
 
 
 def con_posicion(t, lado):

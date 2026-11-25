@@ -285,7 +285,7 @@ class Barra(QObject):
         self._ventana_claude.connect(lambda h: win.activate(h))
         self._sitio_claude = None
         self._t_claude = QTimer(self, singleShot=True, interval=350, timeout=self._mostrar_claude)
-        self._centrado = temas.windows_centrado()
+        self._centrado, self._apariencia = temas.windows_centrado(), temas.apariencia_windows()
         self.fondo = vidrio.fondo = vidrio.Fondo()
         self.temaCambio.connect(self._zonas_vidrio)
         self.animarCambio.connect(self._zonas_vidrio)
@@ -390,10 +390,9 @@ class Barra(QObject):
         if t["dinamico"]:
             t = {**t, "colores": {**t["colores"], **self._camaleon}}
         t = temas.con_momento(t, self._momento)
-        t = temas.con_formato(t, self.ajustes["formatos"].get(self._elegido, "tema"))
-        if t["translucida"]:
-            t = temas.con_opacidad(t, self.ajustes["opacidad"],
-                                   temas.brillo_de_lado(self._pix_fondo, self.ajustes["posicion"]))
+        detras = temas.brillo_de_lado(self._pix_fondo, self.ajustes["posicion"]) if t["translucida"] else 0
+        t = temas.con_windows_y_opacidad(t, self._apariencia, self.ajustes["formatos"].get(self._elegido, "tema"),
+                                         self.ajustes["opacidad"], detras)
         t = temas.con_posicion(t, self.ajustes["posicion"])
         t = iconos.con_iconos(t, self.ajustes["iconos"])
         t = temas.con_icono(t, self._tono_fondo if self.ajustes["icono"] == "fondo" or t["vidrio"] or t["adapta"] else None)
@@ -624,9 +623,9 @@ class Barra(QObject):
             registrar("ventanas")
 
     def _actualizar_ventanas(self):
-        centrado = temas.windows_centrado()
-        if centrado != self._centrado:
-            self._centrado = centrado
+        visto = temas.windows_centrado(), temas.apariencia_windows()
+        if visto != (self._centrado, self._apariencia):
+            self._centrado, self._apariencia = visto
             self.temaCambio.emit()
         activa = win.user32.GetForegroundWindow()
         self._vueltas += 1
@@ -1221,7 +1220,7 @@ class Novedades(QObject):
         super().__init__(barra)
         self.barra, self.version = barra, version
         self.carpeta = os.path.join(DATOS, "actualizacion")
-        self.lista, self._hilo = None, None        # (versión, instalador, SHA-256)
+        self.lista, self._hilo = None, None        # (versión, archivo, SHA-256)
         self._lista.connect(self._poner)
         self._t_buscar = QTimer(self, interval=self.CADA, timeout=self.buscar)
         self._t_mirar = QTimer(self, interval=self.MIRAR, timeout=self._mirar)
@@ -1283,7 +1282,7 @@ class Novedades(QObject):
         self.barra.ajustes["intentos"] = actualizar.contar(self.barra.ajustes["intentos"], version)
         self.barra._guardar()
         try:
-            actualizar.ejecutar(ruta, suma, os.path.join(DATOS, "actualizacion.log"))
+            actualizar.ejecutar(ruta, suma)
         except Exception:
             registrar("actualización")
 
@@ -1507,8 +1506,9 @@ def preparar_vista(app, todo=False):
                                  "gpu": [10, 80, 72, 35, 41]}}
     barra._cancion = {"titulo": "Canción de ejemplo", "artista": "Artista", "sonando": True}
     barra._titulo = "Documento sin título - Bloc de notas"
-    barra._clima = {"hay": True, "icono": "🌤️", "grados": "22°", "texto": "Poco nuboso"}
+    barra._clima = {"hay": True, "icono": "🌤️", "grados": "22°", "texto": "Poco nuboso", "tipo": "parcial", "noche": False}
     barra.ajustes["widgets"] = barra.ajustes["cava"] = True
+    barra._apariencia = (False, "", "")          # igual en todos los equipos
     barra._barras = [35, 62, 88, 100, 81, 66, 74, 52, 60, 43, 38, 49, 30, 24, 17, 10]
     barra._leer_ropa()
     barra._claude = {"modo": "idle", "texto": "Construyendo…"}

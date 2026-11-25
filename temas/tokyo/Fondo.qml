@@ -66,12 +66,12 @@ Item {
         var px = -5
         while (px < width) {
           var an = 12 + Math.floor(azar() * 26), al = (capa ? 5 : 10) + azar() * (capa ? 15 : 24) * Math.min(1, height / 44) * (todo.dentro ? 0.8 : 1)
-          x.fillStyle = todo.dentro ? (capa ? "#FF10111A" : "#FF2A3152") : capa ? "#F216161E" : "#A6292E42"
+          x.fillStyle = todo.dentro ? (capa ? "#FF0E0F18" : "#FF343C66") : capa ? "#FA12131C" : "#D93A426E"
           x.fillRect(px, height - al, an, al)
           if (azar() > 0.82) x.fillRect(px + an / 2, height - al - 5, 1, 5)      // antena
           if (capa) for (var vy = height - al + 3; vy < height - 3; vy += 5)
             for (var vx = px + 3; vx < px + an - 3; vx += 5)
-              if (azar() > 0.55) luces.push([vx, vy])
+              if (azar() > 0.4) luces.push([vx, vy])
           px += an + (azar() > 0.7 ? 3 : 0)
         }
       }
@@ -83,14 +83,16 @@ Item {
     clip: todo.dentro
     Repeater {
       id: luz
-      model: Math.min(40, f.ventanas.length)
+      model: Math.min(Math.round(f.width / 16), f.ventanas.length)
       Rectangle {
         readonly property var sitio: f.ventanas[(index * 37) % f.ventanas.length] || [0, 0]
         x: sitio[0]; y: sitio[1]
         width: 2; height: 2
         color: f.tonos[index % 5]
-        property bool encendida: Math.random() > 0.4
-        opacity: encendida ? 0.85 : 0.08
+        property bool encendida: Math.random() > 0.3
+        // Una de cada tres late con su banda del sonido.
+        readonly property bool baila: index % 3 === 0 && barra.conCava && barra.cancion.sonando
+        opacity: baila ? 0.12 + 0.88 * barra.cava[(index / 3) % 16] / 100 : encendida ? 0.9 : 0.08
       }
     }
     Timer {

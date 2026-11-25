@@ -12,12 +12,13 @@ from . import actualizar
 BUSCAR = "https://geocoding-api.open-meteo.com/v1/search?"
 AHORA = "https://api.open-meteo.com/v1/forecast?"
 
-# Códigos WMO: (hasta, icono de día, icono de noche, texto)
-CODIGOS = ((0, "☀️", "🌙", "Despejado"), (2, "🌤️", "☁️", "Poco nuboso"), (3, "☁️", "☁️", "Nublado"),
-           (48, "🌫️", "🌫️", "Niebla"), (57, "🌦️", "🌧️", "Llovizna"), (67, "🌧️", "🌧️", "Lluvia"),
-           (77, "❄️", "❄️", "Nieve"), (82, "🌧️", "🌧️", "Chubascos"), (86, "🌨️", "🌨️", "Nieve"),
-           (99, "⛈️", "⛈️", "Tormenta"))
-NADA = {"hay": False, "icono": "⛅", "grados": "", "texto": ""}
+# Códigos WMO: (hasta, icono de día, icono de noche, texto, tipo de dibujo)
+CODIGOS = ((0, "☀️", "🌙", "Despejado", "despejado"), (2, "🌤️", "☁️", "Poco nuboso", "parcial"),
+           (3, "☁️", "☁️", "Nublado", "nublado"), (48, "🌫️", "🌫️", "Niebla", "niebla"),
+           (57, "🌦️", "🌧️", "Llovizna", "lluvia"), (67, "🌧️", "🌧️", "Lluvia", "lluvia"),
+           (77, "❄️", "❄️", "Nieve", "nieve"), (82, "🌧️", "🌧️", "Chubascos", "lluvia"),
+           (86, "🌨️", "🌨️", "Nieve", "nieve"), (99, "⛈️", "⛈️", "Tormenta", "tormenta"))
+NADA = {"hay": False, "icono": "⛅", "grados": "", "texto": "", "tipo": "parcial", "noche": False}
 
 
 def leer_ciudad(texto):
@@ -37,7 +38,8 @@ def leer_tiempo(texto):
     except (ValueError, KeyError, TypeError):
         return None
     f = next((f for f in CODIGOS if codigo <= f[0]), CODIGOS[-1])
-    return {"hay": True, "icono": f[1] if dia else f[2], "grados": f"{grados}°", "texto": f[3]}
+    return {"hay": True, "icono": f[1] if dia else f[2], "grados": f"{grados}°", "texto": f[3],
+            "tipo": f[4], "noche": not dia}
 
 
 def ciudad_valida(c):

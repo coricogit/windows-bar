@@ -84,5 +84,7 @@
       "fondo2": "#FF33265F",
       "tenue": "#E3C3DC"
     }
-  }
+  },
+  "cava": "bloques",
+  "clima": "pixel"
 }

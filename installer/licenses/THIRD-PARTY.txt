@@ -18,11 +18,3 @@ Qt 6.12.0, PySide6 6.12.0 and Shiboken6 6.12.0 (folder "python\Lib\site-packages
 Microsoft Visual C++ runtime (msvcp140*.dll, vcruntime140*.dll)
   Copyright (c) Microsoft Corporation. Redistributed as it comes with Python
   and PySide6.
-
-PyWinRT (winrt-runtime 4.2.1 and winrt-Windows.* 10.0.28000.2957, folder "lib")
-  MIT license: see the licenses folders inside lib\*.dist-info
-  https://github.com/pywinrt/pywinrt
-
-typing_extensions 4.16.0 (folder "lib")
-  PSF license: see lib\typing_extensions-4.16.0.dist-info
-  https://github.com/python/typing_extensions

@@ -37,10 +37,10 @@ def activo():
     return guardado() == orden() and not desactivada(_leer(APROBADAS, NOMBRE))
 
 
-def poner(si):
+def poner(si, que=""):
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN, 0, winreg.KEY_SET_VALUE) as k:
         if si:
-            winreg.SetValueEx(k, NOMBRE, 0, winreg.REG_SZ, orden())
+            winreg.SetValueEx(k, NOMBRE, 0, winreg.REG_SZ, que or orden())
         else:
             try:
                 winreg.DeleteValue(k, NOMBRE)

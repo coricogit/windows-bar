@@ -1,11 +1,12 @@
 """Mantiene al día la copia instalada con los releases de GitHub.
 
-Solo se actualiza la que dejó el instalador (lleva version.txt y su propio
-Python). Quien la usa desde el código sigue con `git pull`.
+Solo se actualiza la instalada (lleva version.txt y su propio Python). Quien la
+usa desde el código sigue con `git pull`.
 
-El instalador nuevo se descarga, se compara con el SHA-256 que publica GitHub y
-se ejecuta en silencio; si falla, installer/windows-bar.iss recupera la versión
-anterior. barra.pyw decide cuándo.
+El .zip nuevo se descarga, se compara con el SHA-256 que publica GitHub y se
+descomprime; su barra/instalado.py lo pone en su sitio y, si falla, recupera la
+versión anterior. Sin ningún .exe sin firmar, que Smart App Control bloquearía.
+barra.pyw decide cuándo.
 """
 import hashlib
 import json
@@ -15,6 +16,7 @@ import shutil
 import subprocess
 import time
 import urllib.request
+import zipfile
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ULTIMO = "https://api.github.com/repos/coricogit/windows-bar/releases/latest"
@@ -50,11 +52,11 @@ def numeros(version):
 
 
 def archivo(version):
-    return f"Windows-Bar-Setup-{version}.exe"
+    return f"Windows-Bar-{version}.zip"
 
 
 def mas_nueva(texto, actual):
-    """(versión, url, sha256) del instalador, según la respuesta de GitHub, o
+    """(versión, url, sha256) del .zip, según la respuesta de GitHub, o
     None si no hay nada más nuevo de fiar."""
     try:
         r = json.loads(texto)
@@ -103,7 +105,7 @@ def sha256(ruta):
 
 
 def descargar(actual, carpeta, saltar=lambda version: False, traer=traer):
-    """Trae el instalador de una versión más nueva: (versión, ruta, sha256), o
+    """Trae el .zip de una versión más nueva: (versión, ruta, sha256), o
     None si no la hay. SinRed, o ValueError si no llega lo anunciado."""
     os.makedirs(carpeta, exist_ok=True)
     respuesta = os.path.join(carpeta, "ultimo.json")
@@ -111,7 +113,7 @@ def descargar(actual, carpeta, saltar=lambda version: False, traer=traer):
     with open(respuesta, encoding="utf-8") as f:
         hay = mas_nueva(f.read(), actual)
     if not hay or saltar(hay[0]):
-        shutil.rmtree(carpeta, ignore_errors=True)      # el instalador de la última vez
+        shutil.rmtree(carpeta, ignore_errors=True)      # lo de la última vez
         return None
     version, url, suma = hay
     ruta = os.path.join(carpeta, archivo(version))
@@ -120,17 +122,31 @@ def descargar(actual, carpeta, saltar=lambda version: False, traer=traer):
         traer(url, parte)
         if sha256(parte) != suma:
             os.remove(parte)
-            raise ValueError(f"el instalador de {version} no tiene el SHA-256 anunciado")
+            raise ValueError(f"el archivo de {version} no tiene el SHA-256 anunciado")
         os.replace(parte, ruta)
     return version, ruta, suma
 
 
-def ejecutar(ruta, suma, registro, raiz=RAIZ):
-    """Lanza el instalador, que cierra esta barra y abre la nueva."""
+def preparar(ruta, suma):
+    """Descomprime la versión nueva y devuelve su carpeta."""
     if sha256(ruta) != suma:            # puede llevar horas ahí
-        raise ValueError("el instalador descargado ha cambiado")
-    return subprocess.Popen([ruta, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/UPDATE=1",
-                             f"/DIR={raiz}", f"/LOG={registro}"], cwd=os.path.dirname(ruta), close_fds=True,
+        raise ValueError("el archivo descargado ha cambiado")
+    nueva = os.path.join(os.path.dirname(ruta), "nueva")
+    shutil.rmtree(nueva, ignore_errors=True)
+    with zipfile.ZipFile(ruta) as z:
+        for n in z.namelist():
+            if os.path.isabs(n) or ".." in n.replace("\\", "/").split("/") or ":" in n:
+                raise ValueError(f"nombre sospechoso: {n}")
+        z.extractall(nueva)
+    return nueva
+
+
+def ejecutar(ruta, suma, raiz=RAIZ):
+    """Lanza la versión nueva, que cierra esta barra, se instala y se abre."""
+    nueva = preparar(ruta, suma)
+    # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP: no depende de esta barra
+    return subprocess.Popen([os.path.join(nueva, "python", "pythonw.exe"), os.path.join(nueva, "barra", "instalado.py"),
+                             "--actualizar", raiz], cwd=nueva, close_fds=True, creationflags=0x208,
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 

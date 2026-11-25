@@ -290,7 +290,8 @@ Loader {
     Item {
       id: wid
       readonly property bool conTexto: barra.tiempo.hay && !mod.v && !mod.tema.compacto
-      width: mod.v ? mod.alto : icono.implicitWidth + (barra.tiempo.hay ? datos.width + 5 : 0) + 14
+      readonly property real ancho: mod.tema.clima === "emoji" ? icono.implicitWidth : dibujo.width
+      width: mod.v ? mod.alto : ancho + (barra.tiempo.hay ? datos.width + 5 : 0) + 14
       height: mod.v ? 40 : mod.alto
       Rectangle {
         anchors { fill: parent; topMargin: mod.tema.compacto ? 2 : 4; bottomMargin: mod.tema.compacto ? 2 : 4 }
@@ -302,15 +303,25 @@ Loader {
         id: icono
         x: mod.v ? (parent.width - width) / 2 : 7
         y: mod.v ? 2 : (parent.height - height) / 2
+        visible: mod.tema.clima === "emoji"
         text: barra.tiempo.icono
         font.family: "Segoe UI Emoji"
         font.pixelSize: mod.tema.compacto ? 15 : 19
         color: mod.c.texto
       }
+      Clima {
+        id: dibujo
+        visible: mod.tema.clima !== "emoji"
+        tema: mod.tema
+        tipo: barra.tiempo.tipo
+        noche: barra.tiempo.noche
+        x: mod.v ? (parent.width - width) / 2 : 7
+        y: mod.v ? 1 : (parent.height - height) / 2
+      }
       Column {
         id: datos
         visible: barra.tiempo.hay
-        x: mod.v ? (parent.width - width) / 2 : icono.x + icono.width + 5
+        x: mod.v ? (parent.width - width) / 2 : 12 + wid.ancho
         y: mod.v ? parent.height - height - 1 : (parent.height - height) / 2
         width: Math.max(gr.implicitWidth, wid.conTexto ? Math.min(80, Math.ceil(dm.advanceWidth) + 2) : 0)
         spacing: -2
