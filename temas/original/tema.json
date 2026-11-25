@@ -1,0 +1,45 @@
+{
+  "nombre": "Original",
+  "orden": 2,
+  "forma": "completa",
+  "alto": 48,
+  "relleno": 6,
+  "separacion": 4,
+  "radioBoton": 5,
+  "indicador": "linea",
+  "translucida": true,
+  "relojDoble": true,
+  "glifos": true,
+  "fuente": "Segoe UI Variable Text",
+  "tamano": 12,
+  "fecha": "dd/MM/yyyy",
+  "medidor": "linea",
+  "fondo": "Fondo.qml",
+  "logo": {
+    "fuera": 0.12,
+    "dentro": 0.12,
+    "lados": 0.12,
+    "hueco": 1.5,
+    "colores": ["acento"]
+  },
+  "colores": {
+    "fondo": "#FF1C1C1C",
+    "fondo2": "#FF1C1C1C",
+    "borde": "#FF3A3A3A",
+    "texto": "#FFFFFF",
+    "tenue": "#A6A6A6",
+    "acento": "#4CC2FF",
+    "acento2": "#4CC2FF",
+    "alerta": "#FF99A4",
+    "encima": "#1FFFFFFF"
+  },
+  "coloresClaros": {
+    "texto": "#141414",
+    "tenue": "#2E2E2E",
+    "acento": "#003E73",
+    "acento2": "#003E73",
+    "alerta": "#8E0B12",
+    "encima": "#26000000",
+    "fondoBandeja": "#8C1A212B"
+  }
+}

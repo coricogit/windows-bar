@@ -225,6 +225,7 @@ class Barra(QObject):
     ropaCambio = Signal()
     momentoCambio = Signal()
     ritmoCambio = Signal()
+    bandejaCambio = Signal()
     _musica = Signal(object)
     _bandeja = Signal(object)
     _uso = Signal(object)
@@ -237,9 +238,11 @@ class Barra(QObject):
         self.temas = temas.cargar()
         self.ajustes = cfg.normalizar(cfg.leer(RUTA_AJUSTES), self.temas, temas.FORMATOS)
         self.paneles = []
-        self.tray = Lista(["key", "icono", "tip"], self)
+        self.tray = Lista(["key", "icono", "tip", "oculto"], self)
         self._tray = {}
+        self._abierta, self._ocultos = False, 0      # la flecha de la bandeja
         self._camaleon, self._camaleon_imagen, self._tono_fondo = {}, None, None
+        self._pix_fondo = []
         self._inactivo, self.selector, self.motor, self._vueltas = False, None, None, 0
         self._elegido = None
         self._datos = {"cpu": 0, "ram": 0, "gpu": -1, "volumen": 0, "silencio": False}
@@ -337,7 +340,7 @@ class Barra(QObject):
 
     def _necesita_fondo(self):
         t = self.temas[self._elegido]
-        return t["dinamico"] or t["vidrio"] or t["adapta"] or self.ajustes["icono"] == "fondo"
+        return t["dinamico"] or t["vidrio"] or t["adapta"] or t["translucida"] or self.ajustes["icono"] == "fondo"
 
     def _actualizar_camaleon(self, avisar=True):
         if not self._necesita_fondo():
@@ -350,6 +353,7 @@ class Barra(QObject):
         self._camaleon_imagen = marca
         img = QImage(ruta).scaled(40, 40) if ruta else QImage()
         pix = [QColor(img.pixel(x, y)).getRgb()[:3] for x in range(img.width()) for y in range(img.height())]
+        self._pix_fondo = pix
         self._camaleon = temas.paleta(pix)
         self._tono_fondo = self._camaleon.pop("tono", None)
         if avisar:
@@ -361,6 +365,9 @@ class Barra(QObject):
             t = {**t, "colores": {**t["colores"], **self._camaleon}}
         t = temas.con_momento(t, self._momento)
         t = temas.con_formato(t, self.ajustes["formatos"].get(self._elegido, "tema"))
+        if t["translucida"]:
+            t = temas.con_opacidad(t, self.ajustes["opacidad"],
+                                   temas.brillo_de_lado(self._pix_fondo, self.ajustes["posicion"]))
         t = temas.con_posicion(t, self.ajustes["posicion"])
         t = temas.con_icono(t, self._tono_fondo if self.ajustes["icono"] == "fondo" or t["vidrio"] or t["adapta"] else None)
         al = self.ajustes["alineacion"]
@@ -379,6 +386,12 @@ class Barra(QObject):
         self.ajustes["vidrio"] = nivel
         self._guardar()
         self._zonas_vidrio()
+
+    def _set_opacidad(self, n):
+        self.ajustes["opacidad"] = n
+        self._guardar()
+        self._actualizar_camaleon(avisar=False)
+        self.temaCambio.emit()
 
     def _set_alineacion(self, a):
         self.ajustes["alineacion"] = a
@@ -826,9 +839,67 @@ class Barra(QObject):
             nombre = "tray-" + m["key"]
             self.almacen.poner_pixeles(nombre, m.pop("pixels"))
             self._tray[m["key"]] = {**m, "icono": self.almacen.url(nombre)}
-        self.tray.poner([{"key": k, "icono": v["icono"],
-                          "tip": v["tip"] or programas.nombre(v["exe"])}
-                         for k, v in self._tray.items() if not v["hidden"] and v["icono"]])
+        self._poner_bandeja()
+
+    @staticmethod
+    def _clave_bandeja(v):
+        return programas.clave_bandeja(v["exe"], v["guid"], v["tip"])
+
+    def _en_bandeja(self):
+        """[(clave del icono, sus datos, si está oculto)], los ocultos primero."""
+        out = [(k, v, self._clave_bandeja(v) in self.ajustes["ocultos"])
+               for k, v in self._tray.items() if not v["hidden"] and v["icono"]]
+        return sorted(out, key=lambda x: not x[2])
+
+    def _poner_bandeja(self):
+        todos = self._en_bandeja()
+        n = sum(o for _, _, o in todos)
+        abierta = self._abierta and n > 0
+        self.tray.poner([{"key": k, "icono": v["icono"], "tip": v["tip"] or programas.nombre(v["exe"]), "oculto": o}
+                         for k, v, o in todos if abierta or not o])
+        if (n, abierta) != (self._ocultos, self._abierta):
+            self._ocultos, self._abierta = n, abierta
+        self.bandejaCambio.emit()
+
+    ocultos = Property(int, lambda self: self._ocultos, notify=bandejaCambio)
+    bandejaAbierta = Property(bool, lambda self: self._abierta, notify=bandejaCambio)
+
+    @Slot(bool)
+    def abrir_bandeja(self, si):
+        self._abierta = si
+        self._poner_bandeja()
+
+    @Slot(str)
+    def ocultar_icono(self, clave):
+        """Clic central en un icono de la bandeja: lo guarda tras la flecha o lo saca."""
+        if clave in self._tray:
+            c = self._clave_bandeja(self._tray[clave])
+            # Después del clic: el botón pulsado puede desaparecer de la lista.
+            QTimer.singleShot(0, lambda: self._ocultar([c], c not in self.ajustes["ocultos"]))
+
+    def _ocultar(self, claves, si):
+        resto = [c for c in self.ajustes["ocultos"] if c not in claves]
+        self.ajustes["ocultos"] = resto + list(dict.fromkeys(claves)) if si else resto
+        self._guardar()
+        self._poner_bandeja()
+
+    def _fila_bandeja(self):
+        """Los iconos de la bandeja para el menú: los marcados se ven."""
+        vistos, out = [], []
+        for _, v, oculto in self._en_bandeja():
+            c = self._clave_bandeja(v)
+            if c in vistos:
+                continue
+            vistos.append(c)
+            n = v["tip"].split("\n")[0] if c.split(":")[0] in programas.GENERICOS and v["tip"] else programas.nombre(v["exe"])
+            out.append({"texto": n if len(n) <= 24 else n[:23] + "…", "elegido": not oculto,
+                        "hacer": lambda c=c, o=oculto: self._ocultar([c], not o)})
+        out.sort(key=lambda x: x["texto"].lower())          # que no salten al pulsarlos
+        if out:
+            todos = all(not x["elegido"] for x in out)
+            out.append({"texto": "Mostrar todos" if todos else "Ocultar todos",
+                        "hacer": lambda: self._ocultar(vistos, not todos)})
+        return out
 
     @Slot(str, bool)
     def pulsar_bandeja(self, clave, derecho):
@@ -873,7 +944,10 @@ class Barra(QObject):
                   + [{"texto": "Usar en todos", "hacer": self._formato_para_todos}]),
                  ("Iconos", fila(temas.ALINEACIONES, a["alineacion"], self._set_alineacion)),
                  ("Icono de Windows", fila(temas.ICONO, a["icono"], self._set_icono)),
+                 *([("Bandeja (visibles)", self._fila_bandeja())] if self._tray else []),
                  ("Animaciones", fila(temas.ANIMACIONES, a["animaciones"], self._set_animaciones))]
+        if t["translucida"]:
+            filas.insert(0, ("Opacidad", fila(temas.OPACIDADES, a["opacidad"], self._set_opacidad)))
         if t["vidrio"]:
             filas.append(("Vidrio", fila(vidrio.NOMBRES, a["vidrio"], self._set_vidrio)))
         con_windows = arranque.activo()
@@ -1111,8 +1185,9 @@ def preparar_vista(app, todo=False):
     for e in panel.errores:
         print("QML:", e)
     casos = [(t, f, a, "dia", p) for p in ("arriba", "izquierda", "derecha") for t in barra.temas
-             for f in ("tema", "islas_compactas", "completa") for a in ("centro", "izquierda")] if todo else []
-    casos += [(t, f, a, m, "abajo") for t in barra.temas for f in ("tema", "islas_compactas") for a in ("izquierda", "centro")
+             for f in ("tema", "islas_compactas", "completa", "isla") for a in ("centro", "izquierda")] if todo else []
+    casos += [(t, f, a, m, "abajo") for t in barra.temas for f in ("tema", "islas_compactas", "isla", "isla_compacta")
+              for a in ("izquierda", "centro")
              for m in (cielo.MOMENTOS if barra.temas[t]["momentos"] and (f, a) == ("tema", "centro") else ("dia",))]
     return barra, panel, casos
 

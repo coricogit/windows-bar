@@ -5,7 +5,8 @@ import os
 
 DEFECTO = {"tema": "tokyo", "formatos": {}, "auto": False, "tema_dia": "bosque", "tema_noche": "tokyo",
            "dia": 8, "noche": 19, "por_programa": {}, "modo_juego": True, "pincel": False,
-           "fijados": [], "quitados": [], "alineacion": "windows", "vidrio": "normal", "animaciones": "suaves", "icono": "tema", "agrupar": True, "orden": [], "posicion": "abajo"}
+           "fijados": [], "quitados": [], "alineacion": "windows", "vidrio": "normal", "animaciones": "suaves", "icono": "tema", "agrupar": True,
+           "orden": [], "posicion": "abajo", "opacidad": 85, "ocultos": []}
 
 
 def normalizar(d, temas, formatos):
@@ -22,7 +23,9 @@ def normalizar(d, temas, formatos):
         a["formatos"].setdefault(a["tema"], viejo)
     a["formatos"] = {t: f for t, f in a["formatos"].items() if t in temas and f in formatos}
     a["fijados"] = [f for f in a["fijados"] if isinstance(f, dict) and f.get("clave") and f.get("exe")]
+    a["opacidad"] = max(0, min(100, int(a["opacidad"])))
     a["quitados"] = [q for q in a["quitados"] if isinstance(q, str)]
+    a["ocultos"] = list(dict.fromkeys(c for c in a["ocultos"] if isinstance(c, str)))[:MAX_ORDEN]
     a["orden"] = [c for c in a["orden"] if isinstance(c, str)]
     return a
 

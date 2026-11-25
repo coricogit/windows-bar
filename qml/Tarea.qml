@@ -32,7 +32,7 @@ Item {
 
   Rectangle {
     anchors { fill: parent; margins: tarea.tema.compacto ? 1 : 3 }
-    radius: Math.min(tema.radio, 10)
+    radius: Math.min(Math.max(tema.radio, tema.radioBoton), 10)
     color: tarea.activa && tarea.estilo === "relleno" ? tarea.c.acento
            : raton.containsMouse || (tarea.activa && tarea.estilo !== "corchetes" && tarea.estilo !== "gota") ? tarea.c.encima : "transparent"
     Behavior on color { ColorAnimation { duration: 140 } }

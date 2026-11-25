@@ -14,7 +14,8 @@ BASE = {
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "vidrio": False,
     "compacto": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
-    "medidor": "texto", "momentos": {}, "logoClaros": [],
+    "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": False,
+    "glifos": False, "translucida": False, "opacidad": 100, "aire": 0, "clara": False, "contorno": False,
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
@@ -50,7 +51,7 @@ def cargar(raiz=RAIZ):
 
 
 FORMATOS = {"tema": "El del tema", "completa": "Completa", "islas": "Islas", "compacta": "Compacta",
-            "islas_compactas": "Islas compactas"}
+            "islas_compactas": "Islas compactas", "isla": "Una isla", "isla_compacta": "Una isla compacta"}
 NORMAL = 48        # lo que reserva la barra de Windows
 
 
@@ -66,7 +67,13 @@ def con_formato(t, formato):
         return t
     t = {**t, "compacto": "compacta" in formato}
     col = dict(t["colores"])
-    if formato.startswith("islas"):
+    if formato in ("isla", "isla_compacta"):       # todo junto, en el centro
+        if t["forma"] != "islas" or rgb(col["isla"])[3] < 0.5:
+            col["isla"] = col["fondo"]
+        t.update(forma="islas", unica=True, fondoUrl="", paseo=False, vidrio=False, adapta=False,
+                 separacion=10 if t["compacto"] else 16, aire=4 if t["compacto"] else 6, relleno=8, borde=1, alto=42, margen=3)
+        t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 14)
+    elif formato.startswith("islas"):
         if t["forma"] != "islas":
             t.update(forma="islas", fondoUrl="", separacion=8, relleno=8, borde=1)
             t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 12)
@@ -83,6 +90,50 @@ def con_formato(t, formato):
     return t
 
 
+OPACIDADES = {100: "Opaca", 85: "85 %", 70: "70 %", 50: "50 %", 30: "30 %", 15: "15 %", 0: "Transparente"}
+
+
+def _con_alfa(c, alfa):
+    """El color con su alfa multiplicado. Nunca 0: Windows dejaría pasar los clics."""
+    r, g, b, a = rgb(c)
+    if a == 0:
+        return c
+    return "#%02X%02X%02X%02X" % tuple(round(x * 255) for x in (max(a * alfa, 1 / 255), r, g, b))
+
+
+def brillo(c):
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def brillo_de_lado(pixeles, lado, n=40):
+    """Lo clara que es, de 0 a 1, la parte del fondo que queda tras la barra.
+    `pixeles`: [(r, g, b)] de una imagen de n x n, por columnas."""
+    if len(pixeles) != n * n:
+        return 0.3
+    b = max(1, n // 10)
+    toca = {"abajo": lambda x, y: y >= n - b, "arriba": lambda x, y: y < b,
+            "izquierda": lambda x, y: x < b, "derecha": lambda x, y: x >= n - b}[lado]
+    v = [brillo([k / 255 for k in p]) for i, p in enumerate(pixeles) if toca(i // n, i % n)]
+    return sum(v) / len(v)
+
+
+def con_opacidad(t, nivel, detras):
+    """El tema con su fondo más o menos transparente. `detras`: lo claro que es
+    el fondo de escritorio ahí. El texto pasa a oscuro si hace falta."""
+    if not t["translucida"] or nivel >= 100:
+        return t
+    a = max(0, nivel) / 100
+    col = dict(t["colores"])
+    base = brillo(rgb(col["isla"] if t["forma"] == "islas" else col["fondo"]))
+    for k in ("fondo", "fondo2", "isla", "borde"):
+        col[k] = _con_alfa(col[k], a)
+    if nivel < 80:                  # el gris se perdería sobre una imagen
+        x, y = rgb(col["texto"]), rgb(col["tenue"])
+        col["tenue"] = "#%02X%02X%02X" % tuple(round((0.75 * i + 0.25 * j) * 255) for i, j in zip(x[:3], y[:3]))
+    return {**t, "colores": col, "opacidad": nivel, "contorno": nivel < 60,
+            "clara": base * a + detras * (1 - a) > 0.5}
+
+
 def con_posicion(t, lado):
     """El tema en ese lado de la pantalla. En vertical `alto` es el grosor, y no
     lleva paisaje: están dibujados a lo ancho."""
@@ -93,7 +144,7 @@ def con_posicion(t, lado):
     margen = (3 if t["compacto"] else 4) if islas else 0
     total = 46 if t["compacto"] else 60
     return {**t, "lado": lado, "vertical": True, "fondoUrl": "", "alto": total - 2 * margen, "margen": margen,
-            "relleno": 4 if islas else 8, "separacion": min(t["separacion"], 8)}
+            "relleno": 4 if islas else 8, "separacion": min(t["separacion"], 14 if t["unica"] else 8)}
 
 
 ALINEACIONES = {"windows": "Como en Windows", "izquierda": "Al principio", "centro": "En el centro"}
@@ -122,7 +173,10 @@ def con_alineacion(t, centro):
                  "derecha": [g for g in m["derecha"] if g not in lado]}
     else:
         nuevo = {"izquierda": apps, "centro": resto}
-    return {**t, "modulos": {**m, **nuevo}, "centrado": centro}
+    if t["unica"]:
+        todo = {**m, **nuevo}
+        nuevo = {"izquierda": [], "centro": todo["izquierda"] + todo["centro"] + todo["derecha"], "derecha": []}
+    return {**t, "modulos": {**m, **nuevo}, "centrado": centro or t["unica"]}
 
 
 ICONO = {"tema": "Color del tema", "fondo": "Color del fondo"}
@@ -188,8 +242,11 @@ def tonos_icono(tono, base):
 
 def con_icono(t, tono):
     """El tema con su icono de Windows teñido. `tono` manda si no es None."""
-    if t["vidrio"] or t["adapta"]:         # cambia según lo claro que sea el fondo
+    if t["vidrio"] or t["adapta"] or t["opacidad"] < 100:         # cambia según lo claro que sea el fondo
         oscura, clara = (0.12, 0.14, 0.18), (0.93, 0.93, 0.93)
+        if t["opacidad"] < 100:
+            tono = tono or predominante({**t, "colores": {**t["colores"], "fondo": "#FF000000", "fondo2": "#FF000000",
+                                                          "isla": "#FF000000"}})
     else:
         oscura = clara = base_de(t)
         tono = tono or predominante(t)

@@ -8,6 +8,7 @@ Item {
   property alias colorTexto: et.color
   property real tam: barra.tema.tamano
   property string fuente: barra.tema.fuente
+  property int alineado: Text.AlignHCenter
   property string ayuda: ""
   property real ancho: et.implicitWidth + (barra.tema.compacto ? 12 : 16)
   readonly property alias encima: raton.containsMouse
@@ -18,11 +19,11 @@ Item {
   height: v ? (et.text === "" ? ancho : et.implicitHeight + 12) : alto
   Rectangle {
     anchors { fill: parent; topMargin: barra.tema.compacto ? 2 : 4; bottomMargin: barra.tema.compacto ? 2 : 4 }
-    radius: Math.min(barra.tema.radio, 8)
+    radius: Math.min(Math.max(barra.tema.radio, barra.tema.radioBoton), 8)
     color: raton.containsMouse ? boton.colores.encima : "transparent"
     Behavior on color { ColorAnimation { duration: 120 } }
   }
-  Texto { id: et; anchors.centerIn: parent; horizontalAlignment: Text.AlignHCenter; color: boton.colores.texto; font.pixelSize: boton.tam; font.family: boton.fuente }
+  Texto { id: et; anchors.centerIn: parent; horizontalAlignment: boton.alineado; color: boton.colores.texto; font.pixelSize: boton.tam; font.family: boton.fuente }
   Aviso { texto: boton.ayuda; fuente: raton }
   MouseArea {
     id: raton

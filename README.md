@@ -1,6 +1,6 @@
 # Barra de temas
 
-Barra de tareas para Windows 11 con 7 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
+Barra de tareas para Windows 11 con 5 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
 sistema ni inyectar código: solo la oculta mientras está abierta.
 
 - **Abrir:** `Iniciar barra.bat`
@@ -15,6 +15,7 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 | Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: pasar de una a otra · Clic central: abrir otra · Clic derecho: menú · Arrastrar: cambiar de sitio |
 | Volumen | Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio |
 | Reloj | Clic: notificaciones y calendario |
+| Bandeja | Clic central en un icono: guardarlo tras la flecha o sacarlo (también en el menú) · Clic en la flecha: ver los ocultos |
 | Inicio | Clic: menú Inicio · Clic derecho: menú Win+X · Rueda: pasar de tema |
 
 Ajustes en `%LOCALAPPDATA%\barra-temas\ajustes.json`: tema por hora (`auto`, `tema_dia`, `tema_noche`, `dia`,
@@ -22,8 +23,15 @@ Ajustes en `%LOCALAPPDATA%\barra-temas\ajustes.json`: tema por hora (`auto`, `te
 
 ## Formatos
 
-En el menú, *Formato* cambia la forma de cada tema por separado: completa, islas, compacta (30 px) o islas compactas (36 px).
+En el menú, *Formato* cambia la forma de cada tema por separado: completa, islas, compacta (30 px), islas compactas (36 px),
+una isla (todo junto en el centro) o una isla compacta.
 Las compactas agrandan el área de trabajo, y las ventanas maximizadas ganan ese espacio; al cerrar vuelve a su sitio.
+
+## Original y opacidad
+
+El tema Original imita la barra de Windows 11. En el menú, *Opacidad* va de opaca a transparente. Por debajo del 60 % el
+texto lleva contorno, y si la imagen de fondo es clara tras la barra pasa a oscuro. Cualquier tema puede tener esa fila
+con `"translucida": true` (y `coloresClaros` para el texto oscuro).
 
 ## Claudito
 

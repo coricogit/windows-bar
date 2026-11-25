@@ -1,6 +1,7 @@
 """Qué programa hay detrás de una ventana y cómo se llama de verdad."""
 import ctypes
 import os
+import re
 from ctypes import wintypes as w
 
 from . import win
@@ -23,6 +24,19 @@ def principal(exe):
             return ruta
         carpeta = os.path.dirname(carpeta)
     return exe
+
+
+GENERICOS = ("", "explorer.exe", "python.exe", "pythonw.exe", "javaw.exe", "rundll32.exe")
+
+
+def clave_bandeja(exe, guid, tip):
+    """Identifica un icono de la bandeja entre sesiones. Vale el nombre del
+    archivo (la carpeta cambia al actualizarse), salvo en los que sirven a
+    varios programas: ahí, además, su GUID o el principio de su texto."""
+    base = os.path.basename(exe).lower()
+    if base not in GENERICOS:
+        return base
+    return base + ":" + (guid or re.split(r"[\n:·—|(-]|\d", tip, maxsplit=1)[0].strip().lower())
 
 
 def _datos(ruta):

@@ -36,7 +36,7 @@ Loader {
       height: mod.v ? Math.min(contentHeight, mod.limite) : mod.alto
       clip: true
       interactive: mod.v ? contentHeight > height : contentWidth > width
-      spacing: 2
+      spacing: 2 + mod.tema.aire / 2
       model: tareas
       // La gota: sus dos bordes van a distinta velocidad, así se estira al moverse.
       property Item activaItem: null
@@ -136,7 +136,7 @@ Loader {
     id: sistemaC
     Grid {
       columns: mod.v ? 1 : 3
-      spacing: mod.v ? 6 : mod.tema.compacto ? 7 : 9
+      spacing: mod.v ? 6 : (mod.tema.compacto ? 7 : 9) + mod.tema.aire
       leftPadding: mod.v ? 0 : 4
       rightPadding: mod.v ? 0 : 4
       topPadding: mod.v ? 4 : 0
@@ -169,7 +169,7 @@ Loader {
     id: bandejaC
     Grid {
       id: rejilla
-      readonly property real celda: mod.tema.compacto ? 24 : 28
+      readonly property real celda: (mod.tema.compacto ? 24 : 28) + (mod.v ? 0 : mod.tema.aire / 2)
       columns: mod.v ? Math.max(1, Math.floor(mod.alto / celda)) : 99
       Rectangle {      // en temas claros, para que se vean los iconos blancos
         z: -1
@@ -178,6 +178,37 @@ Loader {
         anchors { fill: parent; topMargin: mod.v ? -2 : 5; bottomMargin: mod.v ? -2 : 5; leftMargin: mod.v ? 1 : 0; rightMargin: mod.v ? 1 : 0 }
         radius: mod.v ? 12 : height / 2
         color: mod.c.fondoBandeja
+      }
+      // Se pliega sola al rato de quitar el ratón.
+      HoverHandler { id: sobre }
+      Timer { interval: 6000; running: barra.bandejaAbierta && !sobre.hovered; onTriggered: barra.abrir_bandeja(false) }
+      Item {           // la flecha de los iconos ocultos
+        visible: barra.ocultos > 0
+        width: rejilla.celda
+        height: mod.v ? width : mod.alto
+        Rectangle {
+          anchors.centerIn: parent
+          width: parent.width; height: width
+          radius: Math.min(Math.max(mod.tema.radio, mod.tema.radioBoton), 6)
+          color: zf.containsMouse ? mod.c.encima : "transparent"
+        }
+        Texto {
+          anchors.centerIn: parent
+          font.family: "Segoe Fluent Icons"
+          font.pixelSize: 11
+          font.bold: false
+          // Con fondo propio (temas claros), la flecha va encima de algo oscuro.
+          color: Qt.color(mod.c.fondoBandeja).a > 0.3 ? "#FFFFFF" : mod.c.texto
+          text: mod.v ? (barra.bandejaAbierta ? "\uE70E" : "\uE70D") : (barra.bandejaAbierta ? "\uE76C" : "\uE76B")
+        }
+        Aviso { texto: barra.bandejaAbierta ? "Plegar" : "Iconos ocultos: " + barra.ocultos; fuente: zf }
+        MouseArea {
+          id: zf
+          anchors.fill: parent
+          hoverEnabled: true
+          acceptedButtons: Qt.LeftButton | Qt.RightButton
+          onClicked: function(e) { if (e.button === Qt.RightButton) barra.menu(); else barra.abrir_bandeja(!barra.bandejaAbierta) }
+        }
       }
       Repeater {
         model: bandeja
@@ -195,17 +226,21 @@ Loader {
             width: 16; height: 16
             sourceSize: Qt.size(32, 32)
             source: model.icono
+            opacity: model.oculto ? 0.75 : 1
             smooth: !mod.tema.pixelado
             mipmap: !mod.tema.pixelado
             cache: false
           }
-          Aviso { texto: model.tip; fuente: zona }
+          Aviso { texto: model.tip + "\nClic central: " + (model.oculto ? "dejar a la vista" : "ocultar"); fuente: zona }
           MouseArea {
             id: zona
             anchors.fill: parent
             hoverEnabled: true
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onClicked: function(e) { barra.pulsar_bandeja(model.key, e.button === Qt.RightButton) }
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+            onClicked: function(e) {
+              if (e.button === Qt.MiddleButton) barra.ocultar_icono(model.key)
+              else barra.pulsar_bandeja(model.key, e.button === Qt.RightButton)
+            }
           }
         }
       }
@@ -217,8 +252,12 @@ Loader {
     Boton {
       alto: mod.alto
       colores: mod.c
-      texto: (barra.datos.silencio ? "✕" : "♪") + (mod.v ? "\n" : " ") + barra.datos.volumen + "%"
-      ayuda: "Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio"
+      readonly property bool mudo: barra.datos.silencio || barra.datos.volumen === 0
+      texto: mod.tema.glifos ? (mudo ? "\uE74F" : ["\uE993", "\uE994", "\uE995"][Math.min(2, Math.floor(barra.datos.volumen / 34))])
+             : (barra.datos.silencio ? "✕" : "♪") + (mod.v ? "\n" : " ") + barra.datos.volumen + "%"
+      fuente: mod.tema.glifos ? "Segoe Fluent Icons" : mod.tema.fuente
+      tam: mod.tema.glifos ? 16 : mod.tema.tamano
+      ayuda: (mod.tema.glifos ? "Volumen " + barra.datos.volumen + " % · " : "") + "Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio"
       onPulsado: function(b) {
         if (b === Qt.RightButton) barra.menu()
         else barra.accion(b === Qt.MiddleButton ? "silencio" : "rapidos")
@@ -234,9 +273,11 @@ Loader {
       colores: mod.c
       id: hora
       property date ahora: new Date()
+      readonly property bool doble: mod.tema.relojDoble && !mod.tema.compacto
+      alineado: doble && !mod.v ? Text.AlignRight : Text.AlignHCenter
       texto: Qt.formatTime(ahora, mod.v ? "HH:mm" : mod.tema.reloj) + (!mod.tema.fecha ? ""
              : mod.v ? "\n" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM")
-             : "  " + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha))
+             : (doble ? "\n" : "  ") + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha))
       tam: mod.v ? Math.min(mod.tema.tamano, 13) : mod.tema.tamano
       ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat)
       onPulsado: function(b) { if (b === Qt.RightButton) barra.menu(); else barra.accion("avisos") }

@@ -75,6 +75,21 @@ Item {
     return out
   }
 
+  // Formato "una isla": todo va en la zona del centro, sobre esta pieza.
+  Rectangle {
+    visible: root.t.unica
+    readonly property real aire: 10 + root.t.aire
+    x: root.v ? cuerpo.x : centro.x - aire
+    y: root.v ? centro.y - aire : cuerpo.y
+    width: root.v ? cuerpo.width : centro.width + 2 * aire
+    height: root.v ? centro.height + 2 * aire : cuerpo.height
+    radius: Math.min(root.t.radio, root.t.alto / 2)
+    color: root.c.isla
+    border.width: root.t.borde
+    border.color: root.c.borde
+    Behavior on color { ColorAnimation { duration: 350 } }
+  }
+
   Zona {
     id: izquierda
     tema: root.t
@@ -102,7 +117,7 @@ Item {
     readonly property real mio: root.v ? height : width
     readonly property real hueco: despues - antes - 24
     // Con las ventanas aquí, se encogen antes que desaparecer.
-    limite: root.t.centrado ? Math.max(120, Math.min(root.largo * 0.5, hueco - 90)) : root.largo * 0.4
+    limite: root.t.unica ? Math.max(80, root.largo - otros - 80) : root.t.centrado ? Math.max(120, Math.min(root.largo * 0.5, hueco - 90)) : root.largo * 0.4
     grupos: root.visibles(root.t.modulos.centro)
     // En el medio, salvo que tape a los lados.
     readonly property real sitio: Math.max(antes + 12, Math.min((root.largo - mio) / 2, despues - mio - 12))

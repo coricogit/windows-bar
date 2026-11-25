@@ -45,8 +45,7 @@ class Bandeja(unittest.TestCase):
 
 class Temas(unittest.TestCase):
     def test_los_que_hay(self):
-        self.assertEqual(list(temas.cargar()), ["tokyo", "grafito", "papel", "nordico", "sakura", "pixel",
-                                                "bosque"])
+        self.assertEqual(list(temas.cargar()), ["tokyo", "original", "sakura", "pixel", "bosque"])
 
     def test_caben_y_tienen_colores(self):
         for ident, t in temas.cargar().items():
@@ -63,7 +62,8 @@ class Temas(unittest.TestCase):
                 self.assertIs(temas.con_formato(t, "tema"), t)
                 if f != "tema":
                     self.assertEqual(n["compacto"], "compacta" in f)
-                    self.assertEqual(n["forma"] == "islas", f.startswith("islas"))
+                    self.assertEqual(n["forma"] == "islas", f.startswith("isla"))
+                    self.assertEqual(n["unica"], f in ("isla", "isla_compacta"))
         self.assertEqual(temas.alto_total(temas.con_formato(temas.cargar()["pixel"], "compacta")), 30)
 
     def test_paleta(self):
@@ -127,6 +127,47 @@ class Contraste(unittest.TestCase):
             fondo = i / 100 * (1 - v) + 0.07 * v
             self.assertGreater(contraste([0.08] * 3 if clara else [0.96] * 3, [fondo] * 3), 4.1, i)
         self.assertEqual(vidrio.velo_justo([0.2, 0.4], False), 0)
+
+
+class Opacidad(unittest.TestCase):
+    def test_solo_los_translucidos(self):
+        t = temas.cargar()["tokyo"]
+        self.assertIs(temas.con_opacidad(t, 30, 0.5), t)
+        t = temas.cargar()["original"]
+        self.assertIs(temas.con_opacidad(t, 100, 0.5), t)
+
+    def test_baja_sin_llegar_a_cero(self):
+        for f in temas.FORMATOS:
+            t = temas.con_formato(temas.cargar()["original"], f)
+            for k in ("fondo", "isla"):
+                v = [temas.rgb(temas.con_opacidad(t, n, 0.3)["colores"][k])[3] for n in sorted(temas.OPACIDADES)]
+                if v[-1]:
+                    self.assertEqual(v, sorted(v))
+                    self.assertGreater(v[0], 0)          # con 0, Windows dejaría pasar los clics
+
+    def test_se_lee_sobre_cualquier_fondo(self):
+        for f in ("tema", "isla"):
+            t = temas.con_formato(temas.cargar()["original"], f)
+            for n in temas.OPACIDADES:
+                for i in range(101):
+                    d = temas.con_opacidad(t, n, i / 100)
+                    c = {**d["colores"], **(d["coloresClaros"] if d["clara"] else {})}
+                    a = n / 100
+                    gris = [0x1C / 255 * a + i / 100 * (1 - a)] * 3
+                    self.assertGreater(contraste(_rgb(c["texto"]), gris), 3.8, (f, n, i))
+                    self.assertGreater(contraste(_rgb(c["tenue"]), gris), 3, (f, n, i))
+
+    def test_brillo_de_lado(self):
+        pix = [(255, 255, 255) if y >= 36 else (0, 0, 0) for x in range(40) for y in range(40)]
+        b = temas.brillo_de_lado
+        self.assertAlmostEqual(b(pix, "abajo"), 1)
+        self.assertAlmostEqual(b(pix, "arriba"), 0)
+        self.assertAlmostEqual(b(pix, "izquierda"), 0.1)
+        self.assertEqual(b([], "abajo"), 0.3)
+
+    def test_ajuste(self):
+        for v, sale in ((50, 50), (-3, 0), (900, 100), ("x", 85), (None, 85)):
+            self.assertEqual(ajustes.normalizar({"opacidad": v}, {"tokyo": 1}, temas.FORMATOS)["opacidad"], sale)
 
 
 class Icono(unittest.TestCase):
@@ -216,6 +257,20 @@ class Programas(unittest.TestCase):
         self.assertEqual([(x["key"], x["abierta"], x["cuenta"]) for x in f], [("g:zen", False, 0), ("g:disc", True, 1)])
         f = programas.agrupar([self.v(1, "disc"), self.v(2, "zen")], [fijo], True, {})
         self.assertEqual([x["key"] for x in f], ["g:zen", "g:disc"])       # misma clave: el botón no salta
+
+
+class IconosOcultos(unittest.TestCase):
+    def test_clave(self):
+        c = programas.clave_bandeja
+        self.assertEqual(c("C:\\x\\app-1.0\\SignalRgb.exe", "", "a"), c("C:\\x\\app-2.0\\SignalRgb.exe", "g", "b"))
+        self.assertEqual(c("C:\\p\\pythonw.exe", "", "Claudito: 3 sesiones"), c("C:\\p\\pythonw.exe", "", "Claudito - 5"))
+        self.assertNotEqual(c("C:\\p\\pythonw.exe", "", "Claudito"), c("C:\\p\\pythonw.exe", "", "Minipantalla"))
+        self.assertNotEqual(c("C:\\w\\explorer.exe", "g1", "x"), c("C:\\w\\explorer.exe", "g2", "x"))
+        self.assertEqual(c("", "", "Antivirus"), ":antivirus")
+
+    def test_ajuste(self):
+        n = ajustes.normalizar({"ocultos": ["a", 3, "a", "b"]}, {"tokyo": 1}, temas.FORMATOS)
+        self.assertEqual(n["ocultos"], ["a", "b"])
 
 
 class Sitio(unittest.TestCase):
@@ -327,6 +382,17 @@ class Alineacion(unittest.TestCase):
                 izq = [m for g in n["modulos"]["izquierda"] for m in g]
                 for m in ("claudito", "sistema"):
                     self.assertEqual(m in izq, centro and m in todos, (ident, m))
+
+    def test_una_isla(self):
+        for ident, t in temas.cargar().items():
+            todos = sorted(m for z in t["modulos"].values() for g in z for m in g)
+            for f in ("isla", "isla_compacta"):
+                for centro in (True, False):
+                    n = temas.con_alineacion(temas.con_formato(t, f), centro)
+                    self.assertEqual((n["modulos"]["izquierda"], n["modulos"]["derecha"]), ([], []))
+                    self.assertEqual(sorted(m for g in n["modulos"]["centro"] for m in g), todos, ident)
+                    self.assertTrue(n["centrado"])
+                    self.assertGreater(temas.rgb(n["colores"]["isla"])[3], 0.5)
 
     def test_lee_windows(self):
         self.assertIn(temas.windows_centrado(), (True, False))
