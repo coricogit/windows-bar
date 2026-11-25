@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QMenu  # noqa: E402
 
-from barra import (ajustes as cfg, arranque, bandeja, cielo, claudito, musica, panel_claude, programas, selector, sesiones, sistema, sitio, temas,  # noqa: E402
+from barra import (actualizar, ajustes as cfg, arranque, bandeja, cielo, claudito, musica, panel_claude, programas, selector, sesiones, sistema, sitio, temas,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -244,7 +244,7 @@ class Barra(QObject):
         self._camaleon, self._camaleon_imagen, self._tono_fondo = {}, None, None
         self._pix_fondo = []
         self._inactivo, self.selector, self.motor, self._vueltas = False, None, None, 0
-        self._elegido = None
+        self._elegido, self.novedades = None, None
         self._datos = {"cpu": 0, "ram": 0, "gpu": -1, "volumen": 0, "silencio": False}
         self._claude = {"modo": "sleep", "texto": ""}
         self._ropa = {"gorro": "", "traje": ""}
@@ -954,14 +954,15 @@ class Barra(QObject):
         return {
             "colores": t["colores"], "fuente": t["fuente"], "filas": filas,
             "temas": [{"texto": x["nombre"], "marcado": k == self._elegido, "hacer": lambda k=k: self.elegir(k),
-                       "mini": os.path.join(temas.RAIZ, k, "miniatura.png")} for k, x in self.temas.items()],
+                       "mini": os.path.join(x["carpeta"], "miniatura.png")} for k, x in self.temas.items()],
             "interruptores": [
                 {"texto": "Arrancar con Windows", "marcado": con_windows, "hacer": lambda: arranque.poner(not con_windows)},
                 {"texto": "Según la hora", "marcado": a["auto"], "hacer": lambda: self._set_auto(not a["auto"])},
                 {"texto": "Modo juego", "marcado": a["modo_juego"], "hacer": lambda: self._set_juego(not a["modo_juego"])},
                 {"texto": "Agrupar ventanas", "marcado": a["agrupar"], "hacer": lambda: self._set_agrupar(not a["agrupar"])},
-                {"texto": "Pincel", "marcado": a["pincel"], "hacer": lambda: self._set_pincel(not a["pincel"])}],
-            "botones": ([{"texto": "Restablecer orden", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []) + [
+                {"texto": "Pincel", "marcado": a["pincel"], "hacer": lambda: self._set_pincel(not a["pincel"])},
+                *(self.novedades.interruptor() if self.novedades else [])],
+            "botones": (self.novedades.boton() if self.novedades else []) + ([{"texto": "Restablecer orden", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []) + [
                 {"texto": "Administrador de tareas", "hacer": lambda: win.press(0x11, 0x10, 0x1B)},
                 {"texto": "Configuración de Windows", "hacer": lambda: win.press(0x5B, 0x49)},
                 {"texto": "Salir y volver a la barra de Windows", "hacer": self.app.quit}]}
@@ -1011,6 +1012,84 @@ class Barra(QObject):
                 p.mostrar(True)
             self._animar = True
             self.animarCambio.emit()
+
+
+class Novedades(QObject):
+    """Busca una versión nueva de vez en cuando y la instala en un momento
+    tranquilo. Solo en la copia instalada."""
+    PRIMERA, CADA = 60_000, 6 * 3600 * 1000
+    MIRAR, QUIETO = 15_000, 120         # con una lista: cada cuánto mirar, y segundos sin tocar el equipo
+    _lista = Signal(object)
+
+    def __init__(self, barra, version):
+        super().__init__(barra)
+        self.barra, self.version = barra, version
+        self.carpeta = os.path.join(DATOS, "actualizacion")
+        self.lista, self._hilo = None, None        # (versión, instalador, SHA-256)
+        self._lista.connect(self._poner)
+        self._t_buscar = QTimer(self, interval=self.CADA, timeout=self.buscar)
+        self._t_mirar = QTimer(self, interval=self.MIRAR, timeout=self._mirar)
+        self._t_buscar.start()
+        QTimer.singleShot(self.PRIMERA, self.buscar)
+
+    def interruptor(self):
+        si = self.barra.ajustes["actualizar"]
+        return [{"texto": f"Actualizar sola ({self.version})", "marcado": si, "hacer": lambda: self._activar(not si)}]
+
+    def boton(self):
+        return [{"texto": "Actualizar a la " + self.lista[0], "hacer": self.instalar}] if self.lista else []
+
+    def _activar(self, si):
+        self.barra.ajustes["actualizar"] = si
+        self.barra._guardar()
+        if si:
+            self.buscar()
+        else:
+            self.lista = None
+            self._t_mirar.stop()
+
+    def buscar(self):
+        a = self.barra.ajustes
+        if not a["actualizar"] or self.lista or (self._hilo and self._hilo.is_alive()):
+            return
+        self._hilo = threading.Thread(target=self._descargar, args=(a["intentos"],), daemon=True)
+        self._hilo.start()
+
+    def _descargar(self, hechos):
+        try:
+            hay = actualizar.descargar(self.version, self.carpeta,
+                                       saltar=lambda v: actualizar.intentos(hechos, v) >= actualizar.MAX_INTENTOS)
+        except actualizar.SinRed:
+            return
+        except Exception:
+            registrar("actualización")
+            return
+        if hay:
+            self._lista.emit(hay)
+
+    def _poner(self, hay):
+        if self.barra.ajustes["actualizar"]:
+            self.lista = hay
+            self._t_mirar.start()
+
+    def _mirar(self):
+        b = self.barra
+        ocupada = not b._animar or b.arrastrando() or (b.selector and b.selector.isVisible())
+        if self.lista and not ocupada and win.segundos_inactivo() >= self.QUIETO:
+            self.instalar()
+
+    def instalar(self):
+        if not self.lista:
+            return
+        (version, ruta, suma), self.lista = self.lista, None
+        self._t_mirar.stop()
+        # Se apunta antes: lo que sigue cierra la barra.
+        self.barra.ajustes["intentos"] = actualizar.contar(self.barra.ajustes["intentos"], version)
+        self.barra._guardar()
+        try:
+            actualizar.ejecutar(ruta, suma, os.path.join(DATOS, "actualizacion.log"))
+        except Exception:
+            registrar("actualización")
 
 
 class Panel:
@@ -1244,7 +1323,7 @@ def hacer_miniaturas(app):
                 p.drawImage(QPoint(x, 0), img, QRect(x0, 0, an, ALTO))
                 x += an
             p.end()
-            mini.save(os.path.join(temas.RAIZ, ids[i - 1], "miniatura.png"))
+            mini.save(os.path.join(barra.temas[ids[i - 1]]["carpeta"], "miniatura.png"))
         if i == len(ids):
             app.quit()
             return
@@ -1282,6 +1361,10 @@ def main():
         return 1
     with open(os.path.join(DATOS, "pid.json"), "w", encoding="utf-8") as f:
         json.dump({"pid": os.getpid()}, f)
+    try:
+        os.remove(os.path.join(DATOS, "parar"))      # era para la anterior: si esta se cae, que se reabra
+    except OSError:
+        pass
     limite = time.monotonic() + 60
     while not win.taskbars() and time.monotonic() < limite:      # recién iniciada la sesión
         time.sleep(0.5)
@@ -1312,6 +1395,9 @@ def main():
     barra.arrancar()
     barra._zonas_vidrio()
     reemplazo.empezar()
+    version = actualizar.version_instalada()
+    if version:
+        barra.novedades = Novedades(barra, version)
     if args.segundos:
         QTimer.singleShot(args.segundos * 1000, app.quit)
     try:

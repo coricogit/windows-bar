@@ -7,6 +7,8 @@ import winreg
 from . import sitio
 
 RAIZ = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temas")
+# Los tuyos: ahí las actualizaciones no los tocan.
+PROPIOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas", "temas")
 
 BASE = {
     "nombre": "", "orden": 99, "forma": "completa", "alto": 48, "margen": 0, "radio": 0, "relleno": 6,
@@ -27,17 +29,17 @@ BASE = {
 }
 
 
-def cargar(raiz=RAIZ):
+def cargar(raices=(RAIZ, PROPIOS)):
     """{id: tema}, en el orden en que se muestran. Un tema roto se salta."""
     out = {}
-    for nombre in sorted(os.listdir(raiz)):
+    for raiz, nombre in [(r, n) for r in raices if os.path.isdir(r) for n in sorted(os.listdir(r))]:
         ruta = os.path.join(raiz, nombre, "tema.json")
         if not os.path.exists(ruta):
             continue
         try:
             with open(ruta, encoding="utf-8") as f:
                 d = json.load(f)
-            t = {**BASE, **d, "id": nombre}
+            t = {**BASE, **d, "id": nombre, "carpeta": os.path.join(raiz, nombre)}
             t["colores"] = {**BASE["colores"], **d.get("colores", {})}
             t["modulos"] = {**BASE["modulos"], **d.get("modulos", {})}
             t["logo"] = {**BASE["logo"], **d.get("logo", {})}

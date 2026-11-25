@@ -29,8 +29,12 @@ def desactivada(valor):
     return bool(valor) and bool(valor[0] & 1)
 
 
+def guardado():
+    return _leer(RUN, NOMBRE)
+
+
 def activo():
-    return _leer(RUN, NOMBRE) == orden() and not desactivada(_leer(APROBADAS, NOMBRE))
+    return guardado() == orden() and not desactivada(_leer(APROBADAS, NOMBRE))
 
 
 def poner(si):

@@ -3,7 +3,20 @@
 Barra de tareas para Windows 11 con 5 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
 sistema ni inyectar código: solo la oculta mientras está abierta.
 
-- **Abrir:** `Iniciar barra.bat`
+## Instalar
+
+Descarga `Windows-Bar-Setup-<versión>.exe` de [Releases](https://github.com/coricogit/windows-bar/releases/latest) y
+ejecútalo. Necesita Windows 11 de 64 bits; no pide administrador y trae Python y Qt. No está firmado: si Windows avisa,
+*Más información > Ejecutar de todas formas*. Se desinstala desde *Configuración > Aplicaciones*.
+
+La copia instalada se actualiza sola: mira este repositorio cada pocas horas, comprueba la descarga y la instala cuando
+llevas un par de minutos sin tocar el equipo. Si falla, vuelve la versión anterior. Se quita en el menú (*Actualizar sola*).
+
+Claudito sale si está [instalado](https://github.com/coricogit/claudito) o en `~/src/claudito`.
+
+Desde el código: `py -m pip install PySide6_Essentials`, y después
+
+- **Abrir:** `Iniciar barra.bat` (o *Windows Bar* en el menú Inicio)
 - **Cerrar:** clic derecho en el reloj → *Salir y volver a la barra de Windows*
 - **Emergencia:** `Ctrl+Alt+Mayús+B`, o `Restaurar barra de Windows.bat`
 
@@ -71,7 +84,7 @@ reabre si la cierras tú, con el atajo de emergencia o con el .bat, ni al apagar
 
 ## Crear un tema
 
-Copia una carpeta de `temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.
+Copia una carpeta de `temas` en `%LOCALAPPDATA%\barra-temas\temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.
 `Fondo.qml` es opcional. Para verlos todos sin tocar nada: `py barra.pyw --vista CARPETA`.
 
 Para recuperar un tema quitado, muévelo de `temas-retirados` a `temas`.
@@ -80,6 +93,7 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 
 ## Piezas
 
+- `barra/actualizar.py`, `barra/instalado.py`, `installer/`: instalador y actualización (`py installer\build.py`).
 - `barra/bandeja.py`: proceso aparte que recibe los iconos de la bandeja y los reenvía a Explorer.
 - `barra/vigilante.py`: proceso aparte que devuelve la barra de Windows si esta se cierra o se cuelga.
 - `barra/vista.py`: vista previa de las ventanas (miniaturas de DWM).

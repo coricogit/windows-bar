@@ -8,7 +8,10 @@ import os
 import sys
 
 sys.dont_write_bytecode = True
-RAIZ = os.path.join(os.path.expanduser("~"), "src", "claudito", "windows")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from barra import claudito  # noqa: E402
+
+RAIZ = os.path.join(claudito.RAIZ, "windows")
 
 
 def main():

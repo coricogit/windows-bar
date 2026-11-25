@@ -1,11 +1,13 @@
 """py -m unittest discover -s tests   (no toca la barra de Windows)"""
+import json
 import os
 import struct
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import actualizar, ajustes, arranque, bandeja, cielo, claudito, instalado, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -45,7 +47,7 @@ class Bandeja(unittest.TestCase):
 
 class Temas(unittest.TestCase):
     def test_los_que_hay(self):
-        self.assertEqual(list(temas.cargar()), ["tokyo", "original", "sakura", "pixel", "bosque"])
+        self.assertEqual(list(temas.cargar((temas.RAIZ,))), ["tokyo", "original", "sakura", "pixel", "bosque"])
 
     def test_caben_y_tienen_colores(self):
         for ident, t in temas.cargar().items():
@@ -271,6 +273,86 @@ class IconosOcultos(unittest.TestCase):
     def test_ajuste(self):
         n = ajustes.normalizar({"ocultos": ["a", 3, "a", "b"]}, {"tokyo": 1}, temas.FORMATOS)
         self.assertEqual(n["ocultos"], ["a", "b"])
+
+
+class Actualizar(unittest.TestCase):
+    @staticmethod
+    def release(version="1.2.0", **k):
+        n = actualizar.archivo(version)
+        return {"tag_name": "v" + version, "draft": False, "prerelease": False, "assets": [
+            {"name": n, "digest": "sha256:" + "a" * 64,
+             "browser_download_url": actualizar.DESCARGAS + f"v{version}/{n}"}], **k}
+
+    def test_versiones(self):
+        self.assertLess(actualizar.numeros("1.9.0"), actualizar.numeros("1.10"))
+        for malo in ("", "1.x", "1..2", None, "1.2.3.4.5", "-1"):
+            self.assertIsNone(actualizar.numeros(malo))
+        self.assertEqual(actualizar.version_instalada(), "")          # esta es la copia del código
+
+    def test_mas_nueva(self):
+        def m(r, actual="1.1.0"):
+            return actualizar.mas_nueva(json.dumps(r), actual)
+        self.assertEqual(m(self.release())[0], "1.2.0")
+        self.assertIsNone(m(self.release(), "1.2.0"))
+        self.assertIsNone(m(self.release(), "2.0"))
+        for k in ({"draft": True}, {"prerelease": True}, {"assets": []}, {"assets": None}, {"tag_name": "1.2.0"}, {"tag_name": 3}):
+            self.assertIsNone(m(self.release(**k)), k)
+        for campo, valor in (("name", "otro.exe"), ("digest", None), ("digest", "sha256:x"),
+                             ("browser_download_url", "https://malo.example/Windows-Bar-Setup-1.2.0.exe")):
+            r = self.release()
+            r["assets"][0][campo] = valor
+            self.assertIsNone(m(r), (campo, valor))
+        for texto in ("", "[]", "no json", "null"):
+            self.assertIsNone(actualizar.mas_nueva(texto, "1.0"))
+
+    def test_descarga_comprobada(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as d:
+            r = self.release()
+            bueno = b"instalador"
+
+            def traer(que):
+                def f(url, ruta):
+                    with open(ruta, "wb") as s:
+                        s.write(json.dumps(r).encode() if url == actualizar.ULTIMO else que)
+                return f
+            r["assets"][0]["digest"] = "sha256:" + hashlib.sha256(bueno).hexdigest()
+            c = os.path.join(d, "a")
+            with self.assertRaises(ValueError):
+                actualizar.descargar("1.0", c, traer=traer(b"otra cosa"))
+            self.assertFalse([n for n in os.listdir(c) if "Setup" in n])
+            v, ruta, suma = actualizar.descargar("1.0", c, traer=traer(bueno))
+            self.assertEqual((v, actualizar.sha256(ruta)), ("1.2.0", suma))
+            with open(ruta, "ab") as f:
+                f.write(b"x")
+            with self.assertRaises(ValueError):          # cambiado después
+                actualizar.ejecutar(ruta, suma, os.path.join(d, "log"))
+            self.assertIsNone(actualizar.descargar("1.0", c, saltar=lambda v: True, traer=traer(bueno)))
+            self.assertFalse(os.path.exists(c))
+
+    def test_intentos(self):
+        t = actualizar.contar("", "1.2")
+        self.assertEqual(actualizar.intentos(actualizar.contar(t, "1.2"), "1.2"), 2)
+        self.assertEqual(actualizar.intentos(t, "1.3"), 0)
+        self.assertEqual(actualizar.intentos("1.2:5:2000-01-01", "1.2"), 0)
+        for basura in (None, "x", "a:b:c", 3):
+            self.assertEqual(actualizar.intentos(basura, "1.2"), 0)
+
+    def test_es_de(self):
+        self.assertTrue(instalado.es_de("C:\\P\\Bar\\python\\pythonw.exe", "c:\\p\\bar"))
+        self.assertFalse(instalado.es_de("C:\\P\\Barra2\\x.exe", "C:\\P\\Bar"))
+        self.assertFalse(instalado.es_de("", "C:\\P"))
+
+    def test_temas_propios(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "mio"))
+            with open(os.path.join(d, "mio", "tema.json"), "w", encoding="utf-8") as f:
+                f.write('{"nombre": "Mío"}')
+            t = temas.cargar((temas.RAIZ, d, os.path.join(d, "no-existe")))
+            self.assertEqual((t["mio"]["carpeta"], "tokyo" in t), (os.path.join(d, "mio"), True))
+
+    def test_encuentra_a_claudito(self):
+        self.assertEqual(claudito.encontrar(["C:\\no1", "C:\\no2"]), "C:\\no1")
 
 
 class Sitio(unittest.TestCase):

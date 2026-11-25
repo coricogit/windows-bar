@@ -1,5 +1,6 @@
 """Claudito en la barra. Solo lee: usa su lógica de estados y su dibujo desde
-~/src/claudito, sin cambiar nada allí. Si no está, la barra va sin él."""
+~/src/claudito o desde su instalación, sin cambiar nada allí. Si no está, la
+barra va sin él."""
 import importlib.util
 import json
 import os
@@ -8,8 +9,17 @@ import sys
 import time
 import winreg
 
-RAIZ = os.path.join(os.path.expanduser("~"), "src", "claudito")
-PERSONAJE = os.path.join(RAIZ, "plasma", "org.corico.claudito", "contents", "ui", "Character.qml")
+_DIBUJO = os.path.join("plasma", "org.corico.claudito", "contents", "ui", "Character.qml")
+
+
+def encontrar(sitios):
+    """La primera carpeta que tenga a Claudito, o la primera si no está."""
+    return next((s for s in sitios if os.path.exists(os.path.join(s, _DIBUJO))), sitios[0])
+
+
+RAIZ = encontrar([os.path.join(os.path.expanduser("~"), "src", "claudito"),
+                  os.path.join(os.environ["LOCALAPPDATA"], "Programs", "Claudito")])
+PERSONAJE = os.path.join(RAIZ, _DIBUJO)
 
 NOMBRES = {"idle": "Descansando", "wake": "¡Hola!", "thinking": "Pensando…", "build": "Construyendo…",
            "terminal": "En la terminal…", "search": "Buscando…", "explore": "Explorando…",
