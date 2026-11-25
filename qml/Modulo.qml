@@ -64,7 +64,7 @@ Loader {
         }
       }
       add: Transition { NumberAnimation { property: "scale"; from: 0.4; to: 1; duration: 160; easing.type: Easing.OutBack } }
-      displaced: Transition { NumberAnimation { property: "x"; duration: 160 } }
+      displaced: Transition { NumberAnimation { property: "x"; duration: 160; easing.type: Easing.OutCubic } }
       delegate: Tarea {
         tema: mod.tema
         alto: mod.alto
@@ -75,6 +75,8 @@ Loader {
         abierta: !!model.abierta
         minimizada: !!model.minimizada
         cuenta: model.cuenta || 0
+        indice: index
+        lista: ListView.view
         onActivaChanged: marcar()
         Component.onCompleted: marcar()
         Component.onDestruction: if (ListView.view && ListView.view.activaItem === this) ListView.view.activaItem = null

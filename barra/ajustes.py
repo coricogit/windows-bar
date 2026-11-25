@@ -5,7 +5,7 @@ import os
 
 DEFECTO = {"tema": "tokyo", "formatos": {}, "auto": False, "tema_dia": "bosque", "tema_noche": "tokyo",
            "dia": 8, "noche": 19, "por_programa": {}, "modo_juego": True, "pincel": False,
-           "fijados": [], "quitados": [], "alineacion": "windows", "vidrio": "normal", "animaciones": "suaves", "icono": "tema", "agrupar": True}
+           "fijados": [], "quitados": [], "alineacion": "windows", "vidrio": "normal", "animaciones": "suaves", "icono": "tema", "agrupar": True, "orden": []}
 
 
 def normalizar(d, temas, formatos):
@@ -23,6 +23,7 @@ def normalizar(d, temas, formatos):
     a["formatos"] = {t: f for t, f in a["formatos"].items() if t in temas and f in formatos}
     a["fijados"] = [f for f in a["fijados"] if isinstance(f, dict) and f.get("clave") and f.get("exe")]
     a["quitados"] = [q for q in a["quitados"] if isinstance(q, str)]
+    a["orden"] = [c for c in a["orden"] if isinstance(c, str)]
     return a
 
 
@@ -53,6 +54,28 @@ def soltar(a, clave, de_windows):
     a["fijados"] = [f for f in a["fijados"] if f["clave"] != clave]
     if clave in de_windows and clave not in a["quitados"]:
         a["quitados"].append(clave)
+
+
+MAX_ORDEN = 200
+
+
+def fusionar_orden(guardado, visibles):
+    """El orden guardado, con los programas a la vista como los acaban de dejar.
+    Los que ahora no se ven siguen detrás del mismo vecino."""
+    detras, vecino = {}, None
+    for c in guardado:
+        if c in visibles:
+            vecino = c
+        else:
+            detras.setdefault(vecino, []).append(c)
+    out = list(detras.get(None, []))
+    for c in visibles:
+        out += [c, *detras.get(c, [])]
+    sobran = len(out) - MAX_ORDEN
+    if sobran > 0:                 # olvidar primero los que no se ven
+        ocultos = set([c for c in out if c not in visibles][-sobran:])
+        out = [c for c in out if c not in ocultos][:MAX_ORDEN]
+    return out
 
 
 def lista_fijos(a, de_windows):

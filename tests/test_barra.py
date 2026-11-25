@@ -218,6 +218,36 @@ class Programas(unittest.TestCase):
         self.assertEqual([x["key"] for x in f], ["g:zen", "g:disc"])       # misma clave: el botón no salta
 
 
+class Orden(unittest.TestCase):
+    def test_fusionar(self):
+        f = ajustes.fusionar_orden
+        self.assertEqual(f([], ["a", "b"]), ["a", "b"])
+        self.assertEqual(f(["a", "b", "c"], ["c", "a", "b"]), ["c", "a", "b"])
+        # x no se ve: sigue detrás de su vecino b
+        self.assertEqual(f(["a", "b", "x", "c"], ["c", "b", "a"]), ["c", "b", "x", "a"])
+        self.assertEqual(f(["x", "a"], ["b", "a"]), ["x", "b", "a"])
+        self.assertEqual(f(["a"], ["a", "nuevo"]), ["a", "nuevo"])
+        for n in (ajustes.MAX_ORDEN, ajustes.MAX_ORDEN + 50):
+            r = f([f"v{i}" for i in range(n)], ["a", "b"])
+            self.assertLessEqual(len(r), ajustes.MAX_ORDEN)
+            self.assertTrue({"a", "b"} <= set(r))
+
+    def test_manda_el_elegido(self):
+        v = Programas.v
+        fijo = {"clave": "zen", "exe": "zen.exe", "nombre": "Zen", "ruta": "r", "icono": ""}
+        info = [v(1, "disc"), v(2, "steam"), v(3, "nota")]
+
+        def orden(*e):
+            return [x["clave"] for x in programas.agrupar(info, [fijo], True, {}, e)]
+        self.assertEqual(orden(), ["zen", "disc", "steam", "nota"])
+        self.assertEqual(orden("steam", "zen"), ["steam", "zen", "disc", "nota"])
+        self.assertEqual(orden("cerrado", "nota"), ["nota", "zen", "disc", "steam"])
+        # sin agrupar, las ventanas de un programa siguen juntas
+        info.append(v(9, "disc"))
+        f = programas.agrupar(info, [], False, {}, ["nota", "disc"])
+        self.assertEqual([x["key"] for x in f], ["3", "1", "9", "2"])
+
+
 class Reinicio(unittest.TestCase):
     def test_tope(self):
         self.assertTrue(vigilante.puede_reiniciar([], 1000))

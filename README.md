@@ -12,7 +12,7 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 | Dónde | Qué hace |
 |---|---|
 | Reloj, volumen o un hueco | Clic derecho: menú de temas y ajustes |
-| Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: pasar de una a otra · Clic central: abrir otra · Clic derecho: menú |
+| Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: pasar de una a otra · Clic central: abrir otra · Clic derecho: menú · Arrastrar: cambiar de sitio |
 | Volumen | Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio |
 | Reloj | Clic: notificaciones y calendario |
 | Inicio | Clic: menú Inicio · Clic derecho: menú Win+X · Rueda: pasar de tema |

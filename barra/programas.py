@@ -79,10 +79,11 @@ def nombre_tienda(ident):
     return _nombres[ident]
 
 
-def agrupar(info, fijos, juntar, orden):
+def agrupar(info, fijos, juntar, orden, elegido=()):
     """Las filas de la barra a partir de las ventanas `info` ({"hwnd", "clave",
     "nombre", "titulo", "icono", "activa", "minimizada", "exe", "z"}) y de los
-    anclados. `orden` recuerda cuándo se vio cada programa, para no moverlos."""
+    anclados. `orden` recuerda cuándo se vio cada programa, para no moverlos;
+    `elegido` es el orden puesto a mano y manda sobre todo."""
     for i in sorted(info, key=lambda i: i["hwnd"]):
         orden.setdefault(i["clave"], len(orden))
     por_clave = {}
@@ -92,7 +93,7 @@ def agrupar(info, fijos, juntar, orden):
     def fila(key, vs):
         cerca = min(vs, key=lambda v: v["z"])            # la usada más recientemente
         varias = len(vs) > 1
-        return {"key": key, "titulo": vs[0]["nombre"] if varias else cerca["titulo"], "nombre": vs[0]["nombre"],
+        return {"key": key, "clave": vs[0]["clave"], "titulo": vs[0]["nombre"] if varias else cerca["titulo"], "nombre": vs[0]["nombre"],
                 "icono": vs[0]["icono"], "activa": any(v["activa"] for v in vs),
                 "minimizada": all(v["minimizada"] for v in vs), "abierta": True, "hwnd": str(cerca["hwnd"]),
                 "exe": vs[0]["exe"], "ruta": "", "cuenta": len(vs), "ventanas": [v["hwnd"] for v in vs],
@@ -108,10 +109,13 @@ def agrupar(info, fijos, juntar, orden):
         if x["clave"] in por_clave:
             out.extend(filas_de(x["clave"]))
         else:
-            out.append({"key": ("g:" if juntar else "fijo-") + x["clave"], "titulo": x["nombre"],
+            out.append({"key": ("g:" if juntar else "fijo-") + x["clave"], "clave": x["clave"],
+                        "titulo": x["nombre"],
                         "nombre": x["nombre"], "icono": x["icono"], "activa": False, "minimizada": False,
                         "abierta": False, "hwnd": "", "exe": x["exe"], "ruta": x["ruta"], "cuenta": 0,
                         "ventanas": [], "titulos": []})
     for clave in sorted((k for k in por_clave if k not in puestas), key=orden.get):
         out.extend(filas_de(clave))
+    puesto = {c: i for i, c in enumerate(elegido)}
+    out.sort(key=lambda f: puesto.get(f["clave"], len(puesto)))       # estable: el resto, como estaba
     return out

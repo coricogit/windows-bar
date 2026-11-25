@@ -72,6 +72,16 @@ class Lista(QAbstractListModel):
             return self.filas[index.row()].get(self._roles.get(role))
         return None
 
+    @Slot(int, int)
+    def mover(self, de, a):
+        """Cambia una fila de sitio (arrastrando)."""
+        n = len(self.filas)
+        if de == a or not (0 <= de < n and 0 <= a < n):
+            return
+        self.beginMoveRows(QModelIndex(), de, de, QModelIndex(), a + 1 if a > de else a)
+        self.filas.insert(a, self.filas.pop(de))
+        self.endMoveRows()
+
     def poner(self, nuevas):
         claves = {f["key"] for f in nuevas}
         for i in range(len(self.filas) - 1, -1, -1):
@@ -248,6 +258,7 @@ class Barra(QObject):
         self.fijos = cfg.lista_fijos(self.ajustes, self.de_windows)
         self.previa = None
         self._orden = {}            # cuándo se vio cada programa
+        self._arrastre = 0          # desde cuándo se arrastra un botón; 0 si no
         self._ids = {}              # ventana -> identificador de app de la Tienda
         self.panel_claude = None
         self._uso_datos, self._uso_hora, self._uso_hilo = None, 0, None
@@ -665,6 +676,30 @@ class Barra(QObject):
         except OSError:
             registrar("abrir " + str(e["exe"]))
 
+    # ----- arrastrar botones -----
+    def arrastrando(self):
+        return bool(self._arrastre) and time.monotonic() - self._arrastre < 30      # por si se perdiera el final
+
+    @Slot()
+    def empezar_arrastre(self):
+        self._quitar_previa()
+        self._arrastre = time.monotonic()
+
+    @Slot(QObject)
+    def terminar_arrastre(self, lista):
+        if not self._arrastre:
+            return
+        self._arrastre = 0
+        claves = list(dict.fromkeys(f["clave"] for f in lista.filas))
+        self.ajustes["orden"] = cfg.fusionar_orden(self.ajustes["orden"], claves)
+        self._guardar()
+        self.actualizar_ventanas()
+
+    def _olvidar_orden(self):
+        self.ajustes["orden"] = []
+        self._guardar()
+        self.actualizar_ventanas()
+
     # ----- menú de una ventana -----
     @Slot(str)
     def menu_tarea(self, clave):
@@ -726,6 +761,8 @@ class Barra(QObject):
     @Slot(str, float, float)
     def apuntar(self, clave, x, y):
         """El ratón entró en un botón; (x, y) es su borde de arriba, global."""
+        if self._arrastre:
+            return
         self._apuntado = (clave, x, y)
         self._t_previa.start(80 if self.previa and self.previa.isVisible() else 380)
 
@@ -829,7 +866,7 @@ class Barra(QObject):
                 {"texto": "Modo juego", "marcado": a["modo_juego"], "hacer": lambda: self._set_juego(not a["modo_juego"])},
                 {"texto": "Agrupar ventanas", "marcado": a["agrupar"], "hacer": lambda: self._set_agrupar(not a["agrupar"])},
                 {"texto": "Pincel", "marcado": a["pincel"], "hacer": lambda: self._set_pincel(not a["pincel"])}],
-            "botones": [
+            "botones": ([{"texto": "Restablecer orden", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []) + [
                 {"texto": "Administrador de tareas", "hacer": lambda: win.press(0x11, 0x10, 0x1B)},
                 {"texto": "Configuración de Windows", "hacer": lambda: win.press(0x5B, 0x49)},
                 {"texto": "Salir y volver a la barra de Windows", "hacer": self.app.quit}]}
@@ -935,12 +972,15 @@ class Panel:
             win.user32.SetWindowPos(win.w.HWND(int(self.view.winId())), win.w.HWND(-1), 0, 0, 0, 0, 0x13)
 
     def poner_ventanas(self, info, fijos):
+        if self.barra.arrastrando():          # no tocar la lista que se está moviendo
+            return
         if not self.primaria and self.pantalla:
             mia = self.pantalla_real()
             info = [i for i in info if i["pantalla"] == mia]
             fijos = []
         fijos = [{**x, "icono": self.barra.almacen.url(self.barra.almacen.de_fijo(x))} for x in fijos]
-        self.tareas.poner(programas.agrupar(info, fijos, self.barra.ajustes["agrupar"], self.barra._orden))
+        self.tareas.poner(programas.agrupar(info, fijos, self.barra.ajustes["agrupar"], self.barra._orden,
+                                            self.barra.ajustes["orden"]))
 
 
 # ---------------------------------------------------------------------------
@@ -1047,7 +1087,7 @@ def preparar_vista(app):
     barra.fondo.leer()
     panel = Panel(barra, None, True)
     panel.tareas.poner([{"key": str(i), "titulo": os.path.basename(e), "activa": i == 1, "minimizada": False,
-                         "icono": barra.almacen.url(barra.almacen.de_archivo(e)), "abierta": i != 2, "cuenta": (3, 1, 0)[i], "hwnd": "",
+                         "icono": barra.almacen.url(barra.almacen.de_archivo(e)), "abierta": i != 2, "cuenta": (3, 1, 0)[i], "clave": e, "hwnd": "",
                          "exe": e, "ruta": ""} for i, e in enumerate(exes)])
     barra.tray.poner([{"key": e, "icono": barra.almacen.url(barra.almacen.de_archivo(e)), "tip": e} for e in exes])
     panel.view.setGeometry(-6000, -6000, 1920, ALTO)
