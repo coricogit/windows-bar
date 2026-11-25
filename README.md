@@ -51,6 +51,11 @@ Clic derecho en el reloj: menú visual con los temas y todos los ajustes, tambi�
 se rehacen con `py barra.pyw --miniaturas`. *Animaciones* regula cuánto se redibuja; a los 90 s sin tocar el equipo, los
 fondos se paran solos. Claudito se dibuja desde una copia en `%LOCALAPPDATA%\barra-temas\claudito`, hecha al arrancar.
 
+## Si se cae
+
+El vigilante devuelve la barra de Windows al momento y vuelve a abrir esta, como mucho 3 veces en 5 minutos. No la
+reabre si la cierras tú, con el atajo de emergencia o con el .bat, ni al apagar el equipo.
+
 ## Crear un tema
 
 Copia una carpeta de `temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.

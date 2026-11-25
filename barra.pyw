@@ -981,13 +981,18 @@ class Reemplazo(QObject):
             win.ajustar_area(alto if alto != ALTO else None)
 
     def parar(self):
+        if not self.activo:
+            return                  # ya se paró
         self.activo = False
         self._timer.stop()
         for p in (self.tray, self.vigilante):
             try:
+                if p is self.vigilante:
+                    p.stdin.write("adios\n")      # cierre a propósito: que no la reabra
+                    p.stdin.flush()
                 p.stdin.close()
                 p.wait(3)
-            except (OSError, subprocess.TimeoutExpired, AttributeError):
+            except (OSError, ValueError, subprocess.TimeoutExpired, AttributeError):
                 pass
         win.show_taskbars()
 
@@ -1142,6 +1147,10 @@ def main():
         return app.exec()
     finally:
         reemplazo.parar()
+        try:
+            os.remove(os.path.join(DATOS, "pid.json"))      # ese número puede acabar siendo de otro
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

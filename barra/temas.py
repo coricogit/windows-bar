@@ -161,7 +161,8 @@ def tonos_icono(tono, base):
         intentos = [(0.85, v) for v in (0.72, 0.64, 0.56, 0.48, 0.40, 0.32, 0.24, 0.16, 0.08)]
         grados = (1, 0.88, 0.88, 0.76)
     else:
-        intentos = [(x, 1) for x in (0.60, 0.50, 0.40, 0.30, 0.20, 0.10, 0)]
+        tope = min(0.60, max(0.30, s + 0.12))        # tan vivo como el tema
+        intentos = [(tope, 1)] + [(x, 1) for x in (0.50, 0.40, 0.30, 0.20, 0.10, 0) if x < tope]
         grados = (1, 0.92, 0.92, 0.84)
     for sat, v in intentos:
         out = [colorsys.hsv_to_rgb(h, sat if color else 0, v * g) for g in grados]

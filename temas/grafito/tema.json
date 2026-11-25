@@ -1,0 +1,31 @@
+{
+  "nombre": "Grafito",
+  "orden": 2,
+  "forma": "completa",
+  "alto": 46,
+  "relleno": 14,
+  "indicador": "linea",
+  "logo": {
+    "fuera": 0.25,
+    "dentro": 0.25,
+    "lados": 0.25,
+    "hueco": 2,
+    "colores": [
+      "acento"
+    ]
+  },
+  "fuente": "Segoe UI Variable Text",
+  "tamano": 13,
+  "medidor": "linea",
+  "fecha": "ddd d MMM",
+  "colores": {
+    "fondo": "#FF17181A",
+    "fondo2": "#FF17181A",
+    "texto": "#ECECEC",
+    "tenue": "#9A9CA0",
+    "acento": "#7FC8B2",
+    "acento2": "#7FC8B2",
+    "alerta": "#F28B82",
+    "encima": "#14FFFFFF"
+  }
+}

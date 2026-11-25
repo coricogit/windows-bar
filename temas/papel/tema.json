@@ -1,0 +1,34 @@
+{
+  "nombre": "Papel",
+  "orden": 3,
+  "forma": "completa",
+  "alto": 46,
+  "relleno": 14,
+  "borde": 1,
+  "indicador": "linea",
+  "logo": {
+    "fuera": 0.25,
+    "dentro": 0.25,
+    "lados": 0.25,
+    "hueco": 2,
+    "colores": [
+      "acento"
+    ]
+  },
+  "fuente": "Segoe UI Variable Text",
+  "tamano": 13,
+  "medidor": "linea",
+  "fecha": "ddd d MMM",
+  "colores": {
+    "fondo": "#FFF4F1EA",
+    "fondo2": "#FFF4F1EA",
+    "borde": "#FFDDD7CA",
+    "texto": "#2B2A27",
+    "tenue": "#6B675E",
+    "acento": "#B5502F",
+    "acento2": "#6B675E",
+    "alerta": "#B3261E",
+    "encima": "#14000000",
+    "fondoBandeja": "#E63A3832"
+  }
+}

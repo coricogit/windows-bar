@@ -1,0 +1,35 @@
+{
+  "nombre": "Nórdico",
+  "orden": 4,
+  "forma": "islas",
+  "alto": 40,
+  "margen": 4,
+  "radio": 9,
+  "separacion": 8,
+  "relleno": 6,
+  "indicador": "punto",
+  "logo": {
+    "fuera": 0.5,
+    "dentro": 0.25,
+    "lados": 0.25,
+    "hueco": 2,
+    "colores": [
+      "acento"
+    ]
+  },
+  "fuente": "Segoe UI Variable Text",
+  "tamano": 13,
+  "medidor": "linea",
+  "fecha": "ddd d MMM",
+  "colores": {
+    "isla": "#F52E3440",
+    "fondo": "#F52E3440",
+    "fondo2": "#F52E3440",
+    "texto": "#ECEFF4",
+    "tenue": "#A9B4C6",
+    "acento": "#88C0D0",
+    "acento2": "#81A1C1",
+    "alerta": "#E0838C",
+    "encima": "#22FFFFFF"
+  }
+}

@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, selector, sesiones, sistema, temas, vidrio, vista, win  # noqa: E402
+from barra import ajustes, arranque, bandeja, cielo, claudito, panel_claude, selector, sesiones, sistema, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -45,8 +45,8 @@ class Bandeja(unittest.TestCase):
 
 class Temas(unittest.TestCase):
     def test_los_que_hay(self):
-        self.assertEqual(list(temas.cargar()), ["tokyo", "sakura", "liquid", "pixel", "bosque", "minimal",
-                                                "camaleon"])
+        self.assertEqual(list(temas.cargar()), ["tokyo", "grafito", "papel", "nordico", "sakura", "pixel",
+                                                "bosque"])
 
     def test_caben_y_tienen_colores(self):
         for ident, t in temas.cargar().items():
@@ -176,6 +176,15 @@ class Arranque(unittest.TestCase):
         self.assertTrue(arranque.desactivada(bytes([3] + [0] * 11)))
         self.assertFalse(arranque.desactivada(bytes([2] + [0] * 11)))
         self.assertFalse(arranque.desactivada(None))
+
+
+class Reinicio(unittest.TestCase):
+    def test_tope(self):
+        self.assertTrue(vigilante.puede_reiniciar([], 1000))
+        self.assertTrue(vigilante.puede_reiniciar([990, 995], 1000))
+        self.assertFalse(vigilante.puede_reiniciar([990, 995, 999], 1000))
+        self.assertTrue(vigilante.puede_reiniciar([10, 20, 30], 1000))          # ya pasó un rato
+        self.assertTrue(vigilante.puede_reiniciar(["x", None, 5000], 1000))     # basura o futuro
 
 
 class Recursos(unittest.TestCase):
