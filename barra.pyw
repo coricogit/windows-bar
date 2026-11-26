@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox  # noqa: E402
 
-from barra import (actualizar, ajustes as cfg, apps as apps_inicio, arranque, audio, atencion, buscador, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
+from barra import (actualizar, ajustes as cfg, apps as apps_inicio, arranque, audio, atencion, buscador, encaje, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -360,7 +360,7 @@ class Barra(QObject):
         self._calendario = None
         # Isla dinámica: lo último visto de cada cosa, para avisar solo de cambios.
         self._isla = self._ult_cancion = self._modo_claude = self._red_antes = self._bat_antes = None
-        self.atencion = None
+        self.atencion = self.encaje = None
         # Buscador (barra/buscador.py): las apps del menú Inicio se leen en un hilo y se guardan un rato.
         self._buscador = self.atajo_buscar = None
         self._ventanas_info = []                 # las abiertas, para el buscador
@@ -413,6 +413,9 @@ class Barra(QObject):
         self._gancho = win.watch(self._t_pronto.start)
         if not self.vista:
             try:
+                self.encaje = encaje.EncajeAbajo(lambda: self._get_tema()["colores"]["acento"])
+                if not self.encaje.ok:
+                    registrar("sin encaje abajo en pantallas verticales (SetWinEventHook)")
                 self.atencion = atencion.Atencion(self._pide_atencion, self._t_pronto.start)
                 if not self.atencion.ok:
                     registrar("sin aviso de ventanas que piden atención (RegisterShellHookWindow)")
@@ -2028,6 +2031,7 @@ class Reemplazo(QObject):
             lado, grosor = self.barra.ajustes["posicion"], 0 if self.barra.ajustes["esconder"] else self.barra.alto()
             # Abajo y en tamaño normal, justo el hueco que ya reserva Windows.
             win.ajustar_area(None if (lado, grosor) == ("abajo", ALTO) else sitio.margenes(lado, grosor))
+            win.recolocar_encajadas()
 
     def parar(self):
         if not self.activo:

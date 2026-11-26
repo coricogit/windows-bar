@@ -77,6 +77,13 @@ Cuando un programa pide atención (Discord con un mensaje, un juego que termina 
 late, como en la barra de Windows, hasta que lo abres; con la isla dinámica, además, sale un aviso con su nombre y un
 clic lo trae delante. Lo cuenta Windows con `RegisterShellHookWindow`, sin inyectar nada.
 
+## Ventanas encajadas
+
+Windows reparte las ventanas al encajarlas (mitades, tercios, cuartos) con el hueco de su propia barra, no con el de
+esta: la barra las recoloca al momento en el área de verdad, con las mismas proporciones (solo las que encajan
+exactamente en ese reparto; las puestas a mano no se tocan). En una pantalla vertical, soltar una ventana sobre la
+barra la encaja en la mitad de abajo, con una vista previa mientras se arrastra (`barra/encaje.py`).
+
 ## Micrófono y volumen por programa
 
 Mientras un programa graba del micrófono sale un micrófono naranja en la bandeja (y un aviso en la isla al empezar).

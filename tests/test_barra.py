@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import actualizar, ajustes, apps, arranque, audio, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import actualizar, ajustes, apps, arranque, audio, encaje, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -1046,6 +1046,26 @@ class Pantalla(unittest.TestCase):
                 self.assertEqual(win.pixeles_dib(bmp), (1, 2, arriba + abajo))
             finally:
                 win.gdi32.DeleteObject(bmp)
+
+    def test_encaje_con_el_area_buena(self):
+        """Windows reparte al encajar con el área de su barra (48 px); la nuestra reserva otra."""
+        viejo, area = (1920, -468, 3120, 1404), (1920, -468, 3120, 1396)
+        self.assertEqual(win.encaje_corregido((1920, -468, 3120, 468), viejo, area), (1920, -468, 3120, 464))
+        self.assertEqual(win.encaje_corregido((1920, 468, 3120, 1404), viejo, area), (1920, 464, 3120, 1396))
+        self.assertIsNone(win.encaje_corregido((1920, -468, 3120, 464), viejo, area))      # ya está bien
+        self.assertIsNone(win.encaje_corregido((1966, 477, 3081, 1360), viejo, area))      # puesta a mano
+        self.assertIsNone(win.encaje_corregido((0, 0, 960, 1032), (0, 0, 1920, 1032), (0, 0, 1920, 1032)))
+        self.assertEqual(win.encaje_corregido((0, 688, 640, 1032), (0, 0, 1920, 1032), (0, 0, 1920, 1024)),
+                         (0, 683, 640, 1024))                                              # tercio de abajo
+
+    def test_encaje_abajo_en_pantalla_vertical(self):
+        vertical, area = (1920, -468, 3120, 1452), (1920, -468, 3120, 1396)
+        self.assertEqual(encaje.mitad_de_abajo(area), (1920, 464, 3120, 1396))
+        self.assertTrue(encaje.en_zona((2500, 1420), vertical, area))          # soltada sobre la barra
+        self.assertTrue(encaje.en_zona((2500, 1451), vertical, area))          # en el mismo borde
+        self.assertFalse(encaje.en_zona((2500, 1300), vertical, area))         # más arriba: nada
+        self.assertFalse(encaje.en_zona((900, 1420), vertical, area))          # en otra pantalla
+        self.assertFalse(encaje.en_zona((900, 1050), (0, 0, 1920, 1080), (0, 0, 1920, 1024)))   # la horizontal, no
 
     def test_campo_buscar_tras_inicio(self):
         t = {"modulos": {"izquierda": [["inicio", "tareas"]], "derecha": [["reloj"]]}}

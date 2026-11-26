@@ -40,6 +40,8 @@ _sig(user32, "GetForegroundWindow", w.HWND)
 _sig(user32, "SetForegroundWindow", w.BOOL, w.HWND)
 _sig(user32, "IsWindowVisible", w.BOOL, w.HWND)
 _sig(user32, "IsWindow", w.BOOL, w.HWND)
+_sig(user32, "MonitorFromPoint", w.HMONITOR, w.POINT, w.DWORD)
+_sig(user32, "UnhookWinEvent", w.BOOL, w.HANDLE)
 _sig(user32, "IsIconic", w.BOOL, w.HWND)
 _sig(user32, "ShowWindowAsync", w.BOOL, w.HWND, ctypes.c_int)
 _sig(user32, "PostMessageW", w.BOOL, w.HWND, w.UINT, w.WPARAM, w.LPARAM)
@@ -255,6 +257,11 @@ def reserva_de(barra, pantalla, normal=48):
     return normal if escondida else None
 
 
+# El área de cada pantalla tal como la cree el Explorador (la de su barra): con ella
+# reparte Windows las ventanas al encajarlas, porque el cambio de ajustar_area no se le avisa.
+AREA_EXPLORER = {}
+
+
 def ajustar_area(margenes=None):
     """Deja libres esos píxeles en los bordes de cada pantalla (izquierda,
     arriba, derecha, abajo); sin `margenes`, lo que ocupa la barra de Windows.
@@ -266,6 +273,8 @@ def ajustar_area(margenes=None):
         info, r = _info(h), w.RECT()
         user32.GetWindowRect(h, ctypes.byref(r))
         m, t = info.rcMonitor, info.rcWork
+        fija = alto_reservado((r.left, r.top, r.right, r.bottom), (m.left, m.top, m.right, m.bottom)) or 0
+        AREA_EXPLORER[(m.left, m.top, m.right, m.bottom)] = (m.left, m.top, m.right, m.bottom - fija)
         suyo = reserva_de((r.left, r.top, r.right, r.bottom), (m.left, m.top, m.right, m.bottom))
         if suyo is None:
             continue
@@ -292,6 +301,62 @@ def sitio_maximizada(ventana, area, pantalla):
         return None
     nueva = (area[0] - sobra, area[1] - sobra, area[2] + sobra, area[3] + sobra)
     return nueva if nueva != tuple(ventana) else None
+
+
+FRACCIONES = (0, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1)
+
+
+def _en_reparto(v, area, margen=2):
+    """¿Cae cada borde de `v` en una línea de reparto (mitades, tercios, cuartos) de `area`?"""
+    an, al = area[2] - area[0], area[3] - area[1]
+    if an <= 0 or al <= 0:
+        return False
+    return all(any(abs(borde - (inicio + f * largo)) <= margen for f in FRACCIONES)
+               for borde, inicio, largo in ((v[0], area[0], an), (v[2], area[0], an), (v[1], area[1], al), (v[3], area[1], al)))
+
+
+def encaje_corregido(v, viejo, area):
+    """Dónde debe ir una ventana encajada (su parte visible, `v`) que Windows repartió con el
+    área `viejo` (la del Explorador) en vez de con `area` (la de verdad); None si está bien.
+    Solo si encaja en el reparto viejo y no en el bueno: una ventana con otro tamaño no se toca."""
+    if tuple(viejo) == tuple(area) or _en_reparto(v, area) or not _en_reparto(v, viejo):
+        return None
+    sx = (area[2] - area[0]) / (viejo[2] - viejo[0])
+    sy = (area[3] - area[1]) / (viejo[3] - viejo[1])
+    return (round(area[0] + (v[0] - viejo[0]) * sx), round(area[1] + (v[1] - viejo[1]) * sy),
+            round(area[0] + (v[2] - viejo[0]) * sx), round(area[1] + (v[3] - viejo[1]) * sy))
+
+
+try:
+    _sig(user32, "IsWindowArranged", w.BOOL, w.HWND)
+except AttributeError:          # Windows antiguo: sin «encajada» no se sabe
+    pass
+
+
+def recolocar_encajadas():
+    """Las ventanas encajadas (Snap) con el reparto del Explorador pasan al del área de verdad."""
+    if not hasattr(user32, "IsWindowArranged") or not AREA_EXPLORER:
+        return
+
+    def each(hwnd, _):
+        if not user32.IsWindowVisible(hwnd) or not user32.IsWindowArranged(hwnd) or user32.IsZoomed(hwnd)                 or user32.IsIconic(hwnd) or not in_taskbar(hwnd):
+            return True
+        i = _info(hwnd)
+        m, a = i.rcMonitor, i.rcWork
+        viejo = AREA_EXPLORER.get((m.left, m.top, m.right, m.bottom))
+        r, f = w.RECT(), w.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(r))
+        if not viejo or dwmapi.DwmGetWindowAttribute(hwnd, 9, ctypes.byref(f), ctypes.sizeof(f)) != 0:
+            return True
+        n = encaje_corregido((f.left, f.top, f.right, f.bottom), viejo, (a.left, a.top, a.right, a.bottom))
+        if n:
+            # El borde invisible de la ventana se mantiene: se mueve lo que se ve.
+            x, y = n[0] - (f.left - r.left), n[1] - (f.top - r.top)
+            an = (n[2] - n[0]) + (f.left - r.left) + (r.right - f.right)
+            al = (n[3] - n[1]) + (f.top - r.top) + (r.bottom - f.bottom)
+            user32.SetWindowPos(hwnd, None, x, y, an, al, 0x4014)      # NOZORDER | NOACTIVATE | ASYNCWINDOWPOS
+        return True
+    user32.EnumWindows(ENUMPROC(each), 0)
 
 
 def recolocar_maximizadas():
