@@ -11,7 +11,7 @@ Loader {
   readonly property bool v: tema.vertical
   // Sin tamaño propio: cada módulo pone el suyo. Si el Loader lo impusiera,
   // rompería sus enlaces y al girar la barra se quedaría con el anterior.
-  sourceComponent: ({ inicio: inicio, tareas: tareasC, titulo: titulo, musica: musicaC, sistema: sistemaC,
+  sourceComponent: ({ inicio: inicio, buscar: buscarC, tareas: tareasC, titulo: titulo, musica: musicaC, sistema: sistemaC,
                       bandeja: bandejaC, volumen: volumen, reloj: reloj, widgets: widgetsC, temas: temasC, claudito: clauditoC })[nombre]
 
   Component {
@@ -21,8 +21,8 @@ Loader {
       alto: mod.alto
       colores: mod.c
       ancho: mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38
-      ayuda: "Inicio · Rueda: cambiar de tema (" + mod.tema.nombre + ")"
-      onPulsado: function(b) { barra.accion(b === Qt.RightButton ? "menu_inicio" : "inicio") }
+      ayuda: "Inicio · Clic central: buscar · Rueda: cambiar de tema (" + mod.tema.nombre + ")"
+      onPulsado: function(b) { barra.accion(b === Qt.RightButton ? "menu_inicio" : b === Qt.MiddleButton ? "buscador" : "inicio") }
       onRueda: function(p) { barra.girar_tema(-p) }
       Rectangle {        // Burbujas: también en su círculo, como los programas
         visible: mod.tema.burbujas
@@ -34,6 +34,57 @@ Loader {
         border.color: mod.c.borde
       }
       Logo { anchors.centerIn: parent; tema: mod.tema; encima: botonInicio.encima }
+    }
+  }
+
+  Component {          // el campo «Buscar»: abre el buscador (barra/buscador.py)
+    id: buscarC
+    Item {
+      id: campo
+      // En barras estrechas (compacta, vertical, dock, burbujas) solo la lupa, como hace Windows.
+      readonly property bool corto: mod.v || mod.tema.compacto || mod.tema.dock || mod.tema.burbujas
+      readonly property real f: Math.max(0.8, Math.min(1.4, mod.alto / 46))
+      width: mod.v ? mod.alto : corto ? (mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38) : Math.round(200 * f)
+      height: mod.v ? 38 : mod.alto
+      Rectangle {
+        anchors.centerIn: parent
+        width: campo.corto ? Math.min(parent.width, parent.height) - (mod.tema.burbujas ? 2 : 8) : parent.width - 6
+        height: campo.corto ? width : Math.round(mod.alto * 0.66)
+        radius: mod.tema.pixelado ? 0 : campo.corto ? (mod.tema.burbujas ? width / 2 : Math.min(Math.max(mod.tema.radio, mod.tema.radioBoton), 8))
+                                                    : Math.min(height / 2, Math.max(mod.tema.radio, 6))
+        color: raton.containsMouse ? mod.c.encima : campo.corto ? "transparent" : Qt.rgba(mod.c.texto.r, mod.c.texto.g, mod.c.texto.b, 0.07)
+        border.width: campo.corto ? 0 : 1
+        border.color: raton.containsMouse ? mod.c.acento : mod.c.borde
+        Behavior on color { ColorAnimation { duration: 120 } }
+        Row {
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.horizontalCenter: campo.corto ? parent.horizontalCenter : undefined
+          x: campo.corto ? 0 : Math.round(12 * campo.f)
+          spacing: Math.round(9 * campo.f)
+          Texto {
+            text: ""
+            font.family: "Segoe Fluent Icons"
+            font.pixelSize: Math.round(15 * campo.f)
+            font.bold: false
+            color: campo.corto ? mod.c.texto : mod.c.tenue
+          }
+          Texto {
+            visible: !campo.corto
+            text: "Buscar"
+            color: mod.c.tenue
+            font.pixelSize: Math.round(mod.tema.tamano * campo.f)
+            font.bold: false
+          }
+        }
+      }
+      Aviso { texto: "Buscar aplicaciones, configuración y archivos (Alt+Espacio)"; fuente: raton }
+      MouseArea {
+        id: raton
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: function(e) { barra.accion(e.button === Qt.RightButton ? "menu_inicio" : "buscador") }
+      }
     }
   }
 
@@ -86,6 +137,7 @@ Loader {
         activa: !!model.activa
         abierta: !!model.abierta
         minimizada: !!model.minimizada
+        atencion: !!model.atencion
         cuenta: model.cuenta || 0
         indice: index
         lista: ListView.view

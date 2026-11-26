@@ -13,13 +13,18 @@ Row {
   readonly property string estilo: tema.medidor
   readonly property color tono: valor >= 85 ? c.alerta : ([c.medidor1, c.medidor2, c.medidor3][orden] || c.acento)
   // Un dibujo y, a su lado, el nombre sobre el número.
-  readonly property real escala: tema.compacto ? 0.75 : 0.9
-  readonly property int letra: tema.compacto ? 11 : Math.min(14, Math.max(13, tema.tamano))
+  // Todo crece o encoge con el alto de la barra; 46 px es el tamaño de referencia.
+  // Por debajo de 0,8 las letras ya no se leen; la barra compacta (30 px) se queda ahí.
+  readonly property real f: Math.max(0.8, Math.min(1.4, alto / 46))
+  readonly property real escala: 0.9 * f
+  readonly property int letra: Math.round(13.5 * f)
+  readonly property int letraNombre: Math.max(9, Math.round(10 * f))
+  readonly property int px: Math.max(2, Math.round(2 * f))      // píxel de los corazones
   readonly property bool apilado: estilo !== "pildora" && !v
   readonly property var anchos: ({ onda: 34, flor: 22, anillo: 26, corazones: 22, rama: 36 })
   readonly property bool v: tema.vertical
   height: v ? pila.height : alto
-  spacing: v ? 0 : 4
+  spacing: v ? 0 : Math.round(4 * f)
 
   onValorChanged: lienzo.requestPaint()
   onHistoriaChanged: if (estilo === "onda") lienzo.requestPaint()
@@ -29,10 +34,11 @@ Row {
   Canvas {
     id: lienzo
     visible: width > 0
-    width: med.v ? 0 : med.estilo === "corazones" ? 18 : Math.round((med.anchos[med.estilo] || 0) * med.escala)
+    width: med.v ? 0 : med.estilo === "corazones" ? 9 * med.px : Math.round((med.anchos[med.estilo] || 0) * med.escala)
     height: med.alto
     renderStrategy: Canvas.Cooperative
     onWidthChanged: requestPaint()
+    onCanvasSizeChanged: requestPaint()
     onHeightChanged: requestPaint()
     onPaint: {
       var x = getContext("2d"), v = Math.max(0, Math.min(1, med.valor / 100))
@@ -71,9 +77,9 @@ Row {
           x.beginPath(); x.arc(width / 2, cy, ra, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * v); x.stroke()
         }
       } else if (med.estilo === "corazones") {
-        var forma = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."], px = 2 / k, x0 = 0
+        var forma = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."], px = med.px / k, x0 = 0
         // Un corazón con contorno que se llena de abajo arriba, en píxeles enteros.
-        var y1 = Math.round(lienzo.height / 2 - 8) / k
+        var y1 = Math.round(lienzo.height / 2 - 4 * med.px) / k
         function lleno(a, b) { return a >= 0 && a < 6 && b >= 0 && b < 7 && forma[a][b] === "#" }
         for (var f = -1; f < 7; f++)
           for (var col = -1; col < 8; col++) {
@@ -101,8 +107,8 @@ Row {
   Column {             // nombre y número
     visible: med.apilado
     anchors.verticalCenter: parent.verticalCenter
-    spacing: med.tema.compacto ? -3 : -2
-    Texto { text: med.nombre; color: med.c.tenue; font.pixelSize: med.tema.compacto ? 9 : 10; font.bold: false }
+    spacing: Math.round(-2.5 * med.f)
+    Texto { text: med.nombre; color: med.c.tenue; font.pixelSize: med.letraNombre; font.bold: false }
     Texto {
       text: med.valor + "%"
       width: medida.width
@@ -112,7 +118,7 @@ Row {
       Rectangle {        // una raya que crece
         visible: med.estilo === "linea"
         y: parent.height - 1
-        height: 2
+        height: Math.max(2, Math.round(2 * med.f))
         width: Math.max(2, parent.width * med.valor / 100)
         color: med.tono
       }
@@ -141,12 +147,12 @@ Row {
 
   Item {               // Camaleón: píldora que se llena
     visible: med.estilo === "pildora" && !med.v
-    width: visible ? letra.implicitWidth + 18 : 0
+    width: visible ? letra.implicitWidth + Math.round(18 * med.f) : 0
     height: med.alto
     Rectangle {
       anchors.centerIn: parent
       width: parent.width
-      height: Math.min(22, med.alto - 8)
+      height: Math.round(med.alto * 0.48)
       radius: height / 2
       color: "#33000000"
       border.color: Qt.rgba(med.tono.r, med.tono.g, med.tono.b, 0.55)
@@ -159,7 +165,7 @@ Row {
         color: Qt.rgba(med.tono.r, med.tono.g, med.tono.b, 0.35)
         Behavior on width { NumberAnimation { duration: 300 } }
       }
-      Texto { id: letra; anchors.centerIn: parent; text: med.nombre + " " + med.valor + "%"; color: med.c.texto; font.pixelSize: med.tema.tamano - 1 }
+      Texto { id: letra; anchors.centerIn: parent; text: med.nombre + " " + med.valor + "%"; color: med.c.texto; font.pixelSize: Math.max(9, Math.round((med.tema.tamano - 1) * med.f)) }
     }
   }
 }

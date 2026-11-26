@@ -58,6 +58,8 @@ _sig(user32, "SetWinEventHook", w.HANDLE, w.DWORD, w.DWORD, w.HMODULE, EVENTPROC
 _sig(kernel32, "OpenProcess", w.HANDLE, w.DWORD, w.BOOL, w.DWORD)
 _sig(kernel32, "CloseHandle", w.BOOL, w.HANDLE)
 _sig(kernel32, "TerminateProcess", w.BOOL, w.HANDLE, w.UINT)
+_sig(kernel32, "WaitForSingleObject", w.DWORD, w.HANDLE, w.DWORD)
+_sig(kernel32, "GetExitCodeProcess", w.BOOL, w.HANDLE, _P(w.DWORD))
 _sig(kernel32, "QueryFullProcessImageNameW", w.BOOL, w.HANDLE, w.DWORD, w.LPWSTR, _P(w.DWORD))
 _sig(dwmapi, "DwmGetWindowAttribute", ctypes.c_long, w.HWND, w.DWORD, ctypes.c_void_p, w.DWORD)
 _sig(gdi32, "DeleteObject", w.BOOL, w.HGDIOBJ)
@@ -242,6 +244,17 @@ def alto_reservado(barra, pantalla):
     return alto if fija and 20 <= alto <= 120 else None
 
 
+def reserva_de(barra, pantalla, normal=48):
+    """Cuánto reservar abajo por la barra de Windows de esa pantalla, o None si no hay que tocarla.
+    Con "Ocultar automáticamente" Windows no reserva nada y su barra queda por debajo de la
+    pantalla: se reserva lo que ocuparía fija, para que las ventanas no queden debajo de la nuestra."""
+    alto = alto_reservado(barra, pantalla)
+    if alto is not None:
+        return alto
+    escondida = barra[0] == pantalla[0] and barra[2] == pantalla[2] and pantalla[3] - 8 <= barra[1] <= pantalla[3]
+    return normal if escondida else None
+
+
 def ajustar_area(margenes=None):
     """Deja libres esos píxeles en los bordes de cada pantalla (izquierda,
     arriba, derecha, abajo); sin `margenes`, lo que ocupa la barra de Windows.
@@ -253,7 +266,7 @@ def ajustar_area(margenes=None):
         info, r = _info(h), w.RECT()
         user32.GetWindowRect(h, ctypes.byref(r))
         m, t = info.rcMonitor, info.rcWork
-        suyo = alto_reservado((r.left, r.top, r.right, r.bottom), (m.left, m.top, m.right, m.bottom))
+        suyo = reserva_de((r.left, r.top, r.right, r.bottom), (m.left, m.top, m.right, m.bottom))
         if suyo is None:
             continue
         izq, arr, der, aba = margenes or (0, 0, 0, suyo)

@@ -11,6 +11,7 @@ Item {
   property bool activa: false
   property bool abierta: false
   property bool minimizada: false
+  property bool atencion: false        // el programa pide atención (el naranja de Windows)
   property int cuenta: 0
   property int indice: 0
   property var lista
@@ -59,6 +60,22 @@ Item {
     border.width: tarea.elegida ? 2 : 0        // elegida con el teclado
     border.color: tarea.c.acento
     Behavior on color { ColorAnimation { duration: 140 } }
+  }
+  // Pide atención: un fondo cálido que late unas veces y se queda encendido.
+  Rectangle {
+    id: llama
+    visible: tarea.atencion && !tarea.activa
+    anchors { fill: parent; margins: tarea.tema.burbujas ? 1 : tarea.tema.compacto ? 1 : 3 }
+    radius: tarea.tema.burbujas ? (tarea.tema.pixelado ? 0 : width / 2) : Math.min(Math.max(tarea.tema.radio, tarea.tema.radioBoton), 10)
+    color: tarea.c.atencion || "#E8912D"
+    opacity: 0.55
+    SequentialAnimation on opacity {
+      running: llama.visible && barra.animar
+      loops: 4
+      NumberAnimation { to: 0.85; duration: 450; easing.type: Easing.InOutSine }
+      NumberAnimation { to: 0.35; duration: 450; easing.type: Easing.InOutSine }
+      onFinished: llama.opacity = 0.55
+    }
   }
   readonly property bool elegida: esPrimaria && barra.seleccion === "t:" + clave
   onElegidaChanged: {

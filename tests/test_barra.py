@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import actualizar, ajustes, arranque, atajos, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import actualizar, ajustes, apps, arranque, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -810,6 +810,12 @@ class Reinicio(unittest.TestCase):
         self.assertTrue(vigilante.puede_reiniciar([10, 20, 30], 1000))          # ya pasó un rato
         self.assertTrue(vigilante.puede_reiniciar(["x", None, 5000], 1000))     # basura o futuro
 
+    def test_motivo_del_cierre(self):
+        self.assertEqual(vigilante.motivo(0xC0000005), "código 0xC0000005, fallo de memoria")
+        self.assertEqual(vigilante.motivo(1), "código 0x1, la cerró otro programa o falló Python")
+        self.assertEqual(vigilante.motivo(0x1234), "código 0x1234")
+        self.assertEqual(vigilante.motivo(None), "sin código de salida")
+
 
 class Recursos(unittest.TestCase):
     def test_gpu(self):
@@ -997,6 +1003,93 @@ class Pantalla(unittest.TestCase):
         self.assertEqual(win.alto_reservado((0, 1032, 1920, 1080), (0, 0, 1920, 1080)), 48)
         self.assertIsNone(win.alto_reservado((0, 1078, 1920, 1126), (0, 0, 1920, 1080)))   # ocultación automática
         self.assertIsNone(win.alto_reservado((0, 0, 1920, 48), (0, 0, 1920, 1080)))        # arriba
+
+    def test_buscador_puntuar(self):
+        p = buscador.puntuar
+        self.assertEqual(p("steam", "Steam"), 100)
+        self.assertGreater(p("ste", "Steam"), p("ste", "Liberador de espacio"))
+        self.assertEqual(p("estudio", "Visual Estudio"), 80)
+        self.assertEqual(p("vsc", "Visual Studio Code"), 72)
+        self.assertEqual(p("musica", buscador.normalizar("Música")), 100)       # sin tildes
+        self.assertEqual(p("trmnl", "Terminal"), 30)                            # letras en orden
+        self.assertEqual(p("zzz", "Terminal"), 0)
+
+    def test_buscador_calcular(self):
+        c = buscador.calcular
+        self.assertEqual(c("2*(3+4)"), "14")
+        self.assertEqual(c("7/2"), "3.5")
+        self.assertEqual(c("15% de 80"), "12")
+        self.assertEqual(c("2^10"), "1 024")
+        self.assertEqual(c("sqrt(16)"), "4")
+        self.assertEqual(c("3 x 4"), "12")
+        self.assertIsNone(c("1/0"))
+        self.assertIsNone(c("9**999999"))                 # no se cuelga
+        self.assertIsNone(c("steam"))
+        self.assertIsNone(c("2024"))                      # un número solo no es una cuenta
+        self.assertIsNone(c("__import__('os')"))
+
+    def test_campo_buscar_tras_inicio(self):
+        t = {"modulos": {"izquierda": [["inicio", "tareas"]], "derecha": [["reloj"]]}}
+        con = temas.con_busqueda(t, True)
+        self.assertEqual(con["modulos"]["izquierda"], [["inicio", "buscar", "tareas"]])
+        self.assertEqual(t["modulos"]["izquierda"], [["inicio", "tareas"]])          # no toca el tema guardado
+        self.assertIs(temas.con_busqueda(t, False), t)
+        self.assertEqual(temas.con_busqueda(con, True), con)                         # no lo pone dos veces
+        solo = {"modulos": {"izquierda": [["inicio"], ["tareas"]]}}
+        self.assertEqual(temas.con_busqueda(solo, True)["modulos"]["izquierda"], [["inicio", "buscar"], ["tareas"]])
+        centrado = temas.con_alineacion({**con, "modulos": {**con["modulos"], "centro": []}, "unica": False}, True)
+        self.assertEqual(centrado["modulos"]["centro"], [["inicio", "buscar", "tareas"]])
+
+    def test_buscador_resultados(self):
+        lista = [{"nombre": "Steam", "id": "s"}, {"nombre": "Spotify", "id": "sp"}, {"nombre": "Terminal", "id": "t"}]
+        r = buscador.resultados("s", lista, {"sp": 5})
+        self.assertEqual(r[0]["nombre"], "Spotify")                       # el más usado, primero
+        self.assertEqual(r[-1]["tipo"], "archivos")
+        self.assertIn("Sonido", [x["nombre"] for x in buscador.resultados("volumen", lista)])
+        self.assertEqual(buscador.resultados("1+1", lista)[0]["valor"], "2")
+        self.assertEqual([x["id"] for x in buscador.resultados("", lista, {"t": 2})], ["t"])
+        self.assertEqual(buscador.resultados("", lista), [])
+        self.assertLessEqual(len(buscador.resultados("a", lista * 20)), buscador.MAX)
+
+    def test_apps_del_inicio(self):
+        lista = apps.leer()
+        self.assertTrue(lista and all(a["nombre"] and a["id"] for a in lista))
+
+    def test_atencion(self):
+        self.assertEqual(atencion.que_paso(0x8006), "pide")
+        self.assertEqual(atencion.que_paso(4), "activa")
+        self.assertEqual(atencion.que_paso(0x8004), "activa")
+        self.assertEqual(atencion.que_paso(2), "cerrada")
+        self.assertIsNone(atencion.que_paso(1))
+        avisos, cambios = [], []
+        a = atencion.Atencion(avisos.append, lambda: cambios.append(1))
+        try:
+            a.recibir("pide", 10)
+            a.recibir("pide", 10)                 # parpadea varias veces: un solo aviso
+            self.assertEqual((avisos, a.piden, len(cambios)), ([10], {10}, 1))
+            a.recibir("activa", 10)
+            self.assertEqual(a.piden, set())
+            a.recibir("pide", 11)
+            a.olvidar({12})                       # ya no existe
+            self.assertEqual(a.piden, set())
+        finally:
+            a.cerrar()
+
+    def test_agrupar_con_atencion(self):
+        info = [{"hwnd": 1, "clave": "d", "nombre": "Discord", "titulo": "a", "icono": "", "activa": False,
+                 "minimizada": False, "exe": "d.exe", "z": 0, "atencion": False},
+                {"hwnd": 2, "clave": "d", "nombre": "Discord", "titulo": "b", "icono": "", "activa": False,
+                 "minimizada": False, "exe": "d.exe", "z": 1, "atencion": True}]
+        self.assertTrue(programas.agrupar(info, [], True, {})[0]["atencion"])
+        self.assertEqual([f["atencion"] for f in programas.agrupar(info, [], False, {})], [False, True])
+
+    def test_reserva_con_ocultacion_automatica(self):
+        p = (0, 0, 1920, 1080)
+        self.assertEqual(win.reserva_de((0, 1032, 1920, 1080), p), 48)                     # fija
+        self.assertEqual(win.reserva_de((0, 1078, 1920, 1126), p), 48)                     # escondida abajo
+        self.assertEqual(win.reserva_de((1920, 1450, 3120, 1498), (1920, -468, 3120, 1452)), 48)   # en vertical
+        self.assertIsNone(win.reserva_de((0, 0, 1920, 48), p))                             # arriba
+        self.assertIsNone(win.reserva_de((0, 500, 1920, 548), p))                          # a media pantalla
 
     def test_sitio_maximizada(self):
         p = (0, 0, 1920, 1080)

@@ -39,10 +39,11 @@ Desde el código: `py -m pip install PySide6_Essentials`, y después
 | Volumen | Con la red y la batería al lado · Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio |
 | Reloj | Clic: calendario del tema · Clic central: notificaciones |
 | Bandeja | Clic central en un icono: guardarlo tras la flecha o sacarlo (también en el menú) · Clic en la flecha: ver los ocultos |
-| Inicio | Clic: menú Inicio · Clic derecho: menú Win+X · Rueda: pasar de tema |
+| Inicio | Clic: menú Inicio · Clic derecho: menú Win+X · Clic central: buscador · Rueda: pasar de tema |
 
 Ajustes en `%LOCALAPPDATA%\barra-temas\ajustes.json`: tema por hora (`auto`, `tema_dia`, `tema_noche`, `dia`,
-`noche`), por programa (`"por_programa": {"steam.exe": "tokyo"}`) y `modo_juego`. Errores en `barra.log`, al lado.
+`noche`), por programa (`"por_programa": {"steam.exe": "tokyo"}`) y `modo_juego`. Errores en `barra.log`, al lado
+(ver [Si se cae](#si-se-cae)).
 
 ## Atajos de teclado
 
@@ -53,9 +54,25 @@ Ajustes en `%LOCALAPPDATA%\barra-temas\ajustes.json`: tema por hora (`auto`, `te
 | Win+Ctrl+1…0 | Ir a su última ventana |
 | Win+Alt+1…0 | Su menú |
 | Win+T · Win+B | Elegir un botón · un icono de la bandeja. Flechas para moverse, Intro, Esc, tecla Menú |
+| Alt+Espacio | El buscador (ver abajo) |
 
 Los demás (Win+A, N, S, X, W, E…) son de Windows y siguen igual. El proceso que los atiende solo intercepta teclas con
 Windows pulsada o eligiendo con las flechas, y descansa en modo juego. Con una ventana de administrador delante no llegan.
+
+## Buscador
+
+El campo «Buscar» junto a Inicio, Alt+Espacio o clic central en Inicio: escribe y pulsa Intro. En las barras estrechas
+(compacta, vertical, dock, burbujas) el campo es solo una lupa; se quita en *Funciones → Barra de búsqueda junto a Inicio*. Busca en las aplicaciones del menú Inicio (también las de
+la Tienda y los juegos de Steam), en las páginas de Configuración (también por palabras: «volumen» da Sonido) y hace
+cuentas (`2*(3+4)`, `15% de 80`, `sqrt(2)`; Intro copia el resultado). La última fila busca el texto en tus archivos con
+el Explorador. Sin texto enseña las que más abres. Todo es local. Flechas o Tab para moverse, Esc para cerrar.
+El atajo es `RegisterHotKey` (sin gancho de teclado), se suelta en modo juego y se quita en *Funciones → Buscador*.
+
+## Programas que piden atención
+
+Cuando un programa pide atención (Discord con un mensaje, un juego que termina de cargar…), su botón se pone naranja y
+late, como en la barra de Windows, hasta que lo abres; con la isla dinámica, además, sale un aviso con su nombre y un
+clic lo trae delante. Lo cuenta Windows con `RegisterShellHookWindow`, sin inyectar nada.
 
 ## Widgets y tiempo
 
@@ -107,11 +124,6 @@ vertical los temas no llevan paisaje.
 Sigue lo elegido en Windows (izquierda o centro) y cambia al momento. Se puede fijar en el menú. Los iconos van en el centro
 exacto o al principio; lo demás se reparte a los lados y, si no cabe, se esconde: título, música, widgets, medidores y Claudito.
 
-## Liquid Glass
-
-Refracta la capa del fondo de escritorio, también la de Wallpaper Engine; nunca lee las ventanas. Cada pieza mide lo
-claro que es su fondo y cambia a texto oscuro si hace falta. El menú tiene cinco niveles de transparencia.
-
 ## Iconos
 
 En el menú, *Iconos*: los originales o adaptados al tema, que los pinta con sus colores (en Píxel, como pixel art). Vale
@@ -138,6 +150,12 @@ fondos se paran solos. Claudito se dibuja desde una copia en `%LOCALAPPDATA%\bar
 El vigilante devuelve la barra de Windows al momento y vuelve a abrir esta, como mucho 3 veces en 5 minutos. No la
 reabre si la cierras tú, con el atajo de emergencia o con el .bat, ni al apagar el equipo.
 
+En `barra.log` queda cada cierre con su motivo: el código de salida y qué suele querer decir (fallo de memoria, la
+cerró otro programa, no respondía…). Si cayó de golpe, debajo va dónde estaba cada hilo (lo deja `faulthandler` en
+`barra-fallo.log`). Los errores de Python que no la tiran también se anotan, cada uno como mucho una vez por minuto.
+
+Para probar código nuevo sin que cuente como caída: `py barraigilante.py --recargar` la cierra y la vuelve a abrir.
+
 ## Crear un tema
 
 Copia una carpeta de `temas` en `%LOCALAPPDATA%\barra-temas\temas`, cámbiale el nombre y edita `tema.json`. `alto + margen` no puede pasar de 48.
@@ -158,13 +176,16 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 - `barra/bandeja.py`: proceso aparte que recibe los iconos de la bandeja y los reenvía a Explorer.
 - `barra/vigilante.py`: proceso aparte que devuelve la barra de Windows si esta se cierra o se cuelga.
 - `barra/vista.py`: vista previa de las ventanas (miniaturas de DWM).
-- `barra/vidrio.py`: el vidrio de Liquid Glass.
+- `barra/vidrio.py`: lectura del fondo de escritorio para los temas con `vidrio` o `adapta` (Liquid Glass y Camaleón
+  están en `temas-retirados`).
 - `barra/sesiones.py`, `barra/uso.py`, `barra/conectar.py`, `barra/panel_claude.py`: Claudito interactivo.
 - `claudito/`: copia exacta de lo que hace falta de Claudito (`py installer\copiar_claudito.py`).
 - `barra/iconos.py`: iconos adaptados al tema.
 - `barra/saltos.py`: listas de saltos (IApplicationResolver, IApplicationDocumentLists y CustomDestinations).
 - `barra/red.py`: Wi-Fi, conexión y batería. `barra/calendario.py`: el calendario. `barra/isla.py`: la isla dinámica.
 - `barra/programas.py`: nombre real de los programas y agrupación.
+- `barra/buscador.py`, `barra/apps.py`: el buscador y la lista de aplicaciones de `shell:AppsFolder`.
+- `barra/atencion.py`: programas que piden atención.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.
 

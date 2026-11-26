@@ -124,7 +124,7 @@ def agrupar(info, fijos, juntar, orden, elegido=()):
         cerca = min(vs, key=lambda v: v["z"])            # la usada más recientemente
         varias = len(vs) > 1
         return {"key": key, "clave": vs[0]["clave"], "titulo": vs[0]["nombre"] if varias else cerca["titulo"], "nombre": vs[0]["nombre"],
-                "icono": vs[0]["icono"], "activa": any(v["activa"] for v in vs),
+                "icono": vs[0]["icono"], "activa": any(v["activa"] for v in vs), "atencion": any(v.get("atencion") for v in vs),
                 "minimizada": all(v["minimizada"] for v in vs), "abierta": True, "hwnd": str(cerca["hwnd"]),
                 "exe": vs[0]["exe"], "ruta": "", "cuenta": len(vs), "ventanas": [v["hwnd"] for v in vs],
                 "titulos": [v["titulo"] for v in vs]}
@@ -141,7 +141,7 @@ def agrupar(info, fijos, juntar, orden, elegido=()):
         else:
             out.append({"key": ("g:" if juntar else "fijo-") + x["clave"], "clave": x["clave"],
                         "titulo": x["nombre"],
-                        "nombre": x["nombre"], "icono": x["icono"], "activa": False, "minimizada": False,
+                        "nombre": x["nombre"], "icono": x["icono"], "activa": False, "atencion": False, "minimizada": False,
                         "abierta": False, "hwnd": "", "exe": x["exe"], "ruta": x["ruta"], "cuenta": 0,
                         "ventanas": [], "titulos": []})
     for clave in sorted((k for k in por_clave if k not in puestas), key=orden.get):

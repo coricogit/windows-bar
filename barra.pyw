@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox  # noqa: E402
 
-from barra import (actualizar, ajustes as cfg, arranque, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
+from barra import (actualizar, ajustes as cfg, apps as apps_inicio, arranque, atencion, buscador, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -49,6 +49,38 @@ def registrar(que):
             f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + que + "\n")
             if sys.exc_info()[0]:
                 f.write(traceback.format_exc())
+    except OSError:
+        pass
+
+
+_vistos = {}
+
+
+def anotar_errores():
+    """Con pythonw no hay consola: los errores de Python van a barra.log (cada uno, como mucho una vez
+    por minuto) y, si el proceso cae de golpe, faulthandler deja dónde estaba en barra-fallo.log."""
+    import faulthandler
+    import traceback
+
+    def anotar(tipo, valor, tb, donde=""):
+        texto = "".join(traceback.format_exception(tipo, valor, tb))
+        ahora = time.monotonic()
+        if ahora - _vistos.get(texto, -1e9) < 60:
+            return
+        if len(_vistos) > 100:
+            _vistos.clear()
+        _vistos[texto] = ahora
+        try:
+            with open(os.path.join(DATOS, "barra.log"), "a", encoding="utf-8") as f:
+                f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + "error" + donde + "\n" + texto)
+        except OSError:
+            pass
+
+    sys.excepthook = anotar
+    threading.excepthook = lambda a: anotar(a.exc_type, a.exc_value, a.exc_traceback, f" en el hilo {a.thread.name if a.thread else '?'}")
+    try:
+        anotar_errores.fallo = open(os.path.join(DATOS, "barra-fallo.log"), "w", encoding="utf-8")
+        faulthandler.enable(anotar_errores.fallo, all_threads=True)
     except OSError:
         pass
 
@@ -246,6 +278,7 @@ class Barra(QObject):
     _bandeja = Signal(object)
     _uso = Signal(object)
     _ventana_claude = Signal(object)
+    _apps = Signal(object)
 
     def __init__(self, app, vista=False):
         super().__init__()
@@ -280,6 +313,10 @@ class Barra(QObject):
         self._calendario = None
         # Isla dinámica: lo último visto de cada cosa, para avisar solo de cambios.
         self._isla = self._ult_cancion = self._modo_claude = self._red_antes = self._bat_antes = None
+        self.atencion = None
+        # Buscador (barra/buscador.py): las apps del menú Inicio se leen en un hilo y se guardan un rato.
+        self._buscador = self.atajo_buscar = None
+        self._apps_lista, self._apps_hora, self._apps_hilo, self._iconos_apps = [], 0.0, None, {}
         self._orden = {}            # cuándo se vio cada programa
         self._arrastre = 0          # desde cuándo se arrastra un botón; 0 si no
         self._ids = {}              # ventana -> identificador de app de la Tienda
@@ -300,6 +337,7 @@ class Barra(QObject):
         self._barras = [0] * 16
         self._cava.connect(self._set_cava)
         self._atajo.connect(self._hacer_atajo)
+        self._apps.connect(self._apps_leidas)
         self._tiempo.connect(self._set_tiempo)
         self._ciudad.connect(self._set_ciudad)
         self._musica.connect(self._set_musica)
@@ -323,6 +361,20 @@ class Barra(QObject):
         self._t_tiempo.start()
         QTimer.singleShot(3000, self._pedir_tiempo)
         self._gancho = win.watch(self._t_pronto.start)
+        if not self.vista:
+            try:
+                self.atencion = atencion.Atencion(self._pide_atencion, self._t_pronto.start)
+                if not self.atencion.ok:
+                    registrar("sin aviso de ventanas que piden atención (RegisterShellHookWindow)")
+            except Exception:
+                registrar("atención")
+            try:
+                self.atajo_buscar = buscador.Atajo(self.abrir_buscador)
+                self._poner_atajo_buscar()
+                self.animarCambio.connect(self._poner_atajo_buscar)
+                QTimer.singleShot(20_000, self._leer_apps)      # para que la primera vez ya esté
+            except Exception:
+                registrar("atajo del buscador")
         self._t_raton = QTimer(self, interval=120, timeout=self._vigilar_raton)
         if self.ajustes["esconder"]:
             self._t_raton.start()
@@ -403,6 +455,7 @@ class Barra(QObject):
         t = temas.con_posicion(t, self.ajustes["posicion"])
         t = iconos.con_iconos(t, self.ajustes["iconos"])
         t = temas.con_icono(t, self._tono_fondo if self.ajustes["icono"] == "fondo" or t["vidrio"] or t["adapta"] else None)
+        t = temas.con_busqueda(t, self.ajustes["barra_busqueda"] and not self.vista)
         al = self.ajustes["alineacion"]
         return temas.con_alineacion(t, self._centrado if al == "windows" else al == "centro")
 
@@ -536,6 +589,84 @@ class Barra(QObject):
             if self._ult_cancion is not None and clave != self._ult_cancion:
                 self._avisar({"icono": "🎵", "titulo": d["titulo"], "detalle": d.get("artista", "")})
             self._ult_cancion = clave
+
+    # ----- ventanas que piden atención (barra/atencion.py) -----
+    def _pide_atencion(self, h):
+        if h == win.user32.GetForegroundWindow():
+            self.atencion.piden.discard(h)
+            return
+        exe = programas.principal(win.app_exe(h))
+        nombre, titulo = self._nombre(h, exe), win.title(h)
+        self._avisar({"icono": "🔔", "titulo": nombre or titulo or "Un programa te llama",
+                      "detalle": titulo if titulo != nombre else "", "hacer": lambda: win.activate(h)})
+
+    # ----- buscador (barra/buscador.py) -----
+    def _poner_atajo_buscar(self):
+        """Alt+Espacio mientras el buscador esté puesto; en modo juego se suelta, para no quitárselo al juego."""
+        if self.atajo_buscar:
+            quiere = self.ajustes["buscador"] and self._animar
+            if self.atajo_buscar.poner(quiere) != quiere and quiere:
+                registrar("Alt+Espacio ya lo usa otro programa: el buscador sigue en el clic central de Inicio")
+
+    def _set_barra_busqueda(self, si):
+        self.ajustes["barra_busqueda"] = si
+        self._guardar()
+        self.temaCambio.emit()
+
+    def _set_buscador(self, si):
+        self.ajustes["buscador"] = si
+        self._guardar()
+        self._poner_atajo_buscar()
+
+    def _leer_apps(self):
+        if self._apps_hilo and self._apps_hilo.is_alive():
+            return
+        def leer():
+            try:
+                self._apps.emit(apps_inicio.leer())
+            except Exception:
+                registrar("apps del menú Inicio")
+        self._apps_hilo = threading.Thread(target=leer, daemon=True)
+        self._apps_hilo.start()
+
+    def _apps_leidas(self, lista):
+        self._apps_lista, self._apps_hora = lista, time.monotonic()
+        if self._buscador:
+            self._buscador.poner_apps(lista)
+
+    def _icono_resultado(self, r):
+        if r["tipo"] != "app":
+            return None
+        if r["id"] not in self._iconos_apps:
+            nombre = self.almacen.de_app(r["id"])
+            self._iconos_apps[r["id"]] = self.almacen.get(nombre) if nombre else None
+        return self._iconos_apps[r["id"]]
+
+    def _usado(self, r):
+        if r["tipo"] != "app":
+            return
+        usos = self.ajustes["lanzados"]
+        usos[r["id"]] = usos.get(r["id"], 0) + 1
+        if len(usos) > 200:                      # solo los más usados
+            self.ajustes["lanzados"] = dict(sorted(usos.items(), key=lambda x: -x[1])[:150])
+        self._guardar()
+
+    @Slot()
+    def abrir_buscador(self):
+        if self.vista or not self.paneles:
+            return
+        if self._buscador is None:
+            self._buscador = buscador.Buscador(self._icono_resultado, self._usado)
+        elif self._buscador.isVisible() or time.monotonic() - self._buscador.cerrado < 0.3:
+            self._buscador.hide()
+            return
+        if not self._apps_lista or time.monotonic() - self._apps_hora > 600:
+            self._leer_apps()                    # al momento con la lista vieja; la nueva llega sola
+        self._quitar_previa()
+        p = next((x for x in self.paneles if x.primaria), self.paneles[0])
+        x, y, an, al = p.zona_real()
+        self._buscador.mostrar(self.sitio(x + an / 2, y + al / 2), self._get_tema(), self._apps_lista,
+                               self.ajustes["lanzados"])
 
     # ----- isla dinámica -----
     def _avisar(self, aviso):
@@ -741,6 +872,10 @@ class Barra(QObject):
             self._ver_inactividad()
         hwnds = win.windows()
         self.almacen.olvidar_ventanas(set(hwnds))
+        piden = set()
+        if self.atencion:
+            self.atencion.olvidar(set(hwnds) - {activa})
+            piden = self.atencion.piden
         info = []
         self._ids = {h: i for h, i in self._ids.items() if h in hwnds}
         for z, h in enumerate(hwnds):            # de la más reciente a la más antigua
@@ -748,7 +883,7 @@ class Barra(QObject):
             info.append({"hwnd": h, "exe": exe, "titulo": win.title(h), "z": z,
                          "activa": h == activa and not win.user32.IsIconic(h),
                          "clave": win.clave_exe(exe), "nombre": self._nombre(h, exe),
-                         "minimizada": bool(win.user32.IsIconic(h)), "pantalla": win.monitor_of(h),
+                         "minimizada": bool(win.user32.IsIconic(h)), "pantalla": win.monitor_of(h), "atencion": h in piden,
                          "icono": self.almacen.url(self.almacen.de_ventana(h, exe))})
         titulo = next((i["titulo"] for i in info if i["activa"]), "")
         if titulo != self._titulo:
@@ -1278,6 +1413,9 @@ class Barra(QObject):
     # ----- botones -----
     @Slot(str)
     def accion(self, que):
+        if que == "buscador":
+            self.abrir_buscador()
+            return
         teclas = {"inicio": (0x5B,), "buscar": (0x5B, 0x53), "rapidos": (0x5B, 0x41), "avisos": (0x5B, 0x4E), "widgets": (0x5B, 0x57),
                   "menu_inicio": (0x5B, 0x58), "silencio": (0xAD,), "menos": (0xAE,), "mas": (0xAF,)}
         if que in teclas:
@@ -1360,7 +1498,9 @@ class Barra(QObject):
                                    marca("Atajos (Win+1…, Win+T, Win+B)", a["atajos"], self._set_atajos),
                                    marca("Modo juego", a["modo_juego"], self._set_juego),
                                    marca("Pincel en la barra", a["pincel"], self._set_pincel),
-                                   marca("Isla dinámica (avisos junto a la barra)", a["isla"], self._set_isla)],
+                                   marca("Isla dinámica (avisos junto a la barra)", a["isla"], self._set_isla),
+                                   marca("Buscador (Alt+Espacio o clic central en Inicio)", a["buscador"], self._set_buscador),
+                                   marca("Barra de búsqueda junto a Inicio", a["barra_busqueda"], self._set_barra_busqueda)],
                  "botones": [{"texto": "Ciudad del tiempo: " + (a["ciudad"].get("nombre") or "elegir…"),
                               "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)}] + self._boton_conectar()},
                 {"titulo": "General",
@@ -1533,7 +1673,7 @@ class Panel:
 
     def __init__(self, barra, pantalla, primaria):
         self.barra, self.pantalla, self.primaria = barra, pantalla, primaria
-        self.tareas = Lista(["key", "titulo", "icono", "activa", "minimizada", "abierta", "hwnd", "exe", "ruta", "cuenta"])
+        self.tareas = Lista(["key", "titulo", "icono", "activa", "minimizada", "abierta", "hwnd", "exe", "ruta", "cuenta", "atencion"])
         if barra.motor is None:              # uno para todas las pantallas: ahorra unos 15 MB
             barra.motor = QQmlEngine(barra)
             barra.motor.addImageProvider("iconos", Iconos(barra.almacen))
@@ -1873,12 +2013,14 @@ def main():
     candado = QLockFile(os.path.join(DATOS, "barra.lock"))
     if not candado.tryLock(100):
         return 1
+    anotar_errores()
     with open(os.path.join(DATOS, "pid.json"), "w", encoding="utf-8") as f:
         json.dump({"pid": os.getpid()}, f)
-    try:
-        os.remove(os.path.join(DATOS, "parar"))      # era para la anterior: si esta se cae, que se reabra
-    except OSError:
-        pass
+    for aviso in ("parar", "recargar"):       # eran para la anterior: si esta se cae, que se reabra
+        try:
+            os.remove(os.path.join(DATOS, aviso))
+        except OSError:
+            pass
     limite = time.monotonic() + 60
     while not win.taskbars() and time.monotonic() < limite:      # recién iniciada la sesión
         time.sleep(0.5)

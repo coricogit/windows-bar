@@ -252,6 +252,19 @@ def con_alineacion(t, centro):
     return {**t, "modulos": {**m, **nuevo}, "centrado": centro}
 
 
+def con_busqueda(t, si):
+    """El campo «Buscar» justo después de Inicio, en su mismo grupo."""
+    if not si:
+        return t
+    m = {lado: [list(g) for g in grupos] for lado, grupos in t["modulos"].items()}
+    for grupos in m.values():
+        for g in grupos:
+            if "inicio" in g and "buscar" not in g:
+                g.insert(g.index("inicio") + 1, "buscar")
+                return {**t, "modulos": m}
+    return t
+
+
 ICONO = {"tema": "Color del tema", "fondo": "Color del fondo"}
 ANIMACIONES = {"completas": "Completas", "suaves": "Suaves", "ninguna": "Ninguna"}
 RITMO = {"completas": 100, "suaves": 200, "ninguna": 1000}       # ms entre fotogramas de los fondos
