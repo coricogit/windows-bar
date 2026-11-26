@@ -428,6 +428,48 @@ def app_id(hwnd):
         method(store, 2)()
 
 
+class _DIBSECTION(ctypes.Structure):
+    _fields_ = [("bmType", w.LONG), ("bmWidth", w.LONG), ("bmHeight", w.LONG), ("bmWidthBytes", w.LONG),
+                ("bmPlanes", w.WORD), ("bmBitsPixel", w.WORD), ("bmBits", ctypes.c_void_p),
+                ("biSize", w.DWORD), ("biWidth", w.LONG), ("biHeight", w.LONG), ("biPlanes", w.WORD),
+                ("biBitCount", w.WORD), ("biCompression", w.DWORD), ("biSizeImage", w.DWORD),
+                ("biXPelsPerMeter", w.LONG), ("biYPelsPerMeter", w.LONG), ("biClrUsed", w.DWORD),
+                ("biClrImportant", w.DWORD), ("dsBitfields", w.DWORD * 3), ("dshSection", w.HANDLE),
+                ("dsOffset", w.DWORD)]
+
+
+_sig(gdi32, "GetObjectW", ctypes.c_int, w.HANDLE, ctypes.c_int, ctypes.c_void_p)
+
+
+_sig(gdi32, "GetDIBits", ctypes.c_int, w.HDC, w.HBITMAP, w.UINT, w.UINT, ctypes.c_void_p, ctypes.c_void_p, w.UINT)
+_sig(user32, "GetDC", w.HDC, w.HWND)
+_sig(user32, "ReleaseDC", ctypes.c_int, w.HWND, w.HDC)
+
+
+def pixeles_dib(bmp):
+    """(ancho, alto, bytes BGRA de arriba abajo, con alfa premultiplicado) de un HBITMAP de 32 bits, o None.
+
+    QImage.fromHBITMAP daba los iconos de IShellItemImageFactory del revés y sin
+    transparencia. Aquí se le piden a Windows las filas de arriba abajo (alto
+    negativo), que las ordena bien sea cual sea el tipo del mapa de bits; con 32
+    bits copia también el alfa.
+    """
+    ds = _DIBSECTION()
+    if gdi32.GetObjectW(bmp, ctypes.sizeof(ds), ctypes.byref(ds)) < 24 or ds.bmBitsPixel != 32             or ds.bmWidth <= 0 or ds.bmHeight <= 0:
+        return None
+    an, al = ds.bmWidth, ds.bmHeight
+    bih = (ctypes.c_byte * 40)()
+    ctypes.memmove(bih, (ctypes.c_uint32 * 3)(40, an, (-al) & 0xFFFFFFFF), 12)
+    ctypes.memmove(ctypes.byref(bih, 12), (ctypes.c_uint16 * 2)(1, 32), 4)      # planos, bits; BI_RGB = 0
+    datos = (ctypes.c_char * (an * al * 4))()
+    dc = user32.GetDC(None)
+    try:
+        filas = gdi32.GetDIBits(dc, bmp, 0, al, datos, bih, 0)
+    finally:
+        user32.ReleaseDC(None, dc)
+    return (an, al, datos.raw) if filas == al else None
+
+
 def store_icon(aumid, size=32):
     """HBITMAP del icono de una app de la Tienda, o None."""
     item, iid = ctypes.c_void_p(), GUID("bcc18b79-ba16-442f-80c4-8a59c30c463b")

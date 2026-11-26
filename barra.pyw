@@ -161,6 +161,18 @@ class Iconos(QQuickImageProvider):
         return img
 
 
+def imagen_de_hbitmap(bmp):
+    """QImage de un HBITMAP de icono, derecha y con su transparencia (ver win.pixeles_dib)."""
+    px = win.pixeles_dib(bmp)
+    if px is None:
+        return QImage.fromHBITMAP(bmp)
+    an, al, datos = px
+    # Sin ningún alfa es un mapa de bits opaco: con alfa 0 se vería vacío.
+    formato = (QImage.Format.Format_ARGB32_Premultiplied if any(datos[3::4])
+               else QImage.Format.Format_RGB32)
+    return QImage(datos, an, al, an * 4, formato).copy()
+
+
 class Almacen:
     """Guarda cada icono una vez y le da una revisión para refrescar QML."""
 
@@ -197,7 +209,7 @@ class Almacen:
         nombre = "app-" + "".join(ch if ch.isalnum() else "_" for ch in ident)
         if nombre not in self.imagenes:
             bmp = win.store_icon(ident)
-            img = QImage.fromHBITMAP(bmp) if bmp else QImage()
+            img = imagen_de_hbitmap(bmp) if bmp else QImage()
             if bmp:
                 win.gdi32.DeleteObject(bmp)
             if img.isNull():
@@ -217,7 +229,7 @@ class Almacen:
             ident = win.app_id(hwnd)
             bmp = win.store_icon(ident) if ident else None
             if bmp:
-                img = QImage.fromHBITMAP(bmp)
+                img = imagen_de_hbitmap(bmp)
                 win.gdi32.DeleteObject(bmp)
                 if not img.isNull():
                     self.poner(nombre, img)

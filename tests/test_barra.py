@@ -1028,6 +1028,25 @@ class Pantalla(unittest.TestCase):
         self.assertIsNone(c("2024"))                      # un número solo no es una cuenta
         self.assertIsNone(c("__import__('os')"))
 
+    def test_pixeles_dib_derechos(self):
+        """Los iconos de Windows salían del revés: la fila de arriba tiene que quedar arriba."""
+        import ctypes
+        from ctypes import wintypes as w
+        gdi = ctypes.WinDLL("gdi32")
+        gdi.CreateDIBSection.restype = w.HBITMAP
+        gdi.CreateDIBSection.argtypes = [w.HDC, ctypes.c_void_p, w.UINT, ctypes.POINTER(ctypes.c_void_p), w.HANDLE, w.DWORD]
+        for alto in (-2, 2):                              # de arriba abajo y de abajo arriba
+            bih = (ctypes.c_byte * 40)()
+            struct.pack_into("<IiiHHI", bih, 0, 40, 1, alto, 1, 32, 0)
+            bits = ctypes.c_void_p()
+            bmp = gdi.CreateDIBSection(None, bih, 0, ctypes.byref(bits), None, 0)
+            try:
+                arriba, abajo = b"\x01\x01\x01\xff", b"\x02\x02\x02\xff"
+                ctypes.memmove(bits, arriba + abajo if alto < 0 else abajo + arriba, 8)
+                self.assertEqual(win.pixeles_dib(bmp), (1, 2, arriba + abajo))
+            finally:
+                win.gdi32.DeleteObject(bmp)
+
     def test_campo_buscar_tras_inicio(self):
         t = {"modulos": {"izquierda": [["inicio", "tareas"]], "derecha": [["reloj"]]}}
         con = temas.con_busqueda(t, True)
