@@ -63,7 +63,11 @@ def con_iconos(t, cual):
         return {**t, "estiloIconos": "", "estiloBandeja": ""}
     # El pixel art, a un múltiplo exacto de su tamaño.
     tam = (PIXELES if t["compacto"] else 2 * PIXELES) if t["pixelado"] else t["icono"]
-    return {**t, "estiloIconos": e, "estiloBandeja": estilo(t, cual, tonos_bandeja), "icono": tam}
+    t = {**t, "estiloIconos": e, "estiloBandeja": estilo(t, cual, tonos_bandeja), "icono": tam}
+    if t["pastillaSoloOriginales"]:     # sin pastilla detrás: la bandeja, con los tonos de los programas
+        t["colores"] = {**t["colores"], "fondoBandeja": "#00000000"}
+        t["estiloBandeja"] = e
+    return t
 
 
 def _color(h):

@@ -15,9 +15,9 @@ BASE = {
     "separacion": 8, "fuente": "Segoe UI", "tamano": 13, "negrita": False, "borde": 0, "indicador": "linea",
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "estiloIconos": "", "estiloBandeja": "", "vidrio": False,
-    "compacto": False, "dock": False, "lupa": 0.38, "pegada": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
+    "compacto": False, "dock": False, "lupa": 0.38, "pegada": False, "esquinas": False, "burbujas": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
     "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "dentro": False,
-    "glifos": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False,
+    "glifos": False, "acentoWindows": True, "fondoActiva": True, "pastillaSoloOriginales": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False,
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
@@ -54,7 +54,8 @@ def cargar(raices=(RAIZ, PROPIOS)):
 
 FORMATOS = {"tema": "El del tema", "completa": "Completa", "flotante": "Flotante", "islas": "Islas", "compacta": "Compacta",
             "islas_compactas": "Islas compactas", "isla": "Una isla", "isla_compacta": "Una isla compacta",
-            "pestana": "Pestaña", "dock": "Dock", "dock_pegado": "Dock pegado", "dock_mini": "Dock pequeño"}
+            "pestana": "Pestaña", "dock": "Dock", "dock_pegado": "Dock pegado", "dock_mini": "Dock pequeño",
+            "esquinas": "Esquinas", "burbujas": "Burbujas"}
 UNA_ISLA = ("isla", "isla_compacta", "pestana", "dock", "dock_pegado", "dock_mini")
 NORMAL = 48        # lo que reserva la barra de Windows
 
@@ -89,6 +90,16 @@ def con_formato(t, formato):
             if t["indicador"] in ("linea", "relleno"):
                 t["indicador"] = "punto"
             t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 18)
+    elif formato in ("esquinas", "burbujas"):
+        if t["forma"] != "islas" or rgb(col["isla"])[3] < 0.5:
+            col["isla"] = col["fondo"]
+        t.update(forma="islas", dentro=True, borde=2 if t["pixelado"] else 1)
+        if formato == "esquinas":       # tres piezas: los lados encajados en las esquinas
+            t.update(esquinas=True, alto=44, margen=0, relleno=12, separacion=10)
+            t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 14)
+        else:                           # cada botón en su círculo; el resto, en píldoras
+            t.update(burbujas=True, alto=40, margen=4, relleno=8, separacion=10, aire=4, indicador="burbuja")
+            t["radio"] = 0 if t["pixelado"] or t["corchetes"] else 20
     elif formato.startswith("islas"):
         if t["forma"] != "islas":
             t.update(forma="islas", dentro=True, separacion=8, relleno=8, borde=2 if t["pixelado"] else 1)
@@ -179,11 +190,11 @@ def con_windows(t, apariencia):
         return t
     claro, en_oscuro, en_claro = apariencia
     col = {**t["colores"], **(t["claro"] if claro else {})}
-    acento = en_claro if claro else en_oscuro
+    acento = (en_claro if claro else en_oscuro) if t["acentoWindows"] else None
     if acento:
         col["acento"] = col["acento2"] = _legible(acento, rgb(col["fondo"]))
     otros = dict(t["coloresClaros"])
-    if en_claro and otros:
+    if en_claro and otros and t["acentoWindows"]:
         otros["acento"] = otros["acento2"] = en_claro
     return {**t, "colores": col, "coloresClaros": otros}
 

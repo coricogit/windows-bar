@@ -48,7 +48,7 @@ class Bandeja(unittest.TestCase):
 
 class Temas(unittest.TestCase):
     def test_los_que_hay(self):
-        self.assertEqual(list(temas.cargar((temas.RAIZ,))), ["tokyo", "original", "sakura", "pixel", "bosque"])
+        self.assertEqual(list(temas.cargar((temas.RAIZ,))), ["tokyo", "original", "minimo", "sakura", "pixel", "bosque"])
 
     def test_caben_y_tienen_colores(self):
         for ident, t in temas.cargar().items():
@@ -65,7 +65,7 @@ class Temas(unittest.TestCase):
                 self.assertIs(temas.con_formato(t, "tema"), t)
                 if f != "tema":
                     self.assertEqual(n["compacto"], "compacta" in f)
-                    self.assertEqual(n["forma"] == "islas", f.startswith("isla") or f in temas.UNA_ISLA)
+                    self.assertEqual(n["forma"] == "islas", f.startswith("isla") or f in temas.UNA_ISLA + ("esquinas", "burbujas"))
                     self.assertEqual(n["unica"], f in temas.UNA_ISLA)
                     self.assertEqual(n["dock"], f.startswith("dock"))
                     self.assertEqual(n["pegada"], f in ("pestana", "dock_pegado"))
@@ -190,7 +190,14 @@ class ComoWindows(unittest.TestCase):
 
     def test_solo_original(self):
         for ident, t in temas.cargar((temas.RAIZ,)).items():
-            self.assertEqual(temas.con_windows(t, (True, "#FF0000", "#FF0000")) is t, ident != "original")
+            self.assertEqual(temas.con_windows(t, (True, "#FF0000", "#FF0000")) is t, ident not in ("original", "minimo"))
+
+    def test_minimo_sin_acento(self):
+        t = temas.cargar((temas.RAIZ,))["minimo"]
+        for claro in (True, False):
+            c = temas.con_windows(t, (claro, "#FF0000", "#FF0000"))["colores"]
+            self.assertEqual(c["acento"], "#111111" if claro else "#FFFFFF")       # monocromo, sin el rojo
+            Contraste.revisar(self, c, [c["fondo"]], ("minimo", claro))
 
     def test_cualquier_acento_destaca(self):
         for claro in (True, False):

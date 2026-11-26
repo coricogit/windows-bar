@@ -127,6 +127,50 @@ Item {
     onWheel: function(e) { barra.girar_tema(e.angleDelta.y > 0 ? -1 : 1) }
   }
 
+  // ---------- Esquinas: una pieza por zona; las de los lados, en las esquinas ----------
+  component Pieza: Rectangle {
+    id: pieza
+    property Item zona
+    property string cual          // "ini", "cen" o "fin"
+    readonly property real aire: root.aire
+    readonly property string ini: root.v ? "arriba" : "izquierda"
+    readonly property string fin: root.v ? "abajo" : "derecha"
+    // Sin redondear lo que toca el borde de la pantalla.
+    function recta(a, b) {
+      var l = [a, b]
+      return l.indexOf(root.t.lado) >= 0 || (cual === "ini" && l.indexOf(ini) >= 0) || (cual === "fin" && l.indexOf(fin) >= 0)
+    }
+    readonly property real r: Math.min(root.t.radio, root.t.alto / 2)
+    visible: root.t.esquinas && zona.mio > 0
+    readonly property real desde: cual === "ini" ? 0 : (root.v ? zona.y : zona.x) - aire
+    readonly property real hasta: cual === "fin" ? root.largo : (root.v ? zona.y + zona.height : zona.x + zona.width) + aire
+    x: root.v ? cuerpo.x : desde
+    y: root.v ? desde : cuerpo.y
+    width: root.v ? cuerpo.width : hasta - desde
+    height: root.v ? hasta - desde : cuerpo.height
+    color: root.c.isla
+    border.width: root.t.borde
+    border.color: root.c.borde
+    topLeftRadius: recta("arriba", "izquierda") ? 0 : r
+    topRightRadius: recta("arriba", "derecha") ? 0 : r
+    bottomLeftRadius: recta("abajo", "izquierda") ? 0 : r
+    bottomRightRadius: recta("abajo", "derecha") ? 0 : r
+    Behavior on color { ColorAnimation { duration: 350 } }
+    Loader {
+      anchors { fill: parent; margins: root.t.borde }
+      active: pieza.visible && root.t.fondoUrl !== "" && pieza.width > 20
+      source: active ? root.t.fondoUrl : ""
+      onLoaded: {
+        item.radio = Qt.binding(function() { return Math.max(0, pieza.r - root.t.borde) })
+        item.desde = Qt.binding(function() { return pieza.desde })
+        item.total = Qt.binding(function() { return root.largo })
+      }
+    }
+  }
+  Pieza { zona: izquierda; cual: "ini" }
+  Pieza { zona: centro; cual: "cen" }
+  Pieza { zona: derecha; cual: "fin" }
+
   Rectangle {          // el fondo de "una isla"
     id: isla
     visible: root.unica

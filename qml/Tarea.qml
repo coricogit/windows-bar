@@ -26,7 +26,7 @@ Item {
   }
   readonly property var c: tema.colores
   readonly property string estilo: tema.indicador
-  readonly property real paso: tema.dock ? tema.icono + 16 : tema.compacto ? 32 : 42
+  readonly property real paso: tema.dock ? tema.icono + 16 : tema.burbujas ? alto : tema.compacto ? 32 : 42
   // Dock: los iconos crecen cuanto más cerca está el ratón, hacia dentro de la pantalla.
   readonly property real lupa: {
     if (!tema.dock || !lista || lista.ratonX < -500) return 1
@@ -38,11 +38,24 @@ Item {
   width: v ? alto : paso
   height: v ? paso : alto
 
+  // Burbujas: un círculo por botón; la activa, con aro del color de acento.
   Rectangle {
+    visible: tarea.tema.burbujas
+    anchors.centerIn: parent
+    width: Math.min(tarea.width, tarea.height) - 2; height: width
+    radius: tarea.tema.pixelado ? 0 : width / 2
+    color: raton.containsMouse || suelta.containsDrag ? Qt.lighter(tarea.c.isla, 1.25) : tarea.c.isla
+    border.width: tarea.activa ? 2 : 1
+    border.color: tarea.activa ? tarea.c.acento : tarea.abierta ? tarea.c.tenue : tarea.c.borde
+    opacity: tarea.abierta || raton.containsMouse ? 1 : 0.8
+    Behavior on color { ColorAnimation { duration: 140 } }
+  }
+  Rectangle {
+    visible: !tarea.tema.burbujas
     anchors { fill: parent; margins: tarea.tema.compacto ? 1 : 3 }
     radius: Math.min(Math.max(tema.radio, tema.radioBoton), 10)
     color: tarea.activa && tarea.estilo === "relleno" ? tarea.c.acento
-           : (raton.containsMouse && !tarea.tema.dock) || suelta.containsDrag || (tarea.activa && tarea.estilo !== "corchetes" && tarea.estilo !== "gota") ? tarea.c.encima : "transparent"
+           : (raton.containsMouse && !tarea.tema.dock) || suelta.containsDrag || (tarea.activa && tarea.tema.fondoActiva && tarea.estilo !== "corchetes" && tarea.estilo !== "gota") ? tarea.c.encima : "transparent"
     border.width: tarea.elegida ? 2 : 0        // elegida con el teclado
     border.color: tarea.c.acento
     Behavior on color { ColorAnimation { duration: 140 } }

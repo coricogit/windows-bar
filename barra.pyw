@@ -1335,7 +1335,7 @@ class Barra(QObject):
                                  {"texto": "Se esconde sola", "elegido": a["esconder"], "hacer": lambda: self._set_esconder(True)}]),
                  ("# Formato de " + t["nombre"], []),
                  ("Barra", formatos("tema", "completa", "flotante", "compacta")),
-                 ("Islas", formatos("islas", "islas_compactas")),
+                 ("Islas", formatos("islas", "islas_compactas", "esquinas", "burbujas")),
                  ("Una pieza", formatos("isla", "isla_compacta", "pestana")),
                  ("Dock", formatos("dock", "dock_pegado", "dock_mini"))]
         iconos_ = [("Estilo", fila(iconos.ESTILOS, a["iconos"], self._set_iconos)),
@@ -1779,7 +1779,7 @@ def preparar_vista(app, todo=False):
         print("QML:", e)
     casos = [(t, f, a, "dia", p) for p in ("arriba", "izquierda", "derecha") for t in barra.temas
              for f in ("tema", "islas_compactas", "completa", "isla") for a in ("centro", "izquierda")] if todo else []
-    casos += [(t, f, a, m, "abajo") for t in barra.temas for f in ("tema", "islas_compactas", "isla", "isla_compacta", "flotante", "pestana", "dock", "dock_pegado", "dock_mini")
+    casos += [(t, f, a, m, "abajo") for t in barra.temas for f in ("tema", "islas_compactas", "isla", "isla_compacta", "flotante", "pestana", "dock", "dock_pegado", "dock_mini", "esquinas", "burbujas")
               for a in ("izquierda", "centro")
              for m in (cielo.MOMENTOS if barra.temas[t]["momentos"] and (f, a) == ("tema", "centro") else ("dia",))]
     return barra, panel, casos

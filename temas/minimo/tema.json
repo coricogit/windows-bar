@@ -1,0 +1,70 @@
+{
+  "nombre": "Mínimo",
+  "orden": 3,
+  "forma": "completa",
+  "alto": 44,
+  "margen": 0,
+  "radio": 0,
+  "borde": 0,
+  "relleno": 14,
+  "separacion": 14,
+  "radioBoton": 6,
+  "fuente": "Segoe UI Variable Text",
+  "tamano": 13,
+  "indicador": "punto",
+  "glifos": true,
+  "reloj": "HH:mm",
+  "fecha": "",
+  "relojDoble": false,
+  "medidor": "linea",
+  "fondo": "Fondo.qml",
+  "fondoActiva": false,
+  "pastillaSoloOriginales": true,
+  "windows": true,
+  "acentoWindows": false,
+  "logo": {
+    "colores": ["texto"],
+    "fuera": 0,
+    "dentro": 0,
+    "lados": 0,
+    "hueco": 1.5
+  },
+  "colores": {
+    "fondo": "#F2121212",
+    "fondo2": "#F2121212",
+    "isla": "transparent",
+    "borde": "#26FFFFFF",
+    "texto": "#EDEDED",
+    "tenue": "#8C8C8C",
+    "acento": "#FFFFFF",
+    "acento2": "#BDBDBD",
+    "alerta": "#FF8A80",
+    "encima": "#17FFFFFF"
+  },
+  "claro": {
+    "fondo": "#F2F7F7F7",
+    "fondo2": "#F2F7F7F7",
+    "borde": "#1F000000",
+    "texto": "#111111",
+    "tenue": "#5C5C5C",
+    "acento": "#111111",
+    "acento2": "#444444",
+    "alerta": "#B3261E",
+    "encima": "#12000000",
+    "fondoBandeja": "#A6404040"
+  },
+  "coloresClaros": {
+    "texto": "#111111",
+    "tenue": "#3A3A3A",
+    "acento": "#111111",
+    "acento2": "#444444",
+    "alerta": "#8E0B12",
+    "encima": "#14000000",
+    "fondoBandeja": "#8C1A1A1A"
+  },
+  "modulos": {
+    "izquierda": [["inicio", "tareas"]],
+    "centro": [],
+    "derecha": [["bandeja", "volumen"], ["reloj"], ["temas"]]
+  }
+}

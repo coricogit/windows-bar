@@ -20,10 +20,19 @@ Loader {
       id: botonInicio
       alto: mod.alto
       colores: mod.c
-      ancho: mod.tema.compacto ? 30 : 38
+      ancho: mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38
       ayuda: "Inicio · Rueda: cambiar de tema (" + mod.tema.nombre + ")"
       onPulsado: function(b) { barra.accion(b === Qt.RightButton ? "menu_inicio" : "inicio") }
       onRueda: function(p) { barra.girar_tema(-p) }
+      Rectangle {        // Burbujas: también en su círculo, como los programas
+        visible: mod.tema.burbujas
+        anchors.centerIn: parent
+        width: Math.min(parent.width, parent.height) - 2; height: width
+        radius: mod.tema.pixelado ? 0 : width / 2
+        color: botonInicio.encima ? Qt.lighter(mod.c.isla, 1.25) : mod.c.isla
+        border.width: 1
+        border.color: mod.c.borde
+      }
       Logo { anchors.centerIn: parent; tema: mod.tema; encima: botonInicio.encima }
     }
   }

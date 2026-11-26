@@ -10,7 +10,9 @@ Rectangle {
   property real limite: 600
   property real desde: 0             // dónde está y cuánto mide la barra, para el paisaje
   property real total: 0
-  readonly property bool isla: tema.forma === "islas" && !tema.unica
+  // Sin pieza propia: con una isla para todo, en Esquinas (la pone la zona) y,
+  // en Burbujas, la de los programas (cada uno lleva su círculo).
+  readonly property bool isla: tema.forma === "islas" && !tema.unica && !tema.esquinas && !(tema.burbujas && conTareas)
   readonly property int llenos: {        // columnas justas, como en Zona
     var n = piezas * 0
     for (var i = 0; i < rep.count; i++) { var m = rep.itemAt(i); if (m && m.width > 0) n++ }
@@ -47,7 +49,7 @@ Rectangle {
   opacity: oculto || vacio ? 0 : 1
   enabled: opacity > 0
   radius: Math.min(tema.radio, alto / 2)
-  color: tema.unica ? "transparent" : tema.colores.isla
+  color: isla ? tema.colores.isla : "transparent"
   border.width: isla ? tema.borde : 0
   border.color: tema.colores.borde
   Behavior on color { ColorAnimation { duration: 350 } }

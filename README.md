@@ -1,6 +1,6 @@
 # Barra de temas
 
-Barra de tareas para Windows 11 con 5 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
+Barra de tareas para Windows 11 con 6 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
 sistema ni inyectar código: solo la oculta mientras está abierta.
 
 ## Instalar
@@ -72,11 +72,18 @@ que sale por los altavoces (nunca el micrófono, y sin guardar nada) solo mientr
 
 En el menú (pestaña *Forma*), el formato cambia la forma de cada tema por separado: completa, flotante (píldora separada
 del borde), compacta (30 px), islas, islas compactas (36 px), una isla (todo junto en el centro), una isla compacta,
-pestaña (una isla pegada al borde), dock (iconos grandes que crecen bajo el ratón; 60 px), dock pegado (56 px) o dock
-pequeño (cabe en los 48 px de Windows).
+pestaña (una isla pegada al borde), dock (iconos grandes que crecen bajo el ratón; 60 px), dock pegado (56 px), dock
+pequeño (cabe en los 48 px de Windows), esquinas (tres piezas pegadas al borde, las de los lados en las esquinas) o
+burbujas (cada programa en su círculo y el resto en píldoras).
 *Esconderse → Se esconde sola* deja una rayita en el borde: la barra sale al llevar el ratón allí, y las ventanas
 maximizadas ocupan toda la pantalla.
 Las compactas agrandan el área de trabajo, y las ventanas maximizadas ganan ese espacio; al cerrar vuelve a su sitio.
+
+## Mínimo
+
+Monocromo y sin dibujos: sigue el modo claro u oscuro de Windows pero no su color de acento (`"acentoWindows": false`),
+marca la ventana activa solo con un punto (`"fondoActiva": false`) y enseña solo inicio, programas, bandeja, volumen y
+hora. Con los iconos adaptados, la bandeja va sin pastilla detrás (`"pastillaSoloOriginales": true`).
 
 ## Original y opacidad
 
