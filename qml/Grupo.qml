@@ -72,6 +72,7 @@ Rectangle {
     anchors { fill: parent; margins: grupo.tema.borde }
     active: grupo.isla && grupo.tema.dentro && grupo.tema.fondoUrl !== "" && grupo.width > 20
     source: active ? grupo.tema.fondoUrl : ""
+    opacity: grupo.tema.variante === "pastel" ? 0.35 : 1
     onLoaded: {
       item.radio = Qt.binding(function() { return Math.max(0, grupo.radius - grupo.tema.borde) })
       item.desde = Qt.binding(function() { return grupo.desde })

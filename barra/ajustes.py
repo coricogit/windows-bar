@@ -11,7 +11,7 @@ DEFECTO = {"tema": "tokyo", "formatos": {}, "auto": False, "tema_dia": "bosque",
            "orden": [], "posicion": "abajo", "opacidad": 85, "ocultos": [],
            "actualizar": True, "intentos": "", "atajos": True, "widgets": True, "ciudad": {},
            "cava": True, "iconos": "originales", "esconder": False, "isla": True,
-           "buscador": True, "barra_busqueda": True, "pomodoro": [25, 5], "lanzados": {}}
+           "buscador": True, "barra_busqueda": True, "pomodoro": [25, 5], "variantes": {}, "lanzados": {}}
 
 
 def normalizar(d, temas, formatos):

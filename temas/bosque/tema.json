@@ -33,6 +33,7 @@
     "hueco": 1
   },
   "medidor": "rama",
+  "sombraReloj": true,
   "momentos": {
     "noche": {
       "fondo": "#F70C120E",

@@ -3,6 +3,18 @@
 Barra de tareas para Windows 11 con 6 temas y Claudito. Reemplaza a la de Windows sin cambiar archivos del
 sistema ni inyectar código: solo la oculta mientras está abierta.
 
+## Novedades
+
+- **1.0.10**: cada tema en cinco gamas de color (*Original, Pastel, Vivos, Suaves, Oscuro*), en *Menú → Forma → Colores*;
+  la hora y la fecha, más grandes y legibles.
+- **1.0.9**: las ventanas encajadas se ajustan al hueco de esta barra; en pantallas verticales, soltar una ventana sobre
+  la barra la encaja en la mitad de abajo.
+- **1.0.8**: iconos más nítidos, volumen de cada programa con la rueda, aviso de micrófono en uso, temporizador y
+  pomodoro con tus minutos, y el buscador lleva a las ventanas abiertas.
+- **1.0.7**: los iconos de las aplicaciones ya no salen del revés.
+- **1.0.6**: buscador (Alt+Espacio o el campo «Buscar»), programas que piden atención en naranja y medidores que se
+  adaptan al alto de la barra.
+
 ## Instalar
 
 Necesita Windows 11 de 64 bits; no pide administrador y trae Python y Qt. Se desinstala desde *Configuración > Aplicaciones*.
@@ -112,6 +124,14 @@ burbujas (cada programa en su círculo y el resto en píldoras).
 *Esconderse → Se esconde sola* deja una rayita en el borde: la barra sale al llevar el ratón allí, y las ventanas
 maximizadas ocupan toda la pantalla.
 Las compactas agrandan el área de trabajo, y las ventanas maximizadas ganan ese espacio; al cerrar vuelve a su sitio.
+
+## Colores
+
+Cada tema tiene cinco gamas, que salen de sus propios tonos: **Original**; **Pastel** (fondo claro y suave con texto
+oscuro; el dibujo del tema se ve tenue); **Vivos** (fondo y acentos más intensos); **Suaves** (casi gris, sin perder
+el tono) y **Oscuro** (fondo muy oscuro con texto claro). Se elige en *Menú → Forma → Colores de…*, para cada tema, y
+*Usar estos colores en todos los temas* la copia a los demás. El texto siempre queda legible sobre el fondo. Se guarda
+en `"variantes": {"bosque": "pastel"}`.
 
 ## Mínimo
 

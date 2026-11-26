@@ -409,11 +409,43 @@ Loader {
       id: hora
       property date ahora: new Date()
       readonly property bool doble: mod.tema.relojDoble && !mod.tema.compacto
-      alineado: doble && !mod.v ? Text.AlignRight : Text.AlignHCenter
-      texto: Qt.formatTime(ahora, mod.v ? "HH:mm" : mod.tema.reloj) + (!mod.tema.fecha ? ""
-             : mod.v ? "\n" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM")
-             : (doble ? "\n" : "  ") + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha))
-      tam: mod.v || doble ? Math.min(mod.tema.tamano, 13) : mod.tema.tamano
+      // En vertical, un texto de dos líneas; en horizontal, la hora grande y en negrita
+      // y la fecha debajo (o al lado), las dos a la medida del alto de la barra.
+      readonly property real f: Math.max(0.8, Math.min(1.4, mod.alto / 46))
+      alineado: Text.AlignHCenter
+      texto: !mod.v ? "" : Qt.formatTime(ahora, "HH:mm") + (!mod.tema.fecha ? ""
+             : "\n" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM"))
+      tam: Math.min(mod.tema.tamano, 13)
+      ancho: mod.v ? mod.alto : esfera.implicitWidth + (mod.tema.compacto ? 14 : 20)
+      Grid {
+        id: esfera
+        visible: !mod.v
+        anchors.centerIn: parent
+        columns: hora.doble ? 1 : 2
+        columnSpacing: Math.round(8 * hora.f)
+        rowSpacing: Math.round(-3 * hora.f)
+        horizontalItemAlignment: hora.doble ? Grid.AlignRight : Grid.AlignLeft
+        verticalItemAlignment: Grid.AlignVCenter
+        Texto {
+          text: Qt.formatTime(hora.ahora, mod.tema.reloj)
+          color: mod.c.texto
+          font.bold: true
+          // En temas con un fondo muy dibujado (bosque), una sombra suave para que se lea.
+          style: mod.tema.sombraReloj ? Text.Raised : Text.Normal
+          styleColor: "#B0000000"
+          font.pixelSize: Math.round((hora.doble ? Math.max(16, mod.tema.tamano + 3) : Math.max(15, mod.tema.tamano + 2)) * hora.f)
+        }
+        Texto {
+          visible: !!mod.tema.fecha
+          text: hora.ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha)
+          color: mod.c.texto
+          opacity: mod.tema.sombraReloj ? 1 : 0.88
+          style: mod.tema.sombraReloj ? Text.Raised : Text.Normal
+          styleColor: "#B0000000"
+          font.bold: false
+          font.pixelSize: Math.round(Math.max(13, mod.tema.tamano) * hora.f)
+        }
+      }
       ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat) + "
 Clic: calendario · Clic central: notificaciones"
       onPulsado: function(b) {

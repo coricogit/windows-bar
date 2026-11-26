@@ -1067,6 +1067,21 @@ class Pantalla(unittest.TestCase):
         self.assertFalse(encaje.en_zona((900, 1420), vertical, area))          # en otra pantalla
         self.assertFalse(encaje.en_zona((900, 1050), (0, 0, 1920, 1080), (0, 0, 1920, 1024)))   # la horizontal, no
 
+    def test_variantes_de_color(self):
+        ts = temas.cargar()
+        for k, t in ts.items():
+            self.assertIs(temas.con_variante(t, "tema"), t)
+            self.assertIs(temas.con_variante(t, "otra"), t)
+            for v in ("pastel", "vivos", "suaves", "oscuro"):
+                x = temas.con_variante(t, v)
+                c = x["colores"]
+                self.assertEqual(x["variante"], v)
+                self.assertGreater(temas.contraste(temas.rgb(c["texto"]), temas.rgb(c["fondo"])), 4.5, (k, v))
+                self.assertNotEqual(c, t["colores"], (k, v))
+            self.assertGreater(temas.luz(temas.rgb(temas.con_variante(t, "pastel")["colores"]["fondo"])), 0.5, k)
+            self.assertLess(temas.luz(temas.rgb(temas.con_variante(t, "oscuro")["colores"]["fondo"])), 0.05, k)
+        self.assertEqual(temas._de_hsl(*temas._hsl("#80FF0000")), "#80FF0000")      # el alfa se conserva
+
     def test_campo_buscar_tras_inicio(self):
         t = {"modulos": {"izquierda": [["inicio", "tareas"]], "derecha": [["reloj"]]}}
         con = temas.con_busqueda(t, True)

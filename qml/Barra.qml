@@ -6,6 +6,8 @@ import QtQuick
 Item {
   id: root
   readonly property var t: barra.tema
+  // En la gama pastel el fondo es claro: el dibujo del tema (pensado para fondo oscuro) se ve tenue.
+  readonly property real tenueAdorno: t.variante === "pastel" ? 0.35 : 1
   readonly property var c: t.colores
   readonly property bool v: t.vertical
   readonly property bool islas: t.forma === "islas"
@@ -105,7 +107,7 @@ Item {
       source: root.t.dentro ? "" : root.t.fondoUrl
       // Flotante: el paisaje no asoma por las esquinas redondeadas.
       onLoaded: item.radio = Qt.binding(function() { return root.islas ? 0 : Math.max(0, root.t.radio - root.t.borde) })
-      opacity: status === Loader.Ready ? 1 : 0
+      opacity: (status === Loader.Ready ? 1 : 0) * root.tenueAdorno
       Behavior on opacity { NumberAnimation { duration: 400 } }
     }
   }
@@ -160,6 +162,7 @@ Item {
       anchors { fill: parent; margins: root.t.borde }
       active: pieza.visible && root.t.fondoUrl !== "" && pieza.width > 20
       source: active ? root.t.fondoUrl : ""
+      opacity: root.tenueAdorno
       onLoaded: {
         item.radio = Qt.binding(function() { return Math.max(0, pieza.r - root.t.borde) })
         item.desde = Qt.binding(function() { return pieza.desde })
@@ -210,6 +213,7 @@ Item {
       anchors { fill: parent; margins: root.t.borde }
       active: root.unica && root.t.dentro && root.t.fondoUrl !== ""
       source: active ? root.t.fondoUrl : ""
+      opacity: root.tenueAdorno
       onLoaded: {
         item.radio = Qt.binding(function() { return Math.max(0, Math.min(root.t.radio, root.t.alto / 2) - root.t.borde) })
         item.desde = Qt.binding(function() { return 0 })

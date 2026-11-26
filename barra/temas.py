@@ -16,7 +16,7 @@ BASE = {
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "estiloIconos": "", "estiloBandeja": "", "vidrio": False,
     "compacto": False, "dock": False, "lupa": 0.38, "pegada": False, "esquinas": False, "burbujas": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
-    "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "dentro": False,
+    "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "sombraReloj": False, "variante": "tema", "dentro": False,
     "glifos": False, "acentoWindows": True, "fondoActiva": True, "pastillaSoloOriginales": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False,
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
@@ -266,6 +266,90 @@ def con_busqueda(t, si):
 
 
 ICONO = {"tema": "Color del tema", "fondo": "Color del fondo"}
+VARIANTES = {"tema": "Original", "pastel": "Pastel", "vivos": "Vivos", "suaves": "Suaves", "oscuro": "Oscuro"}
+_FONDOS = ("fondo", "fondo2", "isla", "fondoBandeja")
+_TONOS = ("acento", "acento2", "alerta", "medidor1", "medidor2", "medidor3", "cava1", "cava2")
+
+
+def _hsl(c):
+    """(tono, saturación, luz, alfa) de un color del tema, o None si no es un color."""
+    import colorsys
+    if not isinstance(c, str) or not c.startswith("#") or len(c) not in (7, 9):
+        return None
+    r, g, b, a = rgb(c)
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    return h, s, l, a
+
+
+def _de_hsl(h, s, l, a=1.0):
+    import colorsys
+    r, g, b = colorsys.hls_to_rgb(h % 1, max(0.0, min(1.0, l)), max(0.0, min(1.0, s)))
+    if a >= 0.999:
+        return "#%02X%02X%02X" % tuple(round(x * 255) for x in (r, g, b))
+    return "#%02X%02X%02X%02X" % tuple(round(x * 255) for x in (a, r, g, b))
+
+
+def con_variante(t, variante):
+    """El tema con otra gama de colores: pastel, vivos, suaves u oscuro. Sale de sus
+    propios colores (cada tema conserva sus tonos) y deja el texto legible."""
+    if variante not in VARIANTES or variante == "tema":
+        return t
+    col = dict(t["colores"])
+    acento = _hsl(col.get("acento")) or (0.58, 0.6, 0.6, 1)
+    h = acento[0]
+
+    def cambiar(clave, f):
+        x = _hsl(col.get(clave))
+        if x is not None and x[3] > 0:
+            col[clave] = _de_hsl(*f(*x))
+
+    if variante == "pastel":                 # fondo claro y suave, texto oscuro
+        for k in _FONDOS:
+            luz = {"fondo": 0.87, "fondo2": 0.83, "isla": 0.9, "fondoBandeja": 0.8}[k]
+            cambiar(k, lambda _h, s, l, a, luz=luz: (h, 0.5, luz, a))
+        cambiar("borde", lambda _h, s, l, a: (h, 0.35, 0.7, a))
+        col["texto"], col["tenue"] = _de_hsl(h, 0.3, 0.2), _de_hsl(h, 0.18, 0.4)
+        for k in _TONOS:
+            cambiar(k, lambda th, s, l, a: (th, 0.55, 0.6, a))
+        cambiar("encima", lambda _h, s, l, a: (h, 0.45, 0.5, 0.18))
+    elif variante == "vivos":                # más color en todo: el fondo, de su tono pero intenso
+        for k in _TONOS:
+            cambiar(k, lambda th, s, l, a: (th, min(1.0, s * 1.3 + 0.15), max(0.5, min(0.62, l)), a))
+        for k in _FONDOS:
+            cambiar(k, lambda th, s, l, a: (th if s > 0.08 else h, min(1.0, max(s * 1.6, 0.45)), l, a))
+    elif variante == "suaves":               # apagado, casi gris, sin perder el tono
+        for k in _TONOS:
+            cambiar(k, lambda th, s, l, a: (th, s * 0.45, 0.5 * l + 0.33, a))
+        for k in _FONDOS + ("borde",):
+            cambiar(k, lambda th, s, l, a: (th, s * 0.3, l, a))
+    elif variante == "oscuro":               # fondo muy oscuro de su mismo tono, texto claro
+        for k in _FONDOS:
+            cambiar(k, lambda th, s, l, a: (th, min(s, 0.35), min(l * 0.45, 0.1), a))
+        texto = _hsl(col.get("texto"))
+        if texto and texto[2] < 0.6:
+            col["texto"], col["tenue"] = _de_hsl(texto[0], 0.15, 0.92), _de_hsl(texto[0], 0.12, 0.7)
+    logo = dict(t.get("logo") or {})
+    if variante != "oscuro" and isinstance(logo.get("colores"), list):
+        tonos = []
+        for c in logo["colores"]:
+            x = _hsl(c)
+            if x is None:
+                tonos.append(c)
+            elif variante == "pastel":
+                tonos.append(_de_hsl(x[0], 0.55, 0.62, x[3]))
+            elif variante == "vivos":
+                tonos.append(_de_hsl(x[0], min(1.0, x[1] * 1.3 + 0.15), max(0.5, min(0.62, x[2])), x[3]))
+            else:
+                tonos.append(_de_hsl(x[0], x[1] * 0.45, 0.5 * x[2] + 0.33, x[3]))
+        logo["colores"] = tonos
+    out = {**t, "colores": col, "logo": logo, "variante": variante}
+    if variante == "pastel":
+        out["clara"] = True
+    elif variante == "oscuro":
+        out["clara"] = False
+    return out
+
+
 ANIMACIONES = {"completas": "Completas", "suaves": "Suaves", "ninguna": "Ninguna"}
 RITMO = {"completas": 100, "suaves": 200, "ninguna": 1000}       # ms entre fotogramas de los fondos
 

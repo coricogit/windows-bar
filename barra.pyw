@@ -502,6 +502,7 @@ class Barra(QObject):
         if t["dinamico"]:
             t = {**t, "colores": {**t["colores"], **self._camaleon}}
         t = temas.con_momento(t, self._momento)
+        t = temas.con_variante(t, self.ajustes["variantes"].get(self._elegido, "tema"))
         detras = temas.brillo_de_lado(self._pix_fondo, self.ajustes["posicion"]) if t["translucida"] else 0
         t = temas.con_windows_y_opacidad(t, self._apariencia, self.ajustes["formatos"].get(self._elegido, "tema"),
                                          self.ajustes["opacidad"], detras)
@@ -580,6 +581,17 @@ class Barra(QObject):
         self.ajustes["formatos"][self._elegido] = f
         self._guardar()
         self.temaCambio.emit()
+
+    def _set_variante(self, v):
+        self.ajustes["variantes"][self._elegido] = v
+        self._guardar()
+        self._actualizar_camaleon(avisar=False)
+        self.temaCambio.emit()
+
+    def _variante_para_todos(self):
+        v = self.ajustes["variantes"].get(self._elegido, "tema")
+        self.ajustes["variantes"] = {t: v for t in self.temas}
+        self._guardar()
 
     def _formato_para_todos(self):
         f = self.ajustes["formatos"].get(self._elegido, "tema")
@@ -1634,7 +1646,9 @@ class Barra(QObject):
                  ("Barra", formatos("tema", "completa", "flotante", "compacta")),
                  ("Islas", formatos("islas", "islas_compactas", "esquinas", "burbujas")),
                  ("Una pieza", formatos("isla", "isla_compacta", "pestana")),
-                 ("Dock", formatos("dock", "dock_pegado", "dock_mini"))]
+                 ("Dock", formatos("dock", "dock_pegado", "dock_mini")),
+                 ("# Colores de " + t["nombre"], []),
+                 ("Gama", fila(temas.VARIANTES, a["variantes"].get(self._elegido, "tema"), self._set_variante))]
         iconos_ = [("Estilo", fila(iconos.ESTILOS, a["iconos"], self._set_iconos)),
                    ("Alinear", fila(temas.ALINEACIONES, a["alineacion"], self._set_alineacion)),
                    ("Botón de inicio", fila(temas.ICONO, a["icono"], self._set_icono)),
@@ -1647,7 +1661,8 @@ class Barra(QObject):
                             "mini": os.path.join(x["carpeta"], "miniatura.png")} for k, x in self.temas.items()],
                  "interruptores": [marca("Cambiar de tema según la hora", a["auto"], self._set_auto)]},
                 {"titulo": "Forma", "filas": forma,
-                 "botones": [{"texto": "Usar este formato en todos los temas", "cierra": False, "hacer": self._formato_para_todos}]},
+                 "botones": [{"texto": "Usar este formato en todos los temas", "cierra": False, "hacer": self._formato_para_todos},
+                             {"texto": "Usar estos colores en todos los temas", "cierra": False, "hacer": self._variante_para_todos}]},
                 {"titulo": "Iconos", "filas": iconos_,
                  "interruptores": [marca("Agrupar ventanas del mismo programa", a["agrupar"], self._set_agrupar)],
                  "botones": [{"texto": "Restablecer el orden de los botones", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []},
