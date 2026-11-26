@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import actualizar, ajustes, apps, arranque, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import actualizar, ajustes, apps, arranque, audio, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -1069,6 +1069,41 @@ class Pantalla(unittest.TestCase):
         self.assertEqual([x["id"] for x in buscador.resultados("", lista, {"t": 2})], ["t"])
         self.assertEqual(buscador.resultados("", lista), [])
         self.assertLessEqual(len(buscador.resultados("a", lista * 20)), buscador.MAX)
+        abiertas = [{"id": "99", "nombre": "Discord", "titulo": "#general | Amigos - Discord", "icono": ""},
+                    {"id": "7", "nombre": "Bloc de notas", "titulo": "lista de la compra.txt", "icono": ""}]
+        con = lista + [{"nombre": "Discord", "id": "d"}]
+        r = buscador.resultados("disc", con, {}, abiertas)
+        self.assertEqual((r[0]["tipo"], r[0]["id"]), ("ventana", "99"))       # ir a la abierta antes que abrir otra
+        self.assertIn("d", [x["id"] for x in r if x["tipo"] == "app"])
+        self.assertEqual(buscador.resultados("compra", con, {}, abiertas)[0]["id"], "7")   # también por el título
+        self.assertEqual(buscador.resultados("", con, {}, abiertas), [])        # sin texto, no
+
+    def test_temporizador(self):
+        t = buscador.temporizador
+        self.assertEqual(t("pomodoro"), {"segundos": 25 * 60, "pomodoro": True, "descanso": 5 * 60})
+        self.assertEqual(t("pomodoro", (30, 8)), {"segundos": 30 * 60, "pomodoro": True, "descanso": 8 * 60})   # los guardados
+        self.assertEqual(t("pomodoro 50/10")["descanso"], 600)
+        self.assertEqual(t("pomodoro 45 min y 15"), {"segundos": 2700, "pomodoro": True, "descanso": 900})
+        self.assertEqual(t("pomodoro 50", (25, 8))["descanso"], 480)       # solo cambia el trabajo
+        self.assertEqual(t("pomodoro 50 0")["descanso"], 0)                 # sin descanso
+        for nada in ("pomodoro 0", "pomodoro 500", "pomodorox"):
+            self.assertIsNone(t(nada), nada)
+        for texto, segundos in (("temporizador 10", 600), ("5 min", 300), ("1h 30m", 5400), ("90 s", 90),
+                                ("alarma 2 horas", 7200), ("1,5 h", 5400), ("Avísame en 20 min", 1200),
+                                ("2 min 30 s", 150)):
+            self.assertEqual(t(texto), {"segundos": segundos, "pomodoro": False}, texto)
+        for nada in ("10", "steam", "5 manzanas", "temporizador", "0 min", "30 horas", "2+2"):
+            self.assertIsNone(t(nada), nada)
+        self.assertEqual(buscador.duracion(5400), "1 h 30 min")
+        self.assertEqual(buscador.duracion(90), "1 min 30 s")
+        r = buscador.resultados("5 min", [])
+        self.assertEqual((r[0]["tipo"], r[0]["segundos"]), ("temporizador", 300))
+
+    def test_sesiones_de_sonido(self):
+        win.ole32.CoInitializeEx(None, 2)
+        self.assertIsInstance(audio.grabando(), list)
+        self.assertIsNone(audio.volumen(r"C:\no\existe.exe"))
+        self.assertIsNone(audio.cambiar_volumen(r"C:\no\existe.exe", 5))     # sin sonido abierto: no toca nada
 
     def test_apps_del_inicio(self):
         lista = apps.leer()

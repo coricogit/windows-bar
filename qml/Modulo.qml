@@ -242,6 +242,33 @@ Loader {
       // Se pliega sola al rato de quitar el ratón.
       HoverHandler { id: sobre }
       Timer { interval: 6000; running: barra.bandejaAbierta && !sobre.hovered; onTriggered: barra.abrir_bandeja(false) }
+      Item {           // micrófono en uso (barra/audio.py): solo mientras algún programa graba
+        readonly property var quien: barra.datos.microfono || []
+        visible: quien.length > 0
+        width: rejilla.celda
+        height: mod.v ? width : mod.alto
+        Rectangle {
+          anchors.centerIn: parent
+          width: parent.width - 4; height: width
+          radius: mod.tema.pixelado ? 0 : width / 2
+          color: Qt.rgba(1, 0.6, 0.15, zmic.containsMouse ? 0.32 : 0.2)
+        }
+        Texto {
+          anchors.centerIn: parent
+          font.family: "Segoe Fluent Icons"
+          font.pixelSize: 13
+          font.bold: false
+          color: "#FFB14A"
+          text: ""
+        }
+        Aviso { texto: "Usando el micrófono: " + parent.quien.join(", "); fuente: zmic }
+        MouseArea {
+          id: zmic
+          anchors.fill: parent
+          hoverEnabled: true
+          onClicked: barra.accion("microfono")
+        }
+      }
       Item {           // la flecha de los iconos ocultos
         visible: barra.ocultos > 0
         width: rejilla.celda
@@ -286,7 +313,7 @@ Loader {
           Image {
             anchors.centerIn: parent
             width: 16; height: 16
-            sourceSize: Qt.size(32, 32)
+            sourceSize: Qt.size(16, 16)
             source: model.icono === "" ? "" : model.icono + mod.tema.estiloBandeja
             opacity: model.oculto ? 0.75 : 1
             smooth: !mod.tema.pixelado
@@ -336,6 +363,46 @@ Loader {
 
   Component {
     id: reloj
+    Grid {
+    columns: mod.v ? 1 : 2
+    verticalItemAlignment: Grid.AlignVCenter
+    horizontalItemAlignment: Grid.AlignHCenter
+    Item {             // el temporizador en marcha: clic para quitarlo
+      id: crono
+      readonly property var c: barra.cuenta
+      visible: !!c.texto
+      width: visible ? (mod.v ? mod.alto : cronoFila.implicitWidth + 22) : 0
+      height: visible ? (mod.v ? 34 : mod.alto) : 0
+      Rectangle {
+        anchors.centerIn: parent
+        width: parent.width - 4; height: Math.min(parent.height - 12, 26)
+        radius: mod.tema.pixelado ? 0 : height / 2
+        color: crono.c.hecho ? mod.c.acento : zc.containsMouse ? mod.c.encima : Qt.rgba(mod.c.texto.r, mod.c.texto.g, mod.c.texto.b, 0.08)
+        border.width: 1
+        border.color: crono.c.fase === "descanso" ? "#6FCF97" : mod.c.acento
+        Rectangle {      // lo que ya ha pasado
+          visible: !crono.c.hecho
+          x: 1; y: parent.height - 3; height: 2
+          width: Math.max(0, (parent.width - 2) * (crono.c.parte || 0))
+          color: crono.c.fase === "descanso" ? "#6FCF97" : mod.c.acento
+        }
+        SequentialAnimation on opacity {
+          running: !!crono.c.hecho
+          loops: Animation.Infinite
+          NumberAnimation { to: 0.45; duration: 450 }
+          NumberAnimation { to: 1; duration: 450 }
+        }
+        Row {
+          id: cronoFila
+          anchors.centerIn: parent
+          spacing: 4
+          Texto { visible: !mod.v; text: crono.c.pomodoro ? (crono.c.fase === "descanso" ? "☕" : "🍅") : "⏱"; font.pixelSize: 11; font.bold: false }
+          Texto { text: crono.c.texto || ""; font.pixelSize: mod.v ? 10 : 12; color: crono.c.hecho ? "#FFFFFF" : mod.c.texto }
+        }
+      }
+      Aviso { texto: (crono.c.hecho ? "Hecho" : crono.c.fase === "descanso" ? "Descanso" : "Temporizador") + " · Clic: quitar"; fuente: zc }
+      MouseArea { id: zc; anchors.fill: parent; hoverEnabled: true; onClicked: barra.parar_cuenta() }
+    }
     Boton {
       alto: mod.alto
       colores: mod.c
@@ -355,6 +422,7 @@ Clic: calendario · Clic central: notificaciones"
         else { var p = hora.mapToGlobal(hora.width / 2, hora.height / 2); barra.calendario(p.x, p.y) }
       }
       Timer { interval: 1000; running: true; repeat: true; onTriggered: hora.ahora = new Date() }
+    }
     }
   }
 

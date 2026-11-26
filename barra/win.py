@@ -470,10 +470,17 @@ def pixeles_dib(bmp):
     return (an, al, datos.raw) if filas == al else None
 
 
-def store_icon(aumid, size=32):
+def store_icon(aumid, size=64):
     """HBITMAP del icono de una app de la Tienda, o None."""
+    return shell_icon("shell:AppsFolder\\" + aumid, size)
+
+
+def shell_icon(nombre, size=64):
+    """HBITMAP del icono que el Explorador da a esa ruta o elemento, a `size` px, o None.
+    Windows elige la imagen más grande del icono y la reduce: sale más nítido que
+    escalar uno de 32 px."""
     item, iid = ctypes.c_void_p(), GUID("bcc18b79-ba16-442f-80c4-8a59c30c463b")
-    if shell32.SHCreateItemFromParsingName(ctypes.c_wchar_p("shell:AppsFolder\\" + aumid), None,
+    if shell32.SHCreateItemFromParsingName(ctypes.c_wchar_p(nombre), None,
                                            ctypes.byref(iid), ctypes.byref(item)) < 0:
         return None
     try:

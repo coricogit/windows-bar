@@ -9,6 +9,7 @@ import ctypes
 import math
 import operator
 import os
+import re
 import time
 import unicodedata
 from ctypes import wintypes as w
@@ -17,7 +18,7 @@ from PySide6.QtCore import QRect, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QImage, QPainter, QPen
 from PySide6.QtWidgets import QLineEdit, QWidget
 
-from . import atencion
+from . import atencion, win
 
 ANCHO, CABEZA, FILA, MAX, MARGEN = 560, 56, 44, 8, 10
 # Una sola rejilla para la cabecera y las filas: la lupa y los iconos en la misma
@@ -93,6 +94,46 @@ _FUNCIONES = {"sqrt": math.sqrt, "raiz": math.sqrt, "sin": math.sin, "cos": math
 _CONSTANTES = {"pi": math.pi, "e": math.e}
 
 
+_UNIDADES = {"h": 3600, "hora": 3600, "horas": 3600, "m": 60, "min": 60, "mins": 60, "minuto": 60,
+             "minutos": 60, "s": 1, "seg": 1, "segs": 1, "segundo": 1, "segundos": 1}
+_PALABRAS_TEMPORIZADOR = ("temporizador", "timer", "alarma", "cuenta atras", "avisame en", "avisar en")
+
+
+def duracion(segundos):
+    """90 → "1 min 30 s"; 5400 → "1 h 30 min"."""
+    h, resto = divmod(int(segundos), 3600)
+    m, s = divmod(resto, 60)
+    return " ".join(f"{n} {u}" for n, u in ((h, "h"), (m, "min"), (s, "s")) if n) or "0 s"
+
+
+def temporizador(texto, pomodoro=(25, 5)):
+    """{"segundos", "pomodoro"} (y "descanso" en un pomodoro) si `texto` pide un temporizador, o None.
+    «temporizador 10» (minutos), «5 min», «1h 30m», «90 s», «alarma 2 horas»; «pomodoro» con los minutos
+    de `pomodoro` (trabajo, descanso), o con otros: «pomodoro 50», «pomodoro 50/10», «pomodoro 50 10»."""
+    t = normalizar(texto.strip())
+    p = re.fullmatch(r"pomodoro(?:\s+(\d{1,3})\s*(?:m|min|minutos)?(?:\s*[/+y,]?\s*(\d{1,2})\s*(?:m|min|minutos)?)?)?", t)
+    if p:
+        trabajo = int(p.group(1)) if p.group(1) else pomodoro[0]
+        descanso = int(p.group(2)) if p.group(2) else pomodoro[1]
+        if not (1 <= trabajo <= 180 and 0 <= descanso <= 60):
+            return None
+        return {"segundos": trabajo * 60, "pomodoro": True, "descanso": descanso * 60}
+    palabra = next((p for p in _PALABRAS_TEMPORIZADOR if t.startswith(p)), "")
+    resto = t[len(palabra):].strip()
+    if palabra and re.fullmatch(r"\d+(?:[.,]\d+)?", resto):
+        resto += " min"                          # «temporizador 10»: minutos
+    partes = re.findall(r"(\d+(?:[.,]\d+)?)\s*([a-z]+)", resto)
+    if not partes or re.sub(r"[\d.,\sa-z]", "", resto) or "".join(n + u for n, u in partes) != resto.replace(" ", ""):
+        return None
+    total = 0
+    for n, u in partes:
+        if u not in _UNIDADES:
+            return None
+        total += float(n.replace(",", ".")) * _UNIDADES[u]
+    total = round(total)
+    return {"segundos": total, "pomodoro": False} if 0 < total <= 24 * 3600 else None
+
+
 def calcular(texto):
     """El resultado de una cuenta como "2*(3+4)" o "15% de 80", o None si no lo es."""
     t = texto.strip().lower().replace(",", ".").replace("x", "*").replace("×", "*").replace("÷", "/").replace("^", "**")
@@ -137,11 +178,20 @@ def calcular(texto):
     return f"{r:,}".replace(",", " ") if isinstance(r, int) else f"{r:.10g}"
 
 
-def resultados(texto, apps, usos=None):
-    """Lo que se enseña para `texto`: [{"tipo", "nombre", "detalle", ...}], lo mejor primero."""
+def resultados(texto, apps, usos=None, ventanas=(), pomodoro=(25, 5)):
+    """Lo que se enseña para `texto`: [{"tipo", "nombre", "detalle", ...}], lo mejor primero.
+    `ventanas`: las abiertas, [{"id" (hwnd), "nombre" (el programa), "titulo", "icono"}]."""
     usos = usos or {}
     consulta = normalizar(texto.strip())
     out = []
+    tiempo = temporizador(texto, pomodoro)
+    if tiempo:
+        if tiempo["pomodoro"]:
+            d = tiempo["descanso"] // 60
+            nombre = f"Pomodoro: {tiempo['segundos'] // 60} min" + (f" y {d} de descanso" if d else ", sin descanso")
+        else:
+            nombre = "Temporizador de " + duracion(tiempo["segundos"])
+        out.append({"tipo": "temporizador", **tiempo, "detalle": "Intro: empezar", "nombre": nombre})
     cuenta = calcular(texto)
     if cuenta is not None:
         out.append({"tipo": "cuenta", "nombre": "= " + cuenta, "detalle": "Intro: copiar", "valor": cuenta.replace(" ", "")})
@@ -153,6 +203,11 @@ def resultados(texto, apps, usos=None):
         p = puntuar(consulta, a["nombre"])
         if p:
             puestos.append((p + min(15, 3 * usos.get(a["id"], 0)), {"tipo": "app", **a, "detalle": "Aplicación"}))
+    for v in ventanas:                        # ir a una abierta va antes que abrir otra
+        p = max(puntuar(consulta, v["nombre"]), puntuar(consulta, v["titulo"]) - 5)
+        if p:
+            puestos.append((p + 8, {"tipo": "ventana", "id": v["id"], "icono": v.get("icono", ""),
+                                    "nombre": v["titulo"] or v["nombre"], "detalle": "Ventana abierta"}))
     for nombre, uri, extra in AJUSTES:
         p = puntuar(consulta, nombre, extra)
         if p:
@@ -170,6 +225,8 @@ def abrir(r):
     """Hace lo que toca con un resultado. Devuelve True si hay que cerrar el buscador."""
     if r["tipo"] == "cuenta":
         QGuiApplication.clipboard().setText(r["valor"])
+    elif r["tipo"] == "ventana":
+        win.activate(int(r["id"]))
     elif r["tipo"] == "app":
         os.startfile("shell:AppsFolder\\" + r["id"])
     elif r["tipo"] == "ajuste":
@@ -227,15 +284,12 @@ def encajar(img, lado):
     grandes, otros pequeños y otros desplazados dentro de su hueco.
     """
     img = img.convertToFormat(QImage.Format.Format_ARGB32)
-    an, al = img.width(), img.height()
-    xs, ys = [], []
-    for y in range(al):
-        for x in range(an):
-            if img.pixel(x, y) >> 24 > 24:
-                xs.append(x)
-                ys.append(y)
-    if xs:
-        img = img.copy(min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1)
+    an, al, paso = img.width(), img.height(), img.bytesPerLine()
+    alfa = bytes(img.constBits())[3::4] if paso == an * 4 else bytes(an * al)
+    filas = [y for y in range(al) if max(alfa[y * an:(y + 1) * an]) > 24]
+    if filas:
+        cols = [x for x in range(an) if max(alfa[x::an]) > 24]
+        img = img.copy(cols[0], filas[0], cols[-1] - cols[0] + 1, filas[-1] - filas[0] + 1)
     return img.scaled(lado, lado, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
 
@@ -244,7 +298,7 @@ class Buscador(QWidget):
         """`icono(r)` da la QImage de un resultado (o None); `al_usar(r)` apunta lo que se abre."""
         super().__init__(None, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
         self._icono, self._al_usar = icono, al_usar
-        self.apps, self.usos = [], {}
+        self.apps, self.usos, self.ventanas, self.pomodoro = [], {}, [], (25, 5)
         self._res, self._sel, self._encima = [], 0, -1
         self._col, self._fuente = {}, "Segoe UI"
         self.cerrado = 0.0
@@ -257,8 +311,9 @@ class Buscador(QWidget):
         self.setMouseTracking(True)
 
     # ----- abrir y cerrar -----
-    def mostrar(self, poner, tema, apps, usos):
-        self.apps, self.usos = apps, usos
+    def mostrar(self, poner, tema, apps, usos, ventanas=(), pomodoro=(25, 5), texto=""):
+        """`texto`: con qué empieza escrito (el menú abre «pomodoro » para cambiar sus minutos)."""
+        self.apps, self.usos, self.ventanas, self.pomodoro = apps, usos, list(ventanas), tuple(pomodoro)
         self._col, self._fuente = tema["colores"], tema["fuente"]
         c = self._col
         f = QFont(self._fuente)
@@ -267,8 +322,8 @@ class Buscador(QWidget):
         self.entrada.setStyleSheet(f"QLineEdit {{ background: transparent; color: {c['texto']}; "
                                    f"selection-background-color: {c['acento']}; }}")
         self._poner = poner
-        self.entrada.clear()
-        self._buscar("")
+        self.entrada.setText(texto)              # dispara la búsqueda si cambia
+        self._buscar(texto)
         self.show()
         self.raise_()
         atencion.user32.SetForegroundWindow(int(self.winId()))
@@ -277,6 +332,8 @@ class Buscador(QWidget):
 
     def poner_apps(self, apps):
         """La lista llegó (o cambió) con el buscador abierto."""
+        if apps == self.apps:
+            return                               # igual que antes: no mover lo que ya se ha elegido
         self.apps = apps
         if self.isVisible():
             self._buscar(self.entrada.text())
@@ -289,7 +346,7 @@ class Buscador(QWidget):
         return CABEZA + (len(self._res) * FILA + MARGEN if self._res else 0)
 
     def _buscar(self, texto):
-        self._res = resultados(texto, self.apps, self.usos) if (texto.strip() or self.usos) else []
+        self._res = resultados(texto, self.apps, self.usos, self.ventanas, self.pomodoro) if (texto.strip() or self.usos) else []
         if not texto.strip() and not self.apps:
             self._res = [{"tipo": "nada", "nombre": "Leyendo las aplicaciones…", "detalle": ""}]
         self._sel, self._encima = 0, -1
@@ -406,7 +463,7 @@ class Buscador(QWidget):
                 p.setFont(g)
                 p.setPen(c["acento"])
                 p.drawText(icono, Qt.AlignmentFlag.AlignCenter,
-                           {"cuenta": "", "ajuste": "", "archivos": ""}.get(r["tipo"], ""))
+                           {"temporizador": "", "cuenta": "", "ajuste": "", "archivos": "", "ventana": ""}.get(r["tipo"], ""))
             texto = QRectF(COL_TEXTO, caja.top(), caja.right() - 140 - COL_TEXTO, caja.height())
             p.setFont(f)
             p.setPen(c["texto"])

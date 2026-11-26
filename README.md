@@ -35,10 +35,10 @@ Desde el código: `py -m pip install PySide6_Essentials`, y después
 | Dónde | Qué hace |
 |---|---|
 | Reloj, volumen o un hueco | Clic derecho: menú de temas y ajustes |
-| Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: pasar de una a otra · Clic central: abrir otra · Clic derecho: menú con su lista de saltos (tareas y recientes) · Arrastrar: cambiar de sitio · Soltar archivos encima: se abren con él (un momento encima: su ventana pasa delante) |
+| Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: su volumen (si tiene sonido abierto; si no, o con Mayús, pasar de una ventana a otra) · Clic central: abrir otra · Clic derecho: menú con su lista de saltos (tareas y recientes) · Arrastrar: cambiar de sitio · Soltar archivos encima: se abren con él (un momento encima: su ventana pasa delante) |
 | Volumen | Con la red y la batería al lado · Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio |
-| Reloj | Clic: calendario del tema · Clic central: notificaciones |
-| Bandeja | Clic central en un icono: guardarlo tras la flecha o sacarlo (también en el menú) · Clic en la flecha: ver los ocultos |
+| Reloj | Clic: calendario del tema · Clic central: notificaciones · A su lado, el temporizador en marcha (clic: quitarlo) |
+| Bandeja | Micrófono naranja: algún programa lo está usando (pasar el ratón: cuál; clic: privacidad) · Clic central en un icono: guardarlo tras la flecha o sacarlo (también en el menú) · Clic en la flecha: ver los ocultos |
 | Inicio | Clic: menú Inicio · Clic derecho: menú Win+X · Clic central: buscador · Rueda: pasar de tema |
 
 Ajustes en `%LOCALAPPDATA%\barra-temas\ajustes.json`: tema por hora (`auto`, `tema_dia`, `tema_noche`, `dia`,
@@ -65,7 +65,10 @@ El campo «Buscar» junto a Inicio, Alt+Espacio o clic central en Inicio: escrib
 (compacta, vertical, dock, burbujas) el campo es solo una lupa; se quita en *Funciones → Barra de búsqueda junto a Inicio*. Busca en las aplicaciones del menú Inicio (también las de
 la Tienda y los juegos de Steam), en las páginas de Configuración (también por palabras: «volumen» da Sonido) y hace
 cuentas (`2*(3+4)`, `15% de 80`, `sqrt(2)`; Intro copia el resultado). La última fila busca el texto en tus archivos con
-el Explorador. Sin texto enseña las que más abres. Todo es local. Flechas o Tab para moverse, Esc para cerrar.
+el Explorador. También lleva a las ventanas abiertas (por programa o por título: «disc» → tu Discord, antes que
+abrir otro) y pone temporizadores: «5 min», «temporizador 10», «1h 30m», «pomodoro» (25 min y 5 de descanso; con otros minutos:
+«pomodoro 50» o «pomodoro 50/10», y se quedan para la próxima vez; también en *Funciones → Pomodoro*). El que
+está en marcha sale junto al reloj y al acabar avisa con un sonido y en la isla. Sin texto enseña las que más abres. Todo es local. Flechas o Tab para moverse, Esc para cerrar.
 El atajo es `RegisterHotKey` (sin gancho de teclado), se suelta en modo juego y se quita en *Funciones → Buscador*.
 
 ## Programas que piden atención
@@ -73,6 +76,13 @@ El atajo es `RegisterHotKey` (sin gancho de teclado), se suelta en modo juego y 
 Cuando un programa pide atención (Discord con un mensaje, un juego que termina de cargar…), su botón se pone naranja y
 late, como en la barra de Windows, hasta que lo abres; con la isla dinámica, además, sale un aviso con su nombre y un
 clic lo trae delante. Lo cuenta Windows con `RegisterShellHookWindow`, sin inyectar nada.
+
+## Micrófono y volumen por programa
+
+Mientras un programa graba del micrófono sale un micrófono naranja en la bandeja (y un aviso en la isla al empezar).
+La rueda sobre el botón de un programa cambia su volumen de 5 en 5, como su barra del Mezclador. Las dos cosas salen
+de las sesiones de sonido de Windows (`barra/audio.py`), por el programa y sus procesos auxiliares. La cámara no:
+Windows ya no deja saber quién la usa sin permisos especiales.
 
 ## Widgets y tiempo
 
@@ -184,7 +194,8 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 - `barra/saltos.py`: listas de saltos (IApplicationResolver, IApplicationDocumentLists y CustomDestinations).
 - `barra/red.py`: Wi-Fi, conexión y batería. `barra/calendario.py`: el calendario. `barra/isla.py`: la isla dinámica.
 - `barra/programas.py`: nombre real de los programas y agrupación.
-- `barra/buscador.py`, `barra/apps.py`: el buscador y la lista de aplicaciones de `shell:AppsFolder`.
+- `barra/buscador.py`, `barra/apps.py`: el buscador (y el temporizador) y la lista de aplicaciones de `shell:AppsFolder`.
+- `barra/audio.py`: las sesiones de sonido de cada programa: quién usa el micrófono y el volumen por programa.
 - `barra/atencion.py`: programas que piden atención.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.

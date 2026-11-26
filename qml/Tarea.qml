@@ -91,7 +91,9 @@ Item {
     anchors.horizontalCenterOffset: !tarea.v ? 0 : tarea.tema.lado === "izquierda" ? -tarea.hacia : tarea.hacia
     transformOrigin: tarea.tema.dock ? tarea.origen : Item.Center
     width: tarea.tema.icono; height: tarea.tema.icono
-    sourceSize: Qt.size(32, 32)
+    // A su tamaño en pantalla (en el dock, al de la lupa): reducido una vez con buen filtro.
+    readonly property int lado: Math.ceil(tarea.tema.icono * (tarea.tema.dock ? 1 + tarea.tema.lupa : 1))
+    sourceSize: Qt.size(lado, lado)
     source: tarea.icono === "" ? "" : tarea.icono + tarea.tema.estiloIconos
     smooth: !tarea.tema.pixelado
     mipmap: !tarea.tema.pixelado
@@ -207,11 +209,43 @@ Item {
       var p = tarea.mapToGlobal(tarea.width / 2, tarea.height / 2)
       barra.apuntar(tarea.clave, p.x, p.y)
     }
-    onWheel: function(e) { if (!tarea.arrastrando) barra.rodar_tarea(tarea.clave, e.angleDelta.y > 0 ? -1 : 1) }
+    onWheel: function(e) {
+      if (tarea.arrastrando) return
+      var n = barra.rodar_tarea(tarea.clave, e.angleDelta.y > 0 ? -1 : 1, !!(e.modifiers & Qt.ShiftModifier))
+      if (n >= 0) { nivel.valor = n; nivel.visible = true; nivelFin.restart() }
+    }
     onClicked: function(e) {
       if (movido) return
       if (e.button === Qt.RightButton) barra.menu_tarea(tarea.clave)
       else barra.pulsar_tarea(tarea.clave, e.button === Qt.MiddleButton)
     }
+  }
+
+  // El volumen del programa al usar la rueda encima (barra/audio.py).
+  Rectangle {
+    id: nivel
+    property int valor: 0
+    visible: false
+    z: 5
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: parent.bottom
+    anchors.bottomMargin: 3
+    width: Math.max(26, parent.width - 8); height: 14
+    radius: tarea.tema.pixelado ? 0 : 4
+    color: "#E6101010"
+    Rectangle {
+      x: 2; y: parent.height - 3
+      width: Math.max(0, (parent.width - 4) * nivel.valor / 100); height: 2
+      color: tarea.c.acento
+    }
+    Text {
+      anchors.centerIn: parent
+      anchors.verticalCenterOffset: -1
+      text: nivel.valor + "%"
+      color: "#FFFFFF"
+      font.pixelSize: 9
+      font.family: tarea.tema.fuente
+    }
+    Timer { id: nivelFin; interval: 1200; onTriggered: nivel.visible = false }
   }
 }

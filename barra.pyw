@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox  # noqa: E402
 
-from barra import (actualizar, ajustes as cfg, apps as apps_inicio, arranque, atencion, buscador, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
+from barra import (actualizar, ajustes as cfg, apps as apps_inicio, arranque, audio, atencion, buscador, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -143,22 +143,31 @@ class Iconos(QQuickImageProvider):
     def __init__(self, almacen):
         super().__init__(QQuickImageProvider.ImageType.Image)
         self.almacen = almacen
-        self._hechos = {}            # los adaptados al tema
+        self._hechos = {}            # (icono, lado): reducidos y adaptados al tema
 
     def requestImage(self, ident, size, requested):
         nombre, _, rev = ident.rpartition("/")
         img = self.almacen.get(nombre)
-        _, _, estilo = rev.partition("~")
-        if estilo and img is not None:
-            if ident not in self._hechos:
-                if len(self._hechos) > 200:
-                    self._hechos.clear()
-                self._hechos[ident] = iconos.adaptar(img, estilo)
-            img = self._hechos[ident]
         if img is None or img.isNull():
             img = QImage(32, 32, QImage.Format.Format_ARGB32)
             img.fill(Qt.GlobalColor.transparent)
-        return img
+            return img
+        _, _, estilo = rev.partition("~")
+        # Se guardan a 64 px: se reducen al tamaño al que se dibujan, con buen filtro
+        # (el pixel art hace su propia reducción) y, ya pequeños, se adaptan al tema.
+        lado = max(requested.width(), requested.height()) if requested.isValid() else 0
+        if not (0 < lado < max(img.width(), img.height())) or estilo.startswith("p"):
+            lado = 0
+        if not estilo and not lado:
+            return img
+        clave = (ident, lado)
+        if clave not in self._hechos:
+            if len(self._hechos) > 400:
+                self._hechos.clear()
+            if lado:
+                img = img.scaled(lado, lado, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self._hechos[clave] = iconos.adaptar(img, estilo) if estilo else img
+        return self._hechos[clave]
 
 
 def imagen_de_hbitmap(bmp):
@@ -167,10 +176,25 @@ def imagen_de_hbitmap(bmp):
     if px is None:
         return QImage.fromHBITMAP(bmp)
     an, al, datos = px
-    # Sin ningún alfa es un mapa de bits opaco: con alfa 0 se vería vacío.
-    formato = (QImage.Format.Format_ARGB32_Premultiplied if any(datos[3::4])
-               else QImage.Format.Format_RGB32)
+    # Sin ningún alfa es un mapa de bits opaco: con alfa 0 se vería vacío. Con alfa,
+    # Windows lo da unas veces premultiplicado y otras no: si algún color pasa de su
+    # alfa, no lo está (y tratarlo como si lo estuviera deja puntos de colores en el borde).
+    alfa = datos[3::4]
+    if not any(alfa):
+        formato = QImage.Format.Format_RGB32
+    elif any(max(datos[i:i + 3]) > alfa[i >> 2] for i in range(0, len(datos), 4)):
+        formato = QImage.Format.Format_ARGB32
+    else:
+        formato = QImage.Format.Format_ARGB32_Premultiplied
     return QImage(datos, an, al, an * 4, formato).copy()
+
+
+TAM_ICONO = 64            # se guardan a 64 px; QML pide cada uno al tamaño al que lo dibuja
+# Programas que hacen de anfitrión de otros (o que ponen a cada ventana su icono,
+# como las aplicaciones web de los navegadores): ahí manda el icono de la ventana.
+ANFITRIONES = {"python.exe", "pythonw.exe", "py.exe", "pyw.exe", "java.exe", "javaw.exe", "rundll32.exe",
+               "dllhost.exe", "mmc.exe", "applicationframehost.exe", "chrome.exe", "msedge.exe", "brave.exe",
+               "vivaldi.exe", "opera.exe", "cmd.exe", "conhost.exe", "powershell.exe", "pwsh.exe"}
 
 
 class Almacen:
@@ -198,17 +222,23 @@ class Almacen:
     def de_archivo(self, ruta):
         nombre = "exe-" + ruta.lower().replace("\\", "_").replace(":", "").replace("/", "_").replace(" ", "_")
         if nombre not in self.imagenes:
-            pm = QFileIconProvider().icon(QFileInfo(ruta)).pixmap(QSize(32, 32))
-            if pm.isNull():
-                return ""
-            self.poner(nombre, pm.toImage())
+            bmp = win.shell_icon(ruta, TAM_ICONO)
+            img = imagen_de_hbitmap(bmp) if bmp else QImage()
+            if bmp:
+                win.gdi32.DeleteObject(bmp)
+            if img.isNull():
+                pm = QFileIconProvider().icon(QFileInfo(ruta)).pixmap(QSize(TAM_ICONO, TAM_ICONO))
+                if pm.isNull():
+                    return ""
+                img = pm.toImage()
+            self.poner(nombre, img)
         return nombre
 
     def de_app(self, ident):
         """El icono de una app de la Tienda, por su identificador."""
         nombre = "app-" + "".join(ch if ch.isalnum() else "_" for ch in ident)
         if nombre not in self.imagenes:
-            bmp = win.store_icon(ident)
+            bmp = win.store_icon(ident, TAM_ICONO)
             img = imagen_de_hbitmap(bmp) if bmp else QImage()
             if bmp:
                 win.gdi32.DeleteObject(bmp)
@@ -227,13 +257,17 @@ class Almacen:
             return nombre
         if win.class_name(hwnd) == "ApplicationFrameWindow" or "\\WindowsApps\\" in exe:
             ident = win.app_id(hwnd)
-            bmp = win.store_icon(ident) if ident else None
+            bmp = win.store_icon(ident, TAM_ICONO) if ident else None
             if bmp:
                 img = imagen_de_hbitmap(bmp)
                 win.gdi32.DeleteObject(bmp)
                 if not img.isNull():
                     self.poner(nombre, img)
                     return nombre
+        if exe and os.path.basename(exe).lower() not in ANFITRIONES:
+            hecho = self.de_archivo(exe)         # el del .exe, a 64 px: el de la ventana suele ser de 32
+            if hecho:
+                return hecho
         hicon = win.window_hicon(hwnd)
         if hicon:
             self.poner_pixeles(nombre, bandeja.icon_pixels(hicon))
@@ -271,6 +305,7 @@ class Barra(QObject):
     """Lo que ve QML como `barra`."""
     temaCambio = Signal()
     datosCambio = Signal()
+    cuentaCambio = Signal()
     claudeCambio = Signal()
     musicaCambio = Signal()
     animarCambio = Signal()
@@ -328,6 +363,9 @@ class Barra(QObject):
         self.atencion = None
         # Buscador (barra/buscador.py): las apps del menú Inicio se leen en un hilo y se guardan un rato.
         self._buscador = self.atajo_buscar = None
+        self._ventanas_info = []                 # las abiertas, para el buscador
+        self._mic_antes = []                     # quién usaba el micrófono en la vuelta anterior
+        self._cuenta, self._t_cuenta = None, None    # el temporizador
         self._apps_lista, self._apps_hora, self._apps_hilo, self._iconos_apps = [], 0.0, None, {}
         self._orden = {}            # cuándo se vio cada programa
         self._arrastre = 0          # desde cuándo se arrastra un botón; 0 si no
@@ -576,8 +614,28 @@ class Barra(QObject):
             except Exception:
                 registrar("red")
         self._vuelta_red += 1
-        self._set_datos({**uso, "historia": dict(self._historia) if self.temas[self._elegido]["medidor"] == "onda" else {},
+        self._set_datos({**uso, "microfono": self._microfono(), "historia": dict(self._historia) if self.temas[self._elegido]["medidor"] == "onda" else {},
                          "volumen": v[0] if v else 0, "silencio": v[1] if v else True, **self._red})
+
+    def _microfono(self):
+        """Los programas que graban del micrófono, por su nombre; avisa en la isla del que empieza."""
+        try:
+            exes = audio.grabando()
+        except Exception:
+            registrar("micrófono")
+            return []
+        nombres = {i["exe"].lower(): i["nombre"] for i in self._ventanas_info}
+        quien = []
+        for e in exes:
+            p = programas.principal(e)
+            quien.append(nombres.get(p.lower()) or os.path.splitext(os.path.basename(p))[0])
+        quien = list(dict.fromkeys(quien))
+        for n in quien:
+            if n not in self._mic_antes:
+                self._avisar({"icono": "🎙️", "titulo": "Micrófono en uso", "detalle": n,
+                              "hacer": lambda: os.startfile("ms-settings:privacy-microphone")})
+        self._mic_antes = quien
+        return quien
 
     @staticmethod
     def _texto_red(r):
@@ -592,6 +650,67 @@ class Barra(QObject):
             self.datosCambio.emit()
 
     datos = Property("QVariantMap", lambda self: self._datos, notify=datosCambio)
+
+    # ----- temporizador (se pone desde el buscador: «10 min», «pomodoro») -----
+    def _empezar_cuenta(self, segundos, pomodoro=False, fase="trabajo", descanso=0):
+        self._cuenta = {"fin": time.monotonic() + segundos, "total": segundos, "pomodoro": pomodoro, "fase": fase,
+                        "descanso": descanso, "hecho": 0.0}
+        if self._t_cuenta is None:
+            self._t_cuenta = QTimer(self)
+            self._t_cuenta.setInterval(1000)
+            self._t_cuenta.timeout.connect(self._tic_cuenta)
+        self._t_cuenta.start()
+        self._tic_cuenta()
+
+    def _tic_cuenta(self):
+        c = self._cuenta
+        if not c:
+            self._t_cuenta.stop()
+            return
+        ahora = time.monotonic()
+        if c["hecho"]:                           # «¡Tiempo!» se queda un rato y se va
+            if ahora - c["hecho"] > 10:
+                self._cuenta = None
+                self._t_cuenta.stop()
+            self.cuentaCambio.emit()
+            return
+        if c["fin"] - ahora > 0:
+            self.cuentaCambio.emit()
+            return
+        try:
+            import winsound
+            winsound.MessageBeep(0x40)
+        except Exception:
+            pass
+        if c["pomodoro"] and c["fase"] == "trabajo" and c["descanso"]:
+            self._avisar({"icono": "🍅", "titulo": "Pomodoro hecho", "detalle": buscador.duracion(c["descanso"]) + " de descanso"})
+            self._empezar_cuenta(c["descanso"], True, "descanso")
+            return
+        titulo = "Descanso terminado" if c["fase"] == "descanso" else "Temporizador"
+        self._avisar({"icono": "⏰", "titulo": titulo, "detalle": buscador.duracion(c["total"]) + " cumplidos"})
+        c["hecho"] = ahora
+        self.cuentaCambio.emit()
+
+    @Slot()
+    def parar_cuenta(self):
+        self._cuenta = None
+        if self._t_cuenta:
+            self._t_cuenta.stop()
+        self.cuentaCambio.emit()
+
+    def _get_cuenta(self):
+        c = self._cuenta
+        if not c:
+            return {}
+        if c["hecho"]:
+            return {"texto": "¡Tiempo!", "fase": c["fase"], "hecho": True, "parte": 1}
+        queda = max(0, round(c["fin"] - time.monotonic()))
+        h, r = divmod(queda, 3600)
+        texto = f"{h}:{r // 60:02d}:{r % 60:02d}" if h else f"{r // 60}:{r % 60:02d}"
+        return {"texto": texto, "fase": c["fase"], "hecho": False, "parte": 1 - queda / c["total"],
+                "pomodoro": c["pomodoro"]}
+
+    cuenta = Property("QVariantMap", _get_cuenta, notify=cuentaCambio)
 
     def _set_musica(self, d):
         self._cancion = d
@@ -647,6 +766,9 @@ class Barra(QObject):
             self._buscador.poner_apps(lista)
 
     def _icono_resultado(self, r):
+        if r["tipo"] == "ventana":               # image://iconos/<nombre>/<revisión>
+            partes = r.get("icono", "").split("/")
+            return self.almacen.get(partes[3]) if len(partes) > 3 else None
         if r["tipo"] != "app":
             return None
         if r["id"] not in self._iconos_apps:
@@ -655,6 +777,12 @@ class Barra(QObject):
         return self._iconos_apps[r["id"]]
 
     def _usado(self, r):
+        if r["tipo"] == "temporizador":
+            if r["pomodoro"]:                    # sus minutos se quedan para la próxima vez
+                self.ajustes["pomodoro"] = [r["segundos"] // 60, r["descanso"] // 60]
+                self._guardar()
+            self._empezar_cuenta(r["segundos"], r["pomodoro"], descanso=r.get("descanso", 0))
+            return
         if r["tipo"] != "app":
             return
         usos = self.ajustes["lanzados"]
@@ -664,21 +792,23 @@ class Barra(QObject):
         self._guardar()
 
     @Slot()
-    def abrir_buscador(self):
+    def abrir_buscador(self, texto=""):
         if self.vista or not self.paneles:
             return
         if self._buscador is None:
             self._buscador = buscador.Buscador(self._icono_resultado, self._usado)
-        elif self._buscador.isVisible() or time.monotonic() - self._buscador.cerrado < 0.3:
+        elif not texto and (self._buscador.isVisible() or time.monotonic() - self._buscador.cerrado < 0.3):
             self._buscador.hide()
             return
-        if not self._apps_lista or time.monotonic() - self._apps_hora > 600:
+        if not self._apps_lista or time.monotonic() - self._apps_hora > 30:
             self._leer_apps()                    # al momento con la lista vieja; la nueva llega sola
         self._quitar_previa()
         p = next((x for x in self.paneles if x.primaria), self.paneles[0])
         x, y, an, al = p.zona_real()
+        ventanas = [{"id": str(i["hwnd"]), "nombre": i["nombre"], "titulo": i["titulo"], "icono": i["icono"]}
+                    for i in self._ventanas_info]
         self._buscador.mostrar(self.sitio(x + an / 2, y + al / 2), self._get_tema(), self._apps_lista,
-                               self.ajustes["lanzados"])
+                               self.ajustes["lanzados"], ventanas, self.ajustes["pomodoro"], texto)
 
     # ----- isla dinámica -----
     def _avisar(self, aviso):
@@ -897,6 +1027,7 @@ class Barra(QObject):
                          "clave": win.clave_exe(exe), "nombre": self._nombre(h, exe),
                          "minimizada": bool(win.user32.IsIconic(h)), "pantalla": win.monitor_of(h), "atencion": h in piden,
                          "icono": self.almacen.url(self.almacen.de_ventana(h, exe))})
+        self._ventanas_info = info
         titulo = next((i["titulo"] for i in info if i["activa"]), "")
         if titulo != self._titulo:
             self._titulo = titulo
@@ -972,15 +1103,25 @@ class Barra(QObject):
             else:
                 win.activate(h)
 
-    @Slot(str, int)
-    def rodar_tarea(self, clave, paso):
-        """La rueda pasa por las ventanas del grupo."""
+    @Slot(str, int, bool, result=int)
+    def rodar_tarea(self, clave, paso, ventanas):
+        """La rueda sube o baja el volumen del programa (si tiene sonido abierto) y
+        devuelve el nuevo, para enseñarlo; si no, o con Mayús, pasa por sus ventanas (y da -1)."""
         f = self._fila(clave)
+        if f and f["exe"] and not ventanas:
+            try:
+                nivel = audio.cambiar_volumen(f["exe"], -5 * paso)
+            except Exception:
+                registrar("volumen de " + f["exe"])
+                nivel = None
+            if nivel is not None:
+                return nivel
         if f and f["cuenta"] > 1:
             vs = f["ventanas"]
             activa = win.user32.GetForegroundWindow()
             i = (vs.index(activa) + paso) % len(vs) if activa in vs else vs.index(int(f["hwnd"]))
             win.activate(vs[i])
+        return -1
 
     def _entrada(self, f):
         """Lo necesario para anclar o volver a abrir el programa de una fila."""
@@ -1428,6 +1569,9 @@ class Barra(QObject):
         if que == "buscador":
             self.abrir_buscador()
             return
+        if que == "microfono":
+            os.startfile("ms-settings:privacy-microphone")
+            return
         teclas = {"inicio": (0x5B,), "buscar": (0x5B, 0x53), "rapidos": (0x5B, 0x41), "avisos": (0x5B, 0x4E), "widgets": (0x5B, 0x57),
                   "menu_inicio": (0x5B, 0x58), "silencio": (0xAD,), "menos": (0xAE,), "mas": (0xAF,)}
         if que in teclas:
@@ -1514,7 +1658,9 @@ class Barra(QObject):
                                    marca("Buscador (Alt+Espacio o clic central en Inicio)", a["buscador"], self._set_buscador),
                                    marca("Barra de búsqueda junto a Inicio", a["barra_busqueda"], self._set_barra_busqueda)],
                  "botones": [{"texto": "Ciudad del tiempo: " + (a["ciudad"].get("nombre") or "elegir…"),
-                              "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)}] + self._boton_conectar()},
+                              "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)},
+                             {"texto": "Pomodoro: {} min + {} de descanso (cambiar…)".format(*a["pomodoro"]),
+                              "hacer": lambda: QTimer.singleShot(0, lambda: self.abrir_buscador("pomodoro "))}] + self._boton_conectar()},
                 {"titulo": "General",
                  "interruptores": [{"texto": "Arrancar con Windows", "marcado": con_windows, "hacer": lambda: arranque.poner(not con_windows)},
                                    *(self.novedades.interruptor() if self.novedades else [])],

@@ -5,7 +5,9 @@ Code ni de los límites del plan. Esto añade a su settings.json los mismos avis
 la misma línea de estado que pondría Claudito, con una copia de seguridad, y solo
 si se pide en el menú. Usa el install.py del propio Claudito.
 """
+import contextlib
 import importlib.util
+import io
 import os
 
 from . import claudito
@@ -33,6 +35,11 @@ def _nuestro(orden, raiz):
     return norma(raiz) in norma(orden or "")
 
 
+def _callado():
+    """El instalador de Claudito cuenta lo que hace por consola; la barra no tiene consola."""
+    return contextlib.redirect_stdout(io.StringIO())
+
+
 def estado(raiz=claudito.INCLUIDO):
     """{"avisos": "no" | "nuestra" | "otra", "linea": "no" | "claudito" | "ajena"}.
     "otra": los de un Claudito instalado aparte, que no se tocan."""
@@ -55,7 +62,8 @@ def conectar(raiz=claudito.INCLUIDO):
         return "Claude Code ya está conectado con otro Claudito, o su settings.json no se puede leer."
     try:
         m = _instalador(raiz)
-        m.install_settings(m.settings_path())
+        with _callado():
+            m.install_settings(m.settings_path())
         return ""
     except (OSError, SystemExit, TypeError, AttributeError) as e:
         return str(e)
@@ -66,6 +74,7 @@ def desconectar(raiz=claudito.INCLUIDO):
         return
     try:
         m = _instalador(raiz)
-        m.uninstall_settings(m.settings_path())
+        with _callado():
+            m.uninstall_settings(m.settings_path())
     except (OSError, SystemExit, TypeError, AttributeError):
         pass
