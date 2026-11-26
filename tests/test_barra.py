@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import actualizar, ajustes, arranque, atajos, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, panel_claude, programas, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import actualizar, ajustes, arranque, atajos, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -65,8 +65,13 @@ class Temas(unittest.TestCase):
                 self.assertIs(temas.con_formato(t, "tema"), t)
                 if f != "tema":
                     self.assertEqual(n["compacto"], "compacta" in f)
-                    self.assertEqual(n["forma"] == "islas", f.startswith("isla"))
-                    self.assertEqual(n["unica"], f in ("isla", "isla_compacta"))
+                    self.assertEqual(n["forma"] == "islas", f.startswith("isla") or f in temas.UNA_ISLA)
+                    self.assertEqual(n["unica"], f in temas.UNA_ISLA)
+                    self.assertEqual(n["dock"], f.startswith("dock"))
+                    self.assertEqual(n["pegada"], f in ("pestana", "dock_pegado"))
+        pix = temas.cargar()["pixel"]
+        self.assertEqual(temas.alto_total(temas.con_formato(pix, "dock_mini")), 48)      # sin quitar sitio
+        self.assertEqual(temas.alto_total(temas.con_formato(pix, "dock")), 60)
         self.assertEqual(temas.alto_total(temas.con_formato(temas.cargar()["pixel"], "compacta")), 30)
 
     def test_paleta(self):
@@ -235,8 +240,11 @@ class Icono(unittest.TestCase):
 class Menu(unittest.TestCase):
     def test_nada_se_sale_ni_se_pisa(self):
         o = [{"texto": "x" * n} for n in (4, 20, 12, 30, 9)]
-        zonas, alto = selector.colocar([{"texto": str(i)} for i in range(7)], [("A", o), ("B", o + o)],
-                                       [{**x, "marcado": True} for x in o], o, lambda t: len(t) * 7)
+        seccion = {"temas": [{"texto": str(i)} for i in range(7)], "filas": [("A", o), ("# Bloque", []), ("B", o + o)],
+                   "interruptores": [{**x, "marcado": True} for x in o], "botones": o}
+        zonas, alto = selector.colocar(seccion, lambda t: len(t) * 7, ["Temas", "Forma", "Iconos"], 1)
+        self.assertEqual([d["elegido"] for r, t, d in zonas if t == "pestana"], [False, True, False])
+        self.assertEqual(sum(t == "encabezado" for _, t, _ in zonas), 1)
         for i, (r, _, _) in enumerate(zonas):
             self.assertLessEqual(r.right(), selector.ANCHO - selector.MARGEN + 1)
             self.assertLess(r.bottom(), alto)
@@ -713,6 +721,18 @@ class Tiempo(unittest.TestCase):
 class Sitio(unittest.TestCase):
     P = (1920, -468, 1200, 1920)
 
+    def test_en_borde(self):
+        z = (0, 1032, 1920, 48)
+        self.assertTrue(sitio.en_borde("abajo", z, (500, 1079)))
+        self.assertFalse(sitio.en_borde("abajo", z, (500, 1070)))
+        self.assertFalse(sitio.en_borde("abajo", z, (2000, 1079)))            # otra pantalla
+        self.assertTrue(sitio.en_borde("arriba", (0, 0, 1920, 48), (10, 0)))
+        self.assertTrue(sitio.en_borde("izquierda", (0, 0, 60, 1080), (1, 500)))
+        self.assertTrue(sitio.en_borde("derecha", (1860, 0, 60, 1080), (1919, 500)))
+        self.assertFalse(sitio.en_borde("derecha", (1860, 0, 60, 1080), (1900, 500)))
+        self.assertTrue(sitio.dentro(z, (10, 1025), 8))
+        self.assertFalse(sitio.dentro(z, (10, 1020), 8))
+
     def test_franja_y_margenes(self):
         self.assertEqual(sitio.franja("abajo", (0, 0, 1920, 1080), 48), (0, 1032, 1920, 48))
         self.assertEqual(sitio.franja("derecha", self.P, 60), (3060, -468, 60, 1920))
@@ -985,6 +1005,73 @@ class Pantalla(unittest.TestCase):
         # segunda pantalla, con coordenadas negativas
         self.assertEqual(win.sitio_maximizada((1912, -476, 3128, 1412), (1980, -468, 3120, 1452), (1920, -468, 3120, 1452)),
                          (1972, -476, 3128, 1460))
+
+    def test_abrir_con(self):
+        d = tempfile.mkdtemp()
+        try:
+            exe, txt = os.path.join(d, "nota.exe"), os.path.join(d, "a.txt")
+            for r in (exe, txt):
+                open(r, "w").close()
+            explorer = os.path.join(os.environ["WINDIR"], "explorer.exe")
+            a = programas.abrir_con
+            self.assertEqual(a(exe, "", [txt, ""]), ("exe", [exe, txt]))
+            self.assertIsNone(a(exe, "", []))
+            self.assertEqual(a(explorer, "", [txt, d]), ("exe", [explorer, d]))   # solo carpetas
+            self.assertIsNone(a(explorer, "", [txt]))
+            self.assertEqual(a("C:\\no\\existe.exe", "C:\\x\\Nota.lnk", [txt]), ("acceso", "C:\\x\\Nota.lnk"))
+            self.assertIsNone(a("", "shell:AppsFolder\\Microsoft.Paint_8wekyb3d8bbwe!App", [txt]))
+        finally:
+            shutil.rmtree(d)
+
+    def test_calendario(self):
+        import datetime
+        d = calendario.cuadricula(2026, 11, 0)               # empieza en lunes
+        self.assertEqual(len(d), 42)
+        self.assertEqual(d[0], datetime.date(2026, 10, 26))
+        self.assertEqual(d[6], datetime.date(2026, 11, 1))
+        self.assertEqual(calendario.cuadricula(2026, 11, 6)[0], datetime.date(2026, 11, 1))   # en domingo
+        self.assertEqual(calendario.cuadricula(2026, 2, 6)[0], datetime.date(2026, 2, 1))
+        self.assertEqual(calendario.mover(2026, 12, 1), (2027, 1))
+        self.assertEqual(calendario.mover(2026, 1, -1), (2025, 12))
+        self.assertEqual(calendario.mover(2026, 5, 0), (2026, 5))
+
+    def test_red_glifos(self):
+        g = red.glifo_red
+        self.assertEqual(g({"tipo": "wifi", "internet": True, "senal": 90}), "")
+        self.assertEqual(g({"tipo": "wifi", "internet": True, "senal": 10}), "")
+        self.assertEqual(g({"tipo": "wifi", "internet": False, "senal": 90}), "")
+        self.assertEqual(g({"tipo": "cable", "internet": True, "senal": 100}), "")
+        self.assertEqual(g({"tipo": "no", "internet": False, "senal": 0}), "")
+        self.assertEqual(red.glifo_bateria(100, False), "")
+        self.assertEqual(red.glifo_bateria(0, True), "")
+        self.assertIn(red.bateria(), (None,) if red.bateria() is None else (red.bateria(),))
+
+    def test_isla_ancho(self):
+        medir = lambda t, b: len(t) * (8 if b else 6)
+        self.assertEqual(isla.ancho_para("Hola", "", medir), isla.MIN)
+        self.assertEqual(isla.ancho_para("x" * 200, "", medir), isla.MAX)
+        self.assertEqual(isla.ancho_para("Canción", "y" * 30, medir), 30 * 6 + 76)
+
+    def test_saltos_crc64(self):
+        # Los nombres que usa Windows para el Explorador, Zen y Terminal.
+        self.assertEqual(saltos.crc64("Microsoft.Windows.Explorer"), "f01b4d95cf55d32a")
+        self.assertEqual(saltos.crc64("F0DC299D809B9700"), "8ce45f87ad8aa327")
+        self.assertEqual(saltos.crc64("Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"), "16f2f0042ddbe0e8")
+
+    def test_saltos_trozos(self):
+        fin = struct.pack("<I", saltos.FIN)
+        lnk = lambda n: saltos.SHELLLINK + b"\x4c\x00\x00\x00" + bytes([n]) * 30
+        cab = struct.pack("<III", 2, 3, 0)
+        nombre = "Fijados".encode("utf-16-le")
+        datos = (cab + struct.pack("<II", 1, 2) + fin
+                 + struct.pack("<IH", 0, 7) + nombre + struct.pack("<I", 1) + lnk(1) + fin
+                 + struct.pack("<II", 2, 2) + lnk(2) + lnk(3) + fin)
+        t = saltos.trozos(datos)
+        self.assertEqual([(c, len(l)) for c, l in t], [("Fijados", 1), ("", 2)])
+        self.assertEqual(t[1][1][1], b"\x4c\x00\x00\x00" + bytes([3]) * 30)
+        self.assertEqual(saltos.trozos(struct.pack("<III", 2, 1, 0) + struct.pack("<II", 1, 0xFFFFFFFF) + fin), [])
+        self.assertEqual(saltos.trozos(b"\x05\x00"), [])
+        self.assertEqual(saltos.trozos(cab + struct.pack("<II", 2, 1) + b"basura" * 5), [])
 
     def test_encuentra_la_barra_de_explorer(self):
         self.assertTrue(win.taskbars())

@@ -1,0 +1,63 @@
+{
+  "nombre": "Retro",
+  "orden": 8,
+  "forma": "completa",
+  "alto": 46,
+  "margen": 0,
+  "radio": 0,
+  "borde": 0,
+  "relleno": 4,
+  "fuente": "Tahoma",
+  "tamano": 12,
+  "indicador": "relieve",
+  "reloj": "H:mm",
+  "fecha": "d/M/yyyy",
+  "relojDoble": true,
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#FFC0C0C0",
+    "fondo2": "#FFC6C6C6",
+    "borde": "#FFFFFFFF",
+    "texto": "#000000",
+    "tenue": "#404040",
+    "acento": "#000080",
+    "acento2": "#008080",
+    "alerta": "#C00000",
+    "encima": "#1F000080",
+    "fondoBandeja": "#FFA8A8A8",
+    "medidor1": "#000080",
+    "medidor2": "#008080",
+    "medidor3": "#800080",
+    "cava1": "#000080",
+    "cava2": "#008080"
+  },
+  "logo": {
+    "colores": ["#E03C31", "#3FA535", "#2C6BD6", "#F3C623"],
+    "fuera": 0,
+    "dentro": 0,
+    "lados": 0,
+    "hueco": 1,
+    "bisel": true
+  },
+  "medidor": "linea",
+  "cava": "barras",
+  "clima": "emoji",
+  "momentos": {
+    "noche": {
+      "fondo": "#FF2E2E2E",
+      "fondo2": "#FF363636",
+      "borde": "#FF5A5A5A",
+      "texto": "#E8E8E8",
+      "tenue": "#A8A8A8",
+      "acento": "#5F9FFF",
+      "acento2": "#3FBFBF",
+      "encima": "#2EFFFFFF",
+      "fondoBandeja": "#FF222222",
+      "medidor1": "#5F9FFF",
+      "medidor2": "#3FBFBF",
+      "medidor3": "#C080FF",
+      "cava1": "#5F9FFF",
+      "cava2": "#3FBFBF"
+    }
+  }
+}

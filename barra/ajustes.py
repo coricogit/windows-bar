@@ -10,7 +10,7 @@ DEFECTO = {"tema": "tokyo", "formatos": {}, "auto": False, "tema_dia": "bosque",
            "fijados": [], "quitados": [], "alineacion": "windows", "vidrio": "normal", "animaciones": "suaves", "icono": "tema", "agrupar": True,
            "orden": [], "posicion": "abajo", "opacidad": 85, "ocultos": [],
            "actualizar": True, "intentos": "", "atajos": True, "widgets": True, "ciudad": {},
-           "cava": True, "iconos": "originales"}
+           "cava": True, "iconos": "originales", "esconder": False, "isla": True}
 
 
 def normalizar(d, temas, formatos):

@@ -35,9 +35,9 @@ Desde el código: `py -m pip install PySide6_Essentials`, y después
 | Dónde | Qué hace |
 |---|---|
 | Reloj, volumen o un hueco | Clic derecho: menú de temas y ajustes |
-| Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: pasar de una a otra · Clic central: abrir otra · Clic derecho: menú · Arrastrar: cambiar de sitio |
-| Volumen | Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio |
-| Reloj | Clic: notificaciones y calendario |
+| Programa | Pasar el ratón: vista previa de todas sus ventanas · Clic: activar o minimizar (con varias, elegir) · Rueda: pasar de una a otra · Clic central: abrir otra · Clic derecho: menú con su lista de saltos (tareas y recientes) · Arrastrar: cambiar de sitio · Soltar archivos encima: se abren con él (un momento encima: su ventana pasa delante) |
+| Volumen | Con la red y la batería al lado · Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio |
+| Reloj | Clic: calendario del tema · Clic central: notificaciones |
 | Bandeja | Clic central en un icono: guardarlo tras la flecha o sacarlo (también en el menú) · Clic en la flecha: ver los ocultos |
 | Inicio | Clic: menú Inicio · Clic derecho: menú Win+X · Rueda: pasar de tema |
 
@@ -70,8 +70,12 @@ que sale por los altavoces (nunca el micrófono, y sin guardar nada) solo mientr
 
 ## Formatos
 
-En el menú, *Formato* cambia la forma de cada tema por separado: completa, islas, compacta (30 px), islas compactas (36 px),
-una isla (todo junto en el centro) o una isla compacta.
+En el menú (pestaña *Forma*), el formato cambia la forma de cada tema por separado: completa, flotante (píldora separada
+del borde), compacta (30 px), islas, islas compactas (36 px), una isla (todo junto en el centro), una isla compacta,
+pestaña (una isla pegada al borde), dock (iconos grandes que crecen bajo el ratón; 60 px), dock pegado (56 px) o dock
+pequeño (cabe en los 48 px de Windows).
+*Esconderse → Se esconde sola* deja una rayita en el borde: la barra sale al llevar el ratón allí, y las ventanas
+maximizadas ocupan toda la pantalla.
 Las compactas agrandan el área de trabajo, y las ventanas maximizadas ganan ese espacio; al cerrar vuelve a su sitio.
 
 ## Original y opacidad
@@ -116,7 +120,9 @@ tema la forma del visualizador (`cava`: `barras`, `neon`, `petalos`, `hojas` o `
 
 ## Menú y recursos
 
-Clic derecho en el reloj: menú visual con los temas y todos los ajustes, también *Arrancar con Windows*. Las miniaturas
+Clic derecho en el reloj: menú visual en pestañas (Temas, Forma, Iconos, Funciones, General), también *Arrancar con Windows*.
+La *isla dinámica* (pestaña Funciones) avisa junto a la barra de la canción nueva, de Claude esperando, de la red y de la
+batería. Las miniaturas
 se rehacen con `py barra.pyw --miniaturas`. *Animaciones* regula cuánto se redibuja; a los 90 s sin tocar el equipo, los
 fondos se paran solos. Claudito se dibuja desde una copia en `%LOCALAPPDATA%\barra-temas\claudito`, hecha al arrancar.
 
@@ -149,6 +155,8 @@ El icono de Windows sale de `logo` en `tema.json`: colores, redondez de cada esq
 - `barra/sesiones.py`, `barra/uso.py`, `barra/conectar.py`, `barra/panel_claude.py`: Claudito interactivo.
 - `claudito/`: copia exacta de lo que hace falta de Claudito (`py installer\copiar_claudito.py`).
 - `barra/iconos.py`: iconos adaptados al tema.
+- `barra/saltos.py`: listas de saltos (IApplicationResolver, IApplicationDocumentLists y CustomDestinations).
+- `barra/red.py`: Wi-Fi, conexión y batería. `barra/calendario.py`: el calendario. `barra/isla.py`: la isla dinámica.
 - `barra/programas.py`: nombre real de los programas y agrupación.
 - `barra/ajustes.py`: ajustes guardados y programas anclados.
 - `barra/claudito.py`: lee el estado y el dibujo de `~/src/claudito`, sin escribir allí.

@@ -40,6 +40,7 @@ Loader {
       model: tareas
       // La gota: sus dos bordes van a distinta velocidad, así se estira al moverse.
       property Item activaItem: null
+      property real ratonX: -1000          // en el dock: dónde está el ratón, para la lupa
       Item {
         id: gota
         parent: contentItem
@@ -257,7 +258,13 @@ Loader {
              : (barra.datos.silencio ? "✕" : "♪") + (mod.v ? "\n" : " ") + barra.datos.volumen + "%"
       fuente: mod.tema.glifos ? "Segoe Fluent Icons" : mod.tema.fuente
       tam: mod.tema.glifos ? 16 : mod.tema.tamano
-      ayuda: (mod.tema.glifos ? "Volumen " + barra.datos.volumen + " % · " : "") + "Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio"
+      glifo: (barra.datos.red || "") + (barra.datos.bateria ? (mod.v ? "
+" : "") + barra.datos.bateria : "")
+      ayuda: (barra.datos.redTexto ? barra.datos.redTexto + "
+" : "")
+             + (barra.datos.bateriaPct >= 0 ? "Batería " + barra.datos.bateriaPct + " %" + (barra.datos.cargando ? " (cargando)" : "") + "
+" : "")
+             + (mod.tema.glifos ? "Volumen " + barra.datos.volumen + " % · " : "") + "Clic: ajustes rápidos · Rueda: volumen · Clic central: silencio"
       onPulsado: function(b) {
         if (b === Qt.RightButton) barra.menu()
         else barra.accion(b === Qt.MiddleButton ? "silencio" : "rapidos")
@@ -279,8 +286,13 @@ Loader {
              : mod.v ? "\n" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM")
              : (doble ? "\n" : "  ") + ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha))
       tam: mod.v || doble ? Math.min(mod.tema.tamano, 13) : mod.tema.tamano
-      ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat)
-      onPulsado: function(b) { if (b === Qt.RightButton) barra.menu(); else barra.accion("avisos") }
+      ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat) + "
+Clic: calendario · Clic central: notificaciones"
+      onPulsado: function(b) {
+        if (b === Qt.RightButton) barra.menu()
+        else if (b === Qt.MiddleButton) barra.accion("avisos")
+        else { var p = hora.mapToGlobal(hora.width / 2, hora.height / 2); barra.calendario(p.x, p.y) }
+      }
       Timer { interval: 1000; running: true; repeat: true; onTriggered: hora.ahora = new Date() }
     }
   }

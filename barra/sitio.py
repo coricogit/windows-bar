@@ -17,6 +17,25 @@ def margenes(lado, grosor):
     return tuple(grosor if lado == n else 0 for n in ("izquierda", "arriba", "derecha", "abajo"))
 
 
+def en_borde(lado, zona, punto, grueso=2):
+    """¿Está el ratón pegado al borde de la pantalla, a lo largo de la barra?
+    `zona` es (x, y, ancho, alto) de la barra."""
+    x, y, an, al = zona
+    px, py = punto
+    if lado in VERTICALES:
+        if not y <= py < y + al:
+            return False
+        return px < x + grueso if lado == "izquierda" else px >= x + an - grueso
+    if not x <= px < x + an:
+        return False
+    return py < y + grueso if lado == "arriba" else py >= y + al - grueso
+
+
+def dentro(zona, punto, holgura=0):
+    x, y, an, al = zona
+    return x - holgura <= punto[0] < x + an + holgura and y - holgura <= punto[1] < y + al + holgura
+
+
 def colocar(lado, ancla, an, al, pantalla, grosor, hueco=8, borde=6):
     """Esquina de una ventanita de `an` x `al`, pegada a la barra y centrada en
     el punto `ancla`, sin salirse de la pantalla."""

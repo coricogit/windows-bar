@@ -1,0 +1,56 @@
+{
+  "nombre": "Vaporwave",
+  "orden": 9,
+  "forma": "completa",
+  "alto": 46,
+  "margen": 0,
+  "radio": 0,
+  "borde": 0,
+  "relleno": 12,
+  "fuente": "Bahnschrift",
+  "tamano": 14,
+  "indicador": "linea",
+  "fecha": "ddd d MMM",
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#F2471A5E",
+    "fondo2": "#F21B0B33",
+    "borde": "#FFFF71CE",
+    "texto": "#FFE9FF",
+    "tenue": "#E4C2F9",
+    "acento": "#FF71CE",
+    "acento2": "#01CDFE",
+    "alerta": "#FFB86C",
+    "encima": "#33FF71CE",
+    "fondoBandeja": "#991B0B33",
+    "medidor1": "#FF71CE",
+    "medidor2": "#01CDFE",
+    "medidor3": "#FFFB96",
+    "cava1": "#FF71CE",
+    "cava2": "#01CDFE"
+  },
+  "logo": {
+    "colores": ["#FF71CE", "#B967FF", "#01CDFE", "#FFFB96"],
+    "fuera": 0.4,
+    "dentro": 0.6,
+    "lados": 1,
+    "hueco": 2
+  },
+  "medidor": "onda",
+  "cava": "neon",
+  "clima": "neon",
+  "momentos": {
+    "dia": {
+      "fondo": "#F2702A78",
+      "fondo2": "#F2341450"
+    },
+    "amanecer": {
+      "fondo": "#F2762C5C",
+      "fondo2": "#F2381655"
+    },
+    "atardecer": {
+      "fondo": "#F2722450",
+      "fondo2": "#F2300E48"
+    }
+  }
+}

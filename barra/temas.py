@@ -15,7 +15,7 @@ BASE = {
     "separacion": 8, "fuente": "Segoe UI", "tamano": 13, "negrita": False, "borde": 0, "indicador": "linea",
     "reloj": "HH:mm", "fecha": "ddd d MMM", "fondo": "", "pixelado": False, "paseo": False,
     "corchetes": False, "dinamico": False, "icono": 24, "estiloIconos": "", "estiloBandeja": "", "vidrio": False,
-    "compacto": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
+    "compacto": False, "dock": False, "lupa": 0.38, "pegada": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
     "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "dentro": False,
     "glifos": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False,
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
@@ -52,8 +52,10 @@ def cargar(raices=(RAIZ, PROPIOS)):
     return dict(sorted(out.items(), key=lambda kv: (kv[1]["orden"], kv[0])))
 
 
-FORMATOS = {"tema": "El del tema", "completa": "Completa", "islas": "Islas", "compacta": "Compacta",
-            "islas_compactas": "Islas compactas", "isla": "Una isla", "isla_compacta": "Una isla compacta"}
+FORMATOS = {"tema": "El del tema", "completa": "Completa", "flotante": "Flotante", "islas": "Islas", "compacta": "Compacta",
+            "islas_compactas": "Islas compactas", "isla": "Una isla", "isla_compacta": "Una isla compacta",
+            "pestana": "Pestaña", "dock": "Dock", "dock_pegado": "Dock pegado", "dock_mini": "Dock pequeño"}
+UNA_ISLA = ("isla", "isla_compacta", "pestana", "dock", "dock_pegado", "dock_mini")
 NORMAL = 48        # lo que reserva la barra de Windows
 
 
@@ -69,13 +71,24 @@ def con_formato(t, formato):
         return t
     t = {**t, "compacto": "compacta" in formato}
     col = dict(t["colores"])
-    if formato in ("isla", "isla_compacta"):       # todo junto, en el centro
+    if formato in UNA_ISLA:       # todo junto, en el centro
         if t["forma"] != "islas" or rgb(col["isla"])[3] < 0.5:
             col["isla"] = col["fondo"]
         t.update(forma="islas", unica=True, dentro=True, paseo=False, vidrio=False, adapta=False,
                  separacion=10 if t["compacto"] else 16, aire=4 if t["compacto"] else 6, relleno=8,
                  borde=2 if t["pixelado"] else 1, alto=42, margen=3)
         t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 14)
+        if formato == "pestana":          # pegada al borde, redondeada solo por dentro
+            t.update(pegada=True, alto=46, margen=0)
+        if formato.startswith("dock"):     # iconos grandes que crecen bajo el ratón; algo más alta
+            t.update(dock=True, alto=54, margen=3, icono=34, relleno=10, lupa=0.38)
+            if formato == "dock_pegado":
+                t.update(alto=56, margen=0, pegada=True)
+            elif formato == "dock_mini":      # cabe en lo que reserva Windows
+                t.update(alto=44, margen=2, icono=28, relleno=8, lupa=0.25)
+            if t["indicador"] in ("linea", "relleno"):
+                t["indicador"] = "punto"
+            t["radio"] = 0 if t["pixelado"] or t["corchetes"] else max(t["radio"], 18)
     elif formato.startswith("islas"):
         if t["forma"] != "islas":
             t.update(forma="islas", dentro=True, separacion=8, relleno=8, borde=2 if t["pixelado"] else 1)
@@ -87,6 +100,9 @@ def con_formato(t, formato):
             t.update(forma="completa", radio=0, vidrio=False, adapta=False)
             col["isla"] = "transparent"
         t.update(alto=46, margen=0)
+        if formato == "flotante":          # separada del borde, como una píldora
+            t.update(alto=38, margen=5, borde=2 if t["pixelado"] else 1)
+            t["radio"] = 0 if t["pixelado"] or t["corchetes"] else 19
     if t["compacto"]:
         t.update(alto=30, margen=3 if t["forma"] == "islas" else 0, tamano=min(t["tamano"], 12), icono=18)
     t["colores"] = col
@@ -303,7 +319,7 @@ def con_icono(t, tono):
 
 def alto_total(t):
     """Alto de la ventana. Los normales usan todo el hueco de la barra de Windows."""
-    return t["alto"] + 2 * t["margen"] if t["compacto"] or t["vertical"] else NORMAL
+    return t["alto"] + 2 * t["margen"] if t["compacto"] or t["vertical"] or t["dock"] else NORMAL
 
 
 # ----- Camaleón -------------------------------------------------------------

@@ -1,0 +1,60 @@
+{
+  "nombre": "Océano",
+  "orden": 10,
+  "forma": "completa",
+  "alto": 46,
+  "margen": 0,
+  "radio": 0,
+  "borde": 0,
+  "relleno": 12,
+  "fuente": "Segoe UI Semibold",
+  "tamano": 13,
+  "indicador": "gota",
+  "fecha": "ddd d MMM",
+  "fondo": "Fondo.qml",
+  "colores": {
+    "fondo": "#F2053B57",
+    "fondo2": "#F20A5670",
+    "borde": "#FF7FE3E8",
+    "texto": "#EFFCFF",
+    "tenue": "#A6DDE8",
+    "acento": "#3DE0D0",
+    "acento2": "#FFB37A",
+    "alerta": "#FF8A7A",
+    "encima": "#333DE0D0",
+    "fondoBandeja": "#99042B40",
+    "medidor1": "#3DE0D0",
+    "medidor2": "#7FC8FF",
+    "medidor3": "#FFB37A",
+    "cava1": "#3DE0D0",
+    "cava2": "#7FC8FF"
+  },
+  "logo": {
+    "colores": ["#3DE0D0", "#22B8CF", "#7FC8FF", "#FFB37A"],
+    "fuera": 0.3,
+    "dentro": 1,
+    "lados": 1,
+    "hueco": 2
+  },
+  "medidor": "linea",
+  "cava": "barras",
+  "clima": "emoji",
+  "momentos": {
+    "amanecer": {
+      "fondo": "#F2154A6B",
+      "fondo2": "#F2704454"
+    },
+    "atardecer": {
+      "fondo": "#F2123A5C",
+      "fondo2": "#F26A3448",
+      "acento": "#FFC48A"
+    },
+    "noche": {
+      "fondo": "#F2010E1C",
+      "fondo2": "#F2032B40",
+      "tenue": "#8FBCCB",
+      "acento": "#4FFFE0",
+      "encima": "#334FFFE0"
+    }
+  }
+}

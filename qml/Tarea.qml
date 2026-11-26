@@ -26,7 +26,15 @@ Item {
   }
   readonly property var c: tema.colores
   readonly property string estilo: tema.indicador
-  readonly property real paso: tema.compacto ? 32 : 42
+  readonly property real paso: tema.dock ? tema.icono + 16 : tema.compacto ? 32 : 42
+  // Dock: los iconos crecen cuanto más cerca está el ratón, hacia dentro de la pantalla.
+  readonly property real lupa: {
+    if (!tema.dock || !lista || lista.ratonX < -500) return 1
+    var d = Math.abs((v ? y + height / 2 : x + width / 2) - lista.ratonX)
+    return 1 + tema.lupa * Math.max(0, 1 - d / 120)
+  }
+  readonly property int origen: ({ abajo: Item.Bottom, arriba: Item.Top, izquierda: Item.Left, derecha: Item.Right })[tema.lado] || Item.Bottom
+  readonly property real hacia: tema.dock ? 3 : 0        // un poco hacia el borde: así cabe al crecer
   width: v ? alto : paso
   height: v ? paso : alto
 
@@ -34,7 +42,7 @@ Item {
     anchors { fill: parent; margins: tarea.tema.compacto ? 1 : 3 }
     radius: Math.min(Math.max(tema.radio, tema.radioBoton), 10)
     color: tarea.activa && tarea.estilo === "relleno" ? tarea.c.acento
-           : raton.containsMouse || (tarea.activa && tarea.estilo !== "corchetes" && tarea.estilo !== "gota") ? tarea.c.encima : "transparent"
+           : (raton.containsMouse && !tarea.tema.dock) || suelta.containsDrag || (tarea.activa && tarea.estilo !== "corchetes" && tarea.estilo !== "gota") ? tarea.c.encima : "transparent"
     border.width: tarea.elegida ? 2 : 0        // elegida con el teclado
     border.color: tarea.c.acento
     Behavior on color { ColorAnimation { duration: 140 } }
@@ -49,14 +57,18 @@ Item {
 
   Image {
     anchors.centerIn: parent
+    anchors.verticalCenterOffset: tarea.v ? 0 : tarea.tema.lado === "arriba" ? -tarea.hacia : tarea.hacia
+    anchors.horizontalCenterOffset: !tarea.v ? 0 : tarea.tema.lado === "izquierda" ? -tarea.hacia : tarea.hacia
+    transformOrigin: tarea.tema.dock ? tarea.origen : Item.Center
     width: tarea.tema.icono; height: tarea.tema.icono
     sourceSize: Qt.size(32, 32)
     source: tarea.icono === "" ? "" : tarea.icono + tarea.tema.estiloIconos
     smooth: !tarea.tema.pixelado
     mipmap: !tarea.tema.pixelado
     opacity: tarea.minimizada ? 0.55 : 1
-    scale: raton.pressed ? 0.85 : raton.containsMouse ? 1.1 : 1
-    Behavior on scale { NumberAnimation { duration: 110 } }
+    scale: tarea.tema.dock ? tarea.lupa * (raton.pressed ? 0.9 : 1)
+           : raton.pressed ? 0.85 : raton.containsMouse || suelta.containsDrag ? 1.1 : 1
+    Behavior on scale { NumberAnimation { duration: tarea.tema.dock ? 70 : 110 } }
   }
   Text {         // sin icono: la inicial
     anchors.centerIn: parent
@@ -104,6 +116,27 @@ Item {
     }
   }
 
+  // Archivos arrastrados desde otro programa: encima un momento, la ventana
+  // pasa delante; soltados en el botón, se abren con este programa.
+  DropArea {
+    id: suelta
+    anchors.fill: parent
+    keys: ["text/uri-list"]
+    onEntered: function(d) {
+      if (!d.hasUrls) { d.accepted = false; return }
+      d.acceptProposedAction()
+      if (tarea.abierta) espera.restart()
+    }
+    onExited: espera.stop()
+    onDropped: function(d) {
+      espera.stop()
+      if (!d.hasUrls) return
+      d.acceptProposedAction()
+      barra.soltar_archivos(tarea.clave, d.urls)
+    }
+    Timer { id: espera; interval: 600; onTriggered: barra.archivo_encima(tarea.clave) }
+  }
+
   Aviso { texto: tarea.abierta ? "" : tarea.titulo; fuente: raton }   // abierta: vista previa
   MouseArea {
     id: raton
@@ -116,6 +149,7 @@ Item {
     function enLista(e) { var p = raton.mapToItem(tarea.lista.contentItem, e.x, e.y); return tarea.v ? p.y : p.x }
     onPressed: function(e) { movido = false; inicio = enLista(e); tarea.agarre = tarea.v ? e.y : e.x }
     onPositionChanged: function(e) {
+      if (tarea.tema.dock && !tarea.arrastrando) tarea.lista.ratonX = enLista(e)
       if (!(pressedButtons & Qt.LeftButton)) return
       var x = enLista(e)
       if (!tarea.arrastrando) {
@@ -138,6 +172,7 @@ Item {
     onReleased: acabar()
     onCanceled: acabar()
     onContainsMouseChanged: {
+      if (!containsMouse && tarea.tema.dock) tarea.lista.ratonX = -1000
       if (!containsMouse) { barra.soltar(tarea.clave); return }
       var p = tarea.mapToGlobal(tarea.width / 2, tarea.height / 2)
       barra.apuntar(tarea.clave, p.x, p.y)

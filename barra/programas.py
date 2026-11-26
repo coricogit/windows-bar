@@ -93,6 +93,22 @@ def nombre_tienda(ident):
     return _nombres[ident]
 
 
+def abrir_con(exe, ruta, rutas):
+    """Cómo abrir los archivos soltados sobre un botón: ("exe", [programa,
+    *archivos]), ("acceso", acceso_directo) o None si ese programa no sabe."""
+    rutas = [r for r in rutas if r]
+    if not rutas:
+        return None
+    if os.path.basename(exe or "").lower() == "explorer.exe":
+        carpetas = [r for r in rutas if os.path.isdir(r)]     # un archivo lo abriría con otro programa
+        return ("exe", [exe, *carpetas]) if carpetas else None
+    if exe and exe.lower().endswith(".exe") and os.path.isfile(exe):
+        return ("exe", [exe, *rutas])
+    if ruta and ruta.lower().endswith(".lnk"):
+        return ("acceso", ruta)
+    return None          # apps de la Tienda: no aceptan archivos por la línea de órdenes
+
+
 def agrupar(info, fijos, juntar, orden, elegido=()):
     """Las filas de la barra a partir de las ventanas `info` ({"hwnd", "clave",
     "nombre", "titulo", "icono", "activa", "minimizada", "exe", "z"}) y de los

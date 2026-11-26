@@ -11,16 +11,34 @@ CHIP_AL, FILA_AL, ETIQUETA = 26, 34, 130
 ANCHO = 2 * MARGEN + COLUMNAS * TARJETA_AN + HUECO
 
 
-def colocar(temas, filas, interruptores, botones, medir):
-    """Dónde va cada cosa: ([(QRect, tipo, datos)], alto total). `medir(texto)`
-    da el ancho de un texto."""
-    zonas, y = [], MARGEN + 26
+PESTANA_AL = 30
+
+
+def colocar(seccion, medir, pestanas=(), elegida=0):
+    """Dónde va cada cosa: ([(QRect, tipo, datos)], alto total). `seccion` es
+    {"temas", "filas", "interruptores", "botones"} (todo opcional) y
+    `pestanas`, sus títulos, arriba. `medir(texto)` da el ancho de un texto."""
+    zonas, y = [], MARGEN
+    if pestanas:
+        x = MARGEN
+        for i, t in enumerate(pestanas):
+            an = medir(t) + 26
+            zonas.append((QRect(x, y, an, PESTANA_AL), "pestana", {"texto": t, "indice": i, "elegido": i == elegida}))
+            x += an + 4
+        y += PESTANA_AL + 14
+    temas = seccion.get("temas", [])
     for i, t in enumerate(temas):
         x = MARGEN + (i % COLUMNAS) * (TARJETA_AN + HUECO)
         fila = y + (i // COLUMNAS) * (MINI_AL + NOMBRE_AL + HUECO)
         zonas.append((QRect(x, fila, TARJETA_AN, MINI_AL + NOMBRE_AL), "tema", t))
-    y += -(-len(temas) // COLUMNAS) * (MINI_AL + NOMBRE_AL + HUECO) + 6
-    for titulo, opciones in filas:
+    if temas:
+        y += -(-len(temas) // COLUMNAS) * (MINI_AL + NOMBRE_AL + HUECO) + 6
+    for titulo, opciones in seccion.get("filas", []):
+        if titulo.startswith("# "):              # encabezado de un bloque
+            y += 4
+            zonas.append((QRect(MARGEN, y, ANCHO - 2 * MARGEN, CHIP_AL), "encabezado", titulo[2:]))
+            y += FILA_AL - 4
+            continue
         zonas.append((QRect(MARGEN, y, ETIQUETA, CHIP_AL), "titulo", titulo))
         x = MARGEN + ETIQUETA
         for o in opciones:
@@ -31,7 +49,9 @@ def colocar(temas, filas, interruptores, botones, medir):
             x += an + 6
         y += FILA_AL
     x, y = MARGEN, y + 4
-    for lista, tipo in ((interruptores, "chip"), (botones, "boton")):
+    for lista, tipo in ((seccion.get("interruptores", []), "chip"), (seccion.get("botones", []), "boton")):
+        if not lista:
+            continue
         for o in lista:
             an = medir(o["texto"]) + (40 if "marcado" in o else 22)
             if x + an > ANCHO - MARGEN:
@@ -44,7 +64,8 @@ def colocar(temas, filas, interruptores, botones, medir):
 
 class Selector(QWidget):
     def __init__(self, datos):
-        """`datos()` da {"temas", "filas", "interruptores", "botones", "colores", "fuente"}."""
+        """`datos()` da {"pestanas": [{"titulo", "temas", "filas", "interruptores",
+        "botones"}], "colores", "fuente"}."""
         super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint
                          | Qt.WindowType.WindowStaysOnTopHint)
         self.setMouseTracking(True)
@@ -52,6 +73,7 @@ class Selector(QWidget):
         self.cerrado = 0.0           # cuándo se cerró, para no reabrir con el mismo clic
         self._d, self._zonas, self._encima, self._minis = None, [], -1, {}
         self._sitio = None
+        self._pestana = 0            # se recuerda mientras la barra sigue abierta
 
     def abrir(self, poner):
         """`poner(ancho, alto)` da la esquina."""
@@ -64,8 +86,12 @@ class Selector(QWidget):
     def refrescar(self):
         self._d = self.datos()
         f = QFontMetrics(self._fuente())
-        self._zonas, alto = colocar(self._d["temas"], self._d["filas"], self._d["interruptores"], self._d["botones"],
-                                    f.horizontalAdvance)
+        pes = self._d["pestanas"]
+        self._pestana = min(self._pestana, len(pes) - 1)
+        titulos = [x["titulo"] for x in pes]
+        self._zonas, _ = colocar(pes[self._pestana], f.horizontalAdvance, titulos, self._pestana)
+        # El alto de la más larga: así no salta al cambiar de pestaña.
+        alto = max(colocar(x, f.horizontalAdvance, titulos)[1] for x in pes)
         self.setGeometry(QRect(*self._sitio(ANCHO, alto), ANCHO, alto))
         self.update()
 
@@ -93,7 +119,7 @@ class Selector(QWidget):
             self.hide()
 
     def _en(self, pos):
-        return next((i for i, (r, t, _) in enumerate(self._zonas) if t != "titulo" and r.contains(pos)), -1)
+        return next((i for i, (r, t, _) in enumerate(self._zonas) if t not in ("titulo", "encabezado") and r.contains(pos)), -1)
 
     def mouseMoveEvent(self, e):
         i = self._en(e.position().toPoint())
@@ -111,6 +137,10 @@ class Selector(QWidget):
         if i < 0 or e.button() != Qt.MouseButton.LeftButton:
             return
         _, tipo, o = self._zonas[i]
+        if tipo == "pestana":
+            self._pestana = o["indice"]
+            self.refrescar()
+            return
         if tipo == "boton" and o.get("cierra", True):
             self.hide()
         o["hacer"]()
@@ -133,20 +163,36 @@ class Selector(QWidget):
         p.fillRect(self.rect(), fondo)
         p.setPen(QPen(c["acento"]))
         p.drawRect(self.rect().adjusted(0, 0, -1, -1))
-        p.setFont(self._fuente(14, True))
-        p.setPen(c["texto"])
-        p.drawText(QRect(MARGEN, MARGEN - 6, 300, 26), Qt.AlignmentFlag.AlignVCenter, "Temas")
+        # Debajo de las pestañas, una línea que las separa del contenido.
+        p.setPen(QPen(c["tenue"], 0.6))
+        p.drawLine(MARGEN, MARGEN + PESTANA_AL + 6, ANCHO - MARGEN, MARGEN + PESTANA_AL + 6)
         for i, (r, tipo, o) in enumerate(self._zonas):
             encima = i == self._encima
             if tipo == "titulo":
                 p.setFont(self._fuente())
                 p.setPen(c["tenue"])
                 p.drawText(r, Qt.AlignmentFlag.AlignVCenter, o)
+            elif tipo == "encabezado":
+                p.setFont(self._fuente(12, True))
+                p.setPen(c["acento"])
+                p.drawText(r, Qt.AlignmentFlag.AlignVCenter, o)
+            elif tipo == "pestana":
+                self._pestana_dibujo(p, r, o, c, encima, fondo)
             elif tipo == "tema":
                 self._tarjeta(p, r, o, c, encima)
             else:
                 self._chip(p, r, o, c, encima, fondo)
         p.end()
+
+    def _pestana_dibujo(self, p, r, o, c, encima, fondo):
+        if o["elegido"] or encima:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(c["acento"] if o["elegido"] else c["encima"])
+            p.drawRoundedRect(QRectF(r), 8, 8)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setFont(self._fuente(13, o["elegido"]))
+        p.setPen(fondo if o["elegido"] else c["texto"])
+        p.drawText(r, Qt.AlignmentFlag.AlignCenter, o["texto"])
 
     def _tarjeta(self, p, r, o, c, encima):
         caja = QRectF(r).adjusted(1, 1, -1, -1)
