@@ -55,6 +55,14 @@ def bateria():
     return s.porcentaje, s.enchufe == 1
 
 
+def bateria_estado():
+    """(enchufado, ahorro de batería activo), o None en un equipo sin batería."""
+    s = SYSTEM_POWER_STATUS()
+    if not kernel32.GetSystemPowerStatus(ctypes.byref(s)) or s.marcas & 128 or s.marcas == 255:
+        return None
+    return s.enchufe != 0, s.ahorro == 1
+
+
 def glifo_bateria(pct, cargando):
     n = max(0, min(10, round(pct / 10)))
     return chr((0xEBAB if cargando else 0xEBA0) + n)

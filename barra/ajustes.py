@@ -11,7 +11,10 @@ DEFECTO = {"tema": "tokyo", "formatos": {}, "auto": False, "tema_dia": "bosque",
            "orden": [], "posicion": "abajo", "opacidad": 85, "ocultos": [],
            "actualizar": True, "intentos": "", "atajos": True, "widgets": True, "ciudad": {},
            "cava": True, "iconos": "originales", "esconder": False, "isla": True,
-           "buscador": True, "barra_busqueda": True, "pomodoro": [25, 5], "variantes": {}, "lanzados": {}}
+           "buscador": True, "barra_busqueda": True, "pomodoro": [25, 5], "variantes": {}, "lanzados": {}, "arranque": "",
+           "pantallas": "suya", "vista_tareas": True, "integrado": False,
+           "sistema": True, "claudito": True, "medidores": ["cpu", "ram", "gpu"], "disenos": {},
+           "menus": "barra"}
 
 
 def normalizar(d, temas, formatos):
@@ -34,6 +37,8 @@ def normalizar(d, temas, formatos):
     a["quitados"] = [q for q in a["quitados"] if isinstance(q, str)]
     a["ocultos"] = list(dict.fromkeys(c for c in a["ocultos"] if isinstance(c, str)))[:MAX_ORDEN]
     a["orden"] = [c for c in a["orden"] if isinstance(c, str)]
+    a["medidores"] = [m for m in ("cpu", "ram", "gpu") if m in a["medidores"]]
+    a["disenos"] = {k: v for k, v in a["disenos"].items() if isinstance(v, str)}
     return a
 
 

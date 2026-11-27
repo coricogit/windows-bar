@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import actualizar, ajustes, apps, arranque, audio, encaje, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import reposo, actualizar, ajustes, apps, arranque, audio, encaje, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -269,6 +269,61 @@ class Arranque(unittest.TestCase):
         self.assertTrue(arranque.desactivada(bytes([3] + [0] * 11)))
         self.assertFalse(arranque.desactivada(bytes([2] + [0] * 11)))
         self.assertFalse(arranque.desactivada(None))
+
+    def test_vuelve_si_la_borran(self):
+        self.assertEqual(arranque.decidir("si", None, "x", False), ("si", True))
+        self.assertEqual(arranque.decidir("no", None, "x", False), ("no", False))
+
+    def test_respeta_al_usuario(self):
+        # Apagada en el Administrador de tareas: se deja así y se recuerda.
+        self.assertEqual(arranque.decidir("si", "x", "x", True), ("no", False))
+        # La entrada es de otra copia (la instalada): no se toca.
+        self.assertEqual(arranque.decidir("si", "otra", "x", False), ("si", False))
+
+    def test_aprende_la_primera_vez(self):
+        self.assertEqual(arranque.decidir("", "x", "x", False), ("si", False))
+        self.assertEqual(arranque.decidir("", None, "x", False), ("no", False))
+        self.assertEqual(arranque.decidir("", "x", "x", True), ("no", False))
+
+
+class Reposo(unittest.TestCase):
+    def test_corriente(self):
+        self.assertEqual(reposo.corriente(None), reposo.ENCHUFE)
+        self.assertEqual(reposo.corriente((True, False)), reposo.ENCHUFE)
+        self.assertEqual(reposo.corriente((False, False)), reposo.BATERIA)
+        self.assertEqual(reposo.corriente((False, True)), reposo.AHORRO)
+
+    def test_quieta_si_nadie_la_ve(self):
+        self.assertTrue(reposo.mover(True, "suaves", False, False, reposo.ENCHUFE))
+        self.assertFalse(reposo.mover(True, "suaves", False, True, reposo.ENCHUFE))
+        self.assertFalse(reposo.mover(True, "suaves", False, False, reposo.AHORRO))
+        self.assertEqual(reposo.fps_cava("completas", True, reposo.ENCHUFE), 0)
+        self.assertEqual(reposo.paso("completas", False, True, reposo.ENCHUFE), 50)
+
+    def test_con_bateria_mas_despacio(self):
+        self.assertEqual(reposo.ritmo("suaves", reposo.BATERIA), 2 * reposo.ritmo("suaves", reposo.ENCHUFE))
+        self.assertEqual(reposo.fps_cava("completas", False, reposo.BATERIA), 15)
+        self.assertEqual(reposo.fps_cava("completas", False, reposo.ENCHUFE), 30)
+        self.assertEqual(reposo.paso("completas", False, False, reposo.BATERIA), 5)
+        self.assertEqual(reposo.paso("completas", False, False, reposo.ENCHUFE), 1)
+
+    def test_bloqueo_responde(self):
+        self.assertIn(win.pantalla_bloqueada(), (True, False))
+
+
+class Escritorios(unittest.TestCase):
+    def test_filtra_si_windows_lo_pide(self):
+        e = win.Escritorios()
+        e.en_este = lambda h: h != 2
+        e.solo_este = lambda: True
+        self.assertEqual(e.filtrar([1, 2, 3]), [1, 3])
+        e.solo_este = lambda: False
+        self.assertEqual(e.filtrar([1, 2, 3]), [1, 2, 3])
+
+    def test_ventanas_de_verdad(self):
+        win.ole32.CoInitializeEx(None, 2)
+        hs = win.windows()
+        self.assertTrue(set(win.Escritorios().filtrar(hs)) <= set(hs))
 
 
 class Programas(unittest.TestCase):
@@ -1268,3 +1323,85 @@ class Pantalla(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VariasPantallas(unittest.TestCase):
+    def test_cada_una_las_suyas(self):
+        info = [{"hwnd": 1, "pantalla": "A"}, {"hwnd": 2, "pantalla": "B"}]
+        self.assertEqual([i["hwnd"] for i in temas.ventanas_de_pantalla(info, "suya", True, "A")], [1])
+        self.assertEqual([i["hwnd"] for i in temas.ventanas_de_pantalla(info, "suya", False, "B")], [2])
+        self.assertEqual(len(temas.ventanas_de_pantalla(info, "principal", True, "A")), 2)
+        self.assertEqual([i["hwnd"] for i in temas.ventanas_de_pantalla(info, "principal", False, "B")], [2])
+        self.assertEqual(len(temas.ventanas_de_pantalla(info, "todas", False, "B")), 2)
+
+
+class VistaDeTareas(unittest.TestCase):
+    def test_tras_inicio_y_buscar(self):
+        t = {"modulos": {"izquierda": [["inicio", "tareas"]], "derecha": [["reloj"]]}}
+        self.assertEqual(temas.con_vista_tareas(t, True)["modulos"]["izquierda"][0], ["inicio", "vista", "tareas"])
+        b = temas.con_busqueda(t, True)
+        self.assertEqual(temas.con_vista_tareas(b, True)["modulos"]["izquierda"][0], ["inicio", "buscar", "vista", "tareas"])
+        self.assertIs(temas.con_vista_tareas(t, False), t)
+
+    def test_escritorio_actual(self):
+        n, total = win.escritorio_actual()
+        self.assertTrue(1 <= n <= total)
+
+
+class ComoWindows2(unittest.TestCase):
+    def test_conserva_el_tema(self):
+        ts = temas.cargar()
+        for k, t in ts.items():
+            x = temas.con_integrado(t, True)
+            self.assertEqual(x["fuente"], "Segoe UI Variable Text")
+            self.assertEqual(x["forma"], "completa")
+            self.assertEqual(x["fondoUrl"], t["fondoUrl"], k)             # el paisaje sigue, suave
+            self.assertLess(x["adorno"], 1)
+            self.assertGreaterEqual(temas._hsl(x["colores"]["acento"])[2], 0.6 - 1e-6, k)
+            self.assertIs(temas.con_integrado(t, False), t)
+
+    def test_se_lee_sobre_el_gris(self):
+        for k, t in temas.cargar().items():
+            c = temas.con_integrado(t, True)["colores"]
+            self.assertLess(temas.brillo(temas.rgb(c["fondo"])), 0.25, k)
+            self.assertEqual(c["texto"], "#FFFFFF")
+
+
+class Widgets(unittest.TestCase):
+    def test_diseno_elegido(self):
+        t = temas.cargar()["tokyo"]
+        x = temas.con_widgets(t, {"medidor": "anillo", "clima": "tema", "cava": "raro"})
+        self.assertEqual(x["medidor"], "anillo")
+        self.assertEqual(x["clima"], t["clima"])            # «Del tema»
+        self.assertEqual(x["cava"], t["cava"])              # uno que no existe no cambia nada
+
+    def test_apagados_fuera(self):
+        t = temas.cargar()["pixel"]
+        x = temas.con_widgets(t, {}, sistema=False, claudito=False)
+        todos = [m for grupos in x["modulos"].values() for g in grupos for m in g]
+        self.assertNotIn("sistema", todos)
+        self.assertNotIn("claudito", todos)
+        self.assertFalse(x["paseo"])
+        self.assertTrue(all(g for grupos in x["modulos"].values() for g in grupos))
+
+    def test_diseños_existen_en_qml(self):
+        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        qml = {k: open(os.path.join(raiz, "qml", f), encoding="utf-8").read()
+               for k, f in (("clima", "Clima.qml"), ("medidor", "Medidor.qml"), ("cava", "Cava.qml"))}
+        for cual, d in ((k, temas.DISENOS[k]) for k in qml):
+            for k in d:
+                if k not in ("tema", "texto", "barras", "emoji"):       # los de por defecto no se nombran
+                    self.assertIn('"%s"' % k, qml[cual], (cual, k))
+
+
+class WidgetsEnTodosLosFormatos(unittest.TestCase):
+    def test_lo_elegido_manda(self):
+        t = temas.cargar()["tokyo"]
+        for f in temas.FORMATOS:
+            x = temas.con_widgets(temas.con_formato(t, f), {"claudito": "paseo", "medidor": "anillo", "busqueda": "pastilla"})
+            self.assertTrue(x["paseo"], f)
+            self.assertEqual((x["medidor"], x["busqueda"]), ("anillo", "pastilla"), f)
+
+    def test_en_vertical_no_pasea(self):
+        t = temas.con_posicion(temas.cargar()["pixel"], "izquierda")
+        self.assertFalse(temas.con_widgets(t, {"claudito": "paseo"})["paseo"])

@@ -12,7 +12,7 @@ Loader {
   // Sin tamaño propio: cada módulo pone el suyo. Si el Loader lo impusiera,
   // rompería sus enlaces y al girar la barra se quedaría con el anterior.
   sourceComponent: ({ inicio: inicio, buscar: buscarC, tareas: tareasC, titulo: titulo, musica: musicaC, sistema: sistemaC,
-                      bandeja: bandejaC, volumen: volumen, reloj: reloj, widgets: widgetsC, temas: temasC, claudito: clauditoC })[nombre]
+                      bandeja: bandejaC, vista: vistaC, volumen: volumen, reloj: reloj, widgets: widgetsC, temas: temasC, claudito: clauditoC })[nombre]
 
   Component {
     id: inicio
@@ -37,12 +37,75 @@ Loader {
     }
   }
 
+  Component {          // Vista de tareas: Win+Tab; con varios escritorios, en cuál estás
+    id: vistaC
+    Boton {
+      id: botonVista
+      alto: mod.alto
+      colores: mod.c
+      readonly property string numero: mod.tema.vista || "insignia"
+      readonly property bool varios: barra.escritorio.total > 1
+      ancho: numero === "texto" && varios ? natural : mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38
+      fuente: numero === "texto" && varios ? mod.tema.fuente : "Segoe Fluent Icons"
+      tam: numero === "texto" && varios ? mod.tema.tamano : 16
+      glifo: numero === "texto" && varios ? (mod.tema.glifoVista || "\uE7C4") : ""
+      texto: numero === "texto" && varios ? barra.escritorio.n : (mod.tema.glifoVista || "\uE7C4")
+      ayuda: "Vista de tareas" + (barra.escritorio.total > 1 ? " · Escritorio " + barra.escritorio.n + " de " + barra.escritorio.total : "")
+             + " · Rueda: cambiar de escritorio · Clic central: escritorio nuevo"
+      onPulsado: function(b) { barra.accion(b === Qt.MiddleButton ? "escritorio_nuevo" : "vista") }
+      onRueda: function(p) { barra.accion(p > 0 ? "escritorio_ant" : "escritorio_sig") }
+      Rectangle {        // Burbujas: también en su círculo
+        visible: mod.tema.burbujas
+        z: -1
+        anchors.centerIn: parent
+        width: Math.min(parent.width, parent.height) - 2; height: width
+        radius: mod.tema.pixelado ? 0 : width / 2
+        color: botonVista.encima ? Qt.lighter(mod.c.isla, 1.25) : mod.c.isla
+        border.width: 1
+        border.color: mod.c.borde
+      }
+      Row {              // Puntos: uno por escritorio, el tuyo encendido
+        visible: botonVista.numero === "puntos" && botonVista.varios
+        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: mod.tema.compacto ? 2 : 5 }
+        spacing: 2
+        Repeater {
+          model: Math.min(6, barra.escritorio.total)
+          Rectangle {
+            width: index + 1 === barra.escritorio.n ? 6 : 3; height: 3
+            radius: mod.tema.pixelado ? 0 : 1.5
+            color: index + 1 === barra.escritorio.n ? mod.c.acento : mod.c.tenue
+          }
+        }
+      }
+      Rectangle {        // el número del escritorio, si hay más de uno
+        visible: botonVista.numero === "insignia" && barra.escritorio.total > 1
+        anchors { right: parent.right; bottom: parent.bottom; rightMargin: 3; bottomMargin: mod.tema.compacto ? 3 : 6 }
+        width: Math.max(13, num.implicitWidth + 5); height: 13
+        radius: mod.tema.pixelado ? 0 : 6.5
+        color: mod.c.acento
+        Texto {
+          id: num
+          anchors.centerIn: parent
+          text: barra.escritorio.n
+          font.pixelSize: 9
+          font.bold: true
+          color: mod.c.acento.hslLightness > 0.55 ? "#000000" : "#FFFFFF"
+        }
+      }
+    }
+  }
+
   Component {          // el campo «Buscar»: abre el buscador (barra/buscador.py)
     id: buscarC
     Item {
       id: campo
       // En barras estrechas (compacta, vertical, dock, burbujas) solo la lupa, como hace Windows.
-      readonly property bool corto: mod.v || mod.tema.compacto || mod.tema.dock || mod.tema.burbujas
+      // Automática: en barras estrechas (compacta, dock, burbujas) solo la lupa, como hace Windows.
+      // Una forma elegida se respeta en cualquier formato; en vertical no cabe más que la lupa.
+      readonly property string elegida: mod.tema.busqueda || "auto"
+      readonly property bool corto: mod.v || elegida === "lupa"
+                                    || (elegida === "auto" && (mod.tema.compacto || mod.tema.dock || mod.tema.burbujas))
+      readonly property string forma: elegida === "auto" ? "campo" : elegida
       readonly property real f: Math.max(0.8, Math.min(1.4, mod.alto / 46))
       width: mod.v ? mod.alto : corto ? (mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38) : Math.round(200 * f)
       height: mod.v ? 38 : mod.alto
@@ -51,9 +114,16 @@ Loader {
         width: campo.corto ? Math.min(parent.width, parent.height) - (mod.tema.burbujas ? 2 : 8) : parent.width - 6
         height: campo.corto ? width : Math.round(mod.alto * 0.66)
         radius: mod.tema.pixelado ? 0 : campo.corto ? (mod.tema.burbujas ? width / 2 : Math.min(Math.max(mod.tema.radio, mod.tema.radioBoton), 8))
-                                                    : Math.min(height / 2, Math.max(mod.tema.radio, 6))
-        color: raton.containsMouse ? mod.c.encima : campo.corto ? "transparent" : Qt.rgba(mod.c.texto.r, mod.c.texto.g, mod.c.texto.b, 0.07)
-        border.width: campo.corto ? 0 : 1
+                : campo.forma === "pastilla" ? height / 2 : Math.min(height / 2, Math.max(mod.tema.radio, 6))
+        color: raton.containsMouse ? mod.c.encima : campo.corto || campo.forma === "subrayado" ? "transparent"
+               : Qt.rgba(mod.c.texto.r, mod.c.texto.g, mod.c.texto.b, campo.forma === "pastilla" ? 0.13 : 0.07)
+        border.width: campo.corto || campo.forma !== "campo" ? 0 : 1
+        Rectangle {          // Subrayado: solo una raya debajo
+          visible: campo.forma === "subrayado" && !campo.corto
+          anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 6; rightMargin: 6 }
+          height: raton.containsMouse ? 2 : 1
+          color: raton.containsMouse ? mod.c.acento : mod.c.tenue
+        }
         border.color: raton.containsMouse ? mod.c.acento : mod.c.borde
         Behavior on color { ColorAnimation { duration: 120 } }
         Row {
@@ -62,7 +132,7 @@ Loader {
           x: campo.corto ? 0 : Math.round(12 * campo.f)
           spacing: Math.round(9 * campo.f)
           Texto {
-            text: ""
+            text: mod.tema.glifoBusqueda || "\uE721"
             font.family: "Segoe Fluent Icons"
             font.pixelSize: Math.round(15 * campo.f)
             font.bold: false
@@ -200,7 +270,7 @@ Loader {
       topPadding: mod.v ? 4 : 0
       bottomPadding: mod.v ? 4 : 0
       Repeater {
-        model: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]]
+        model: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]].filter(function(m) { return barra.medidores.indexOf(m[1]) >= 0 })
         Medidor {
           tema: mod.tema
           alto: mod.alto
@@ -229,16 +299,7 @@ Loader {
       id: rejilla
       readonly property real celda: (mod.tema.compacto ? 24 : 28) + (mod.v ? 0 : mod.tema.aire / 2)
       columns: mod.v ? Math.max(1, Math.floor(mod.alto / celda)) : 99
-      Rectangle {      // en temas claros, para que se vean los iconos blancos
-        z: -1
-        parent: mod
-        visible: mod.item && mod.item.width > 0
-        anchors { fill: parent; topMargin: mod.v ? -2 : 5; bottomMargin: mod.v ? -2 : 5; leftMargin: mod.v ? 1 : 0; rightMargin: mod.v ? 1 : 0 }
-        radius: mod.tema.pixelado ? 0 : mod.v ? 12 : height / 2
-        color: mod.c.fondoBandeja
-        border.width: mod.tema.pixelado && Qt.color(mod.c.fondoBandeja).a > 0 ? 2 : 0
-        border.color: mod.c.borde
-      }
+      // Sin fondo propio: los iconos van directamente sobre la barra, en todos los temas.
       // Se pliega sola al rato de quitar el ratón.
       HoverHandler { id: sobre }
       Timer { interval: 6000; running: barra.bandejaAbierta && !sobre.hovered; onTriggered: barra.abrir_bandeja(false) }
@@ -284,8 +345,7 @@ Loader {
           font.family: "Segoe Fluent Icons"
           font.pixelSize: 11
           font.bold: false
-          // Con fondo propio (temas claros), la flecha va encima de algo oscuro.
-          color: Qt.color(mod.c.fondoBandeja).a > 0.3 ? "#FFFFFF" : mod.c.texto
+          color: mod.c.texto
           text: mod.v ? (barra.bandejaAbierta ? "\uE70E" : "\uE70D") : (barra.bandejaAbierta ? "\uE76C" : "\uE76B")
         }
         Aviso { texto: barra.bandejaAbierta ? "Plegar" : "Iconos ocultos: " + barra.ocultos; fuente: zf }
@@ -424,7 +484,7 @@ Loader {
         columns: hora.doble ? 1 : 2
         columnSpacing: Math.round(8 * hora.f)
         rowSpacing: Math.round(-3 * hora.f)
-        horizontalItemAlignment: hora.doble ? Grid.AlignRight : Grid.AlignLeft
+        horizontalItemAlignment: hora.doble ? Grid.AlignHCenter : Grid.AlignLeft
         verticalItemAlignment: Grid.AlignVCenter
         Texto {
           text: Qt.formatTime(hora.ahora, mod.tema.reloj)

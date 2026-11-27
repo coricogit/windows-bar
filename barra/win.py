@@ -27,6 +27,11 @@ def _sig(lib, name, res, *args):
     f.restype, f.argtypes = res, args
 
 
+_sig(user32, "OpenInputDesktop", w.HANDLE, w.DWORD, w.BOOL, w.DWORD)
+_sig(user32, "GetUserObjectInformationW", w.BOOL, w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD, ctypes.POINTER(w.DWORD))
+_sig(user32, "CloseDesktop", w.BOOL, w.HANDLE)
+
+
 _P = ctypes.POINTER
 _sig(user32, "EnumWindows", w.BOOL, ENUMPROC, w.LPARAM)
 _sig(user32, "FindWindowExW", w.HWND, w.HWND, w.HWND, w.LPCWSTR, w.LPCWSTR)
@@ -411,6 +416,20 @@ def segundos_inactivo():
     return ((kernel32.GetTickCount() - i.dwTime) & 0xFFFFFFFF) / 1000
 
 
+def pantalla_bloqueada():
+    """Si el escritorio que recibe el teclado no es el del usuario (bloqueo, UAC, Ctrl+Alt+Supr)."""
+    d = user32.OpenInputDesktop(0, False, 0x0001)          # DESKTOP_READOBJECTS
+    if not d:
+        return True
+    try:
+        nombre = ctypes.create_unicode_buffer(64)
+        if not user32.GetUserObjectInformationW(d, 2, nombre, ctypes.sizeof(nombre), None):   # UOI_NAME
+            return False
+        return nombre.value.lower() != "default"
+    finally:
+        user32.CloseDesktop(d)
+
+
 # ----- teclas y bandeja -----------------------------------------------------
 
 def press(*keys):
@@ -554,3 +573,77 @@ def shell_icon(nombre, size=64):
         return bmp.value if hr >= 0 else None
     finally:
         method(item, 2)()
+
+
+# ----- esquinas de las ventanitas -------------------------------------------
+
+def esquinas(hwnd, pref):
+    """Redondeo de DWM (DWMWA_WINDOW_CORNER_PREFERENCE): 1 nada, 2 normal, 3 poco. En Windows 10 no hace nada."""
+    try:
+        v = ctypes.c_int(pref)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(w.HWND(hwnd), 33, ctypes.byref(v), 4)
+    except OSError:
+        pass
+
+
+# ----- escritorios virtuales ------------------------------------------------
+
+def escritorio_actual():
+    """(número del escritorio en el que estás, cuántos hay), del registro de Explorer; (1, 1) si no se sabe."""
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops") as k:
+            ids = winreg.QueryValueEx(k, "VirtualDesktopIDs")[0]
+            try:
+                actual = winreg.QueryValueEx(k, "CurrentVirtualDesktop")[0]
+            except OSError:
+                actual = ids[:16]
+    except OSError:
+        return 1, 1
+    todos = [bytes(ids[i:i + 16]) for i in range(0, len(ids) - 15, 16)]
+    if not todos:
+        return 1, 1
+    return (todos.index(bytes(actual)) + 1 if bytes(actual) in todos else 1), len(todos)
+
+
+class Escritorios:
+    """Qué ventanas son del escritorio virtual en el que estás (IVirtualDesktopManager, documentada).
+    Sigue el ajuste de Windows «Mostrar en la barra las ventanas abiertas en: solo este escritorio / todos»."""
+    CLSID, IID = "aa509086-5ca9-4c25-8f95-589d3c07b48a", "a5cd92ff-29be-454c-8d04-d82879fb3f1b"
+    ADVANCED = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+
+    def __init__(self):
+        self._p, self._probado = ctypes.c_void_p(), False
+
+    def _gestor(self):
+        if not self._probado:
+            self._probado = True
+            if ole32.CoCreateInstance(ctypes.byref(GUID(self.CLSID)), None, 23, ctypes.byref(GUID(self.IID)),
+                                      ctypes.byref(self._p)) < 0:
+                self._p = ctypes.c_void_p()
+        return self._p if self._p.value else None
+
+    @classmethod
+    def solo_este(cls):
+        """Como Windows: si falta el valor, solo las de este escritorio."""
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.ADVANCED) as k:
+                return winreg.QueryValueEx(k, "VirtualDesktopTaskbarFilter")[0] != 0
+        except OSError:
+            return True
+
+    def en_este(self, hwnd):
+        """Si la ventana se ve en este escritorio; ante cualquier duda, sí."""
+        g = self._gestor()
+        if not g:
+            return True
+        si = w.BOOL(1)
+        if method(g, 3, w.HWND, _P(w.BOOL))(hwnd, ctypes.byref(si)) < 0:
+            return True
+        return bool(si.value)
+
+    def filtrar(self, hwnds):
+        if not hwnds or not self.solo_este():
+            return hwnds
+        return [h for h in hwnds if self.en_este(h)]

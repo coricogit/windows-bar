@@ -19,15 +19,15 @@ import time
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 
-from PySide6.QtCore import (Property, QAbstractListModel, QByteArray, QFileInfo, QLockFile, QModelIndex,  # noqa: E402
+from PySide6.QtCore import (Property, QAbstractListModel, QByteArray, QEvent, QFileInfo, QLockFile, QModelIndex,  # noqa: E402
                             QObject, QPoint, QRect, QSize, Qt, QTimer, QUrl, Signal, Slot)
 from PySide6.QtGui import QAction, QColor, QCursor, QGuiApplication, QIcon, QImage, QPainter  # noqa: E402
 from PySide6.QtQml import QQmlComponent, QQmlContext, QQmlEngine  # noqa: E402
 from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRendererInterface  # noqa: E402
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
-from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox  # noqa: E402
+from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox, QWidget  # noqa: E402
 
-from barra import (actualizar, ajustes as cfg, apps as apps_inicio, arranque, audio, atencion, buscador, encaje, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
+from barra import (reposo, actualizar, ajustes as cfg, apps as apps_inicio, arranque, audio, atencion, buscador, encaje, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -309,6 +309,7 @@ class Barra(QObject):
     claudeCambio = Signal()
     musicaCambio = Signal()
     animarCambio = Signal()
+    escritorioCambio = Signal()
     tituloCambio = Signal()
     ropaCambio = Signal()
     momentoCambio = Signal()
@@ -334,12 +335,15 @@ class Barra(QObject):
         self.temas = temas.cargar()
         self.ajustes = cfg.normalizar(cfg.leer(RUTA_AJUSTES), self.temas, temas.FORMATOS)
         self.paneles = []
+        self.escritorios = win.Escritorios()
+        self._escritorio = (1, 1)
         self.tray = Lista(["key", "icono", "tip", "oculto"], self)
         self._tray = {}
         self._abierta, self._ocultos = False, 0      # la flecha de la bandeja
         self._camaleon, self._camaleon_imagen, self._tono_fondo = {}, None, None
         self._pix_fondo = []
         self._inactivo, self.selector, self.motor, self._vueltas = False, None, None, 0
+        self._oculto, self._luz = False, reposo.ENCHUFE      # nadie ve la barra; con qué corriente va
         self._elegido, self.novedades = None, None
         self._datos = {"cpu": 0, "ram": 0, "gpu": -1, "volumen": 0, "silencio": False}
         self._claude = {"modo": "sleep", "texto": ""}
@@ -407,6 +411,10 @@ class Barra(QObject):
         self._t_pronto = QTimer(self, interval=60, singleShot=True, timeout=self.actualizar_ventanas)
         for t in (self._t_sis, self._t_cl, self._t_tema, self._t_ven):
             t.start()
+        if not self.vista:
+            self._t_arranque = QTimer(self, interval=5 * 60 * 1000, timeout=self._vigilar_arranque)
+            self._t_arranque.start()
+            QTimer.singleShot(30_000, self._vigilar_arranque)
         self._t_tiempo = QTimer(self, interval=20 * 60 * 1000, timeout=self._pedir_tiempo)
         self._t_tiempo.start()
         QTimer.singleShot(3000, self._pedir_tiempo)
@@ -503,13 +511,17 @@ class Barra(QObject):
             t = {**t, "colores": {**t["colores"], **self._camaleon}}
         t = temas.con_momento(t, self._momento)
         t = temas.con_variante(t, self.ajustes["variantes"].get(self._elegido, "tema"))
+        t = temas.con_integrado(t, self.ajustes["integrado"])
         detras = temas.brillo_de_lado(self._pix_fondo, self.ajustes["posicion"]) if t["translucida"] else 0
         t = temas.con_windows_y_opacidad(t, self._apariencia, self.ajustes["formatos"].get(self._elegido, "tema"),
                                          self.ajustes["opacidad"], detras)
         t = temas.con_posicion(t, self.ajustes["posicion"])
+        # Lo elegido en Widgets manda sobre el formato y la posición.
+        t = temas.con_widgets(t, self.ajustes["disenos"], self.ajustes["sistema"], self.ajustes["claudito"])
         t = iconos.con_iconos(t, self.ajustes["iconos"])
         t = temas.con_icono(t, self._tono_fondo if self.ajustes["icono"] == "fondo" or t["vidrio"] or t["adapta"] else None)
         t = temas.con_busqueda(t, self.ajustes["barra_busqueda"] and not self.vista)
+        t = temas.con_vista_tareas(t, self.ajustes["vista_tareas"])
         al = self.ajustes["alineacion"]
         return temas.con_alineacion(t, self._centrado if al == "windows" else al == "centro")
 
@@ -554,7 +566,16 @@ class Barra(QObject):
     def sitio(self, x, y):
         """Función que coloca una ventanita junto a la barra, frente a ese punto."""
         g = (QGuiApplication.screenAt(QPoint(round(x), round(y))) or self.app.primaryScreen()).geometry().getRect()
-        return lambda an, al: sitio.colocar(self._get_tema()["lado"], (x, y), an, al, g, self.alto())
+        t = self._get_tema()
+        hueco = temas.forma_menus(t, self.ajustes["menus"])[1]
+        return lambda an, al: sitio.colocar(t["lado"], (x, y), an, al, g, self.alto(), hueco)
+
+    def esquinas_menus(self):
+        return temas.forma_menus(self._get_tema(), self.ajustes["menus"])[0]
+
+    def _set_menus(self, modo):
+        self.ajustes["menus"] = modo
+        self._guardar()
 
     def _set_posicion(self, lado):
         self.ajustes["posicion"] = lado
@@ -754,6 +775,23 @@ class Barra(QObject):
             if self.atajo_buscar.poner(quiere) != quiere and quiere:
                 registrar("Alt+Espacio ya lo usa otro programa: el buscador sigue en el clic central de Inicio")
 
+    def _set_integrado(self, si):
+        self.ajustes["integrado"] = si
+        self._guardar()
+        self._actualizar_camaleon(avisar=False)
+        self.temaCambio.emit()
+
+    def _set_vista_tareas(self, si):
+        self.ajustes["vista_tareas"] = si
+        self._guardar()
+        self.temaCambio.emit()
+
+    def _set_pantallas(self, modo):
+        self.ajustes["pantallas"] = modo
+        self._guardar()
+        self._quitar_previa()
+        self.actualizar_ventanas()
+
     def _set_barra_busqueda(self, si):
         self.ajustes["barra_busqueda"] = si
         self._guardar()
@@ -895,20 +933,27 @@ class Barra(QObject):
         self.ritmoCambio.emit()
 
     # Milisegundos entre fotogramas de los fondos, y si se mueven.
-    ritmo = Property(int, lambda self: temas.RITMO.get(self.ajustes["animaciones"], 200), notify=ritmoCambio)
-    mover = Property(bool, lambda self: self._animar and not self._inactivo and self.ajustes["animaciones"] != "ninguna",
-                     notify=ritmoCambio)
+    ritmo = Property(int, lambda self: reposo.ritmo(self.ajustes["animaciones"], self._luz), notify=ritmoCambio)
+    mover = Property(bool, lambda self: reposo.mover(self._animar, self.ajustes["animaciones"], self._inactivo,
+                                                     self._oculto, self._luz), notify=ritmoCambio)
 
     # Cada cuántas décimas de segundo se redibuja Claudito.
-    paso = Property(int, lambda self: 5 if self._inactivo else {"completas": 1, "suaves": 2}.get(
-        self.ajustes["animaciones"], 4), notify=ritmoCambio)
+    paso = Property(int, lambda self: reposo.paso(self.ajustes["animaciones"], self._inactivo, self._oculto, self._luz),
+                    notify=ritmoCambio)
 
     def _ver_inactividad(self):
-        """Tras un rato sin tocar nada, los fondos se quedan quietos."""
-        i = win.segundos_inactivo() > INACTIVO
-        if i != self._inactivo:
-            self._inactivo = i
+        """Tras un rato sin tocar nada, con la pantalla bloqueada o la barra escondida, los dibujos se paran;
+        con batería van más despacio."""
+        estado = (win.segundos_inactivo() > INACTIVO,
+                  win.pantalla_bloqueada() or bool(self.paneles) and all(p.escondida for p in self.paneles),
+                  reposo.corriente(red.bateria_estado()))
+        if estado != (self._inactivo, self._oculto, self._luz):
+            self._inactivo, self._oculto, self._luz = estado
             self.ritmoCambio.emit()
+
+    # El escritorio virtual en el que estás y cuántos hay.
+    escritorio = Property("QVariantMap", lambda self: {"n": self._escritorio[0], "total": self._escritorio[1]},
+                          notify=escritorioCambio)
 
     # Falso en modo juego: nada se anima ni se consulta.
     animar = Property(bool, lambda self: self._animar, notify=animarCambio)
@@ -1027,14 +1072,19 @@ class Barra(QObject):
         self._vueltas += 1
         if not self.vista:
             self._ver_inactividad()
-        hwnds = win.windows()
-        self.almacen.olvidar_ventanas(set(hwnds))
+        todas = win.windows()
+        self.almacen.olvidar_ventanas(set(todas))
         piden = set()
         if self.atencion:
-            self.atencion.olvidar(set(hwnds) - {activa})
+            self.atencion.olvidar(set(todas) - {activa})
             piden = self.atencion.piden
+        hwnds = self.escritorios.filtrar(todas)       # las de otros escritorios virtuales, no
+        e = win.escritorio_actual()
+        if e != self._escritorio:
+            self._escritorio = e
+            self.escritorioCambio.emit()
         info = []
-        self._ids = {h: i for h, i in self._ids.items() if h in hwnds}
+        self._ids = {h: i for h, i in self._ids.items() if h in todas}
         for z, h in enumerate(hwnds):            # de la más reciente a la más antigua
             exe = programas.principal(win.app_exe(h))
             info.append({"hwnd": h, "exe": exe, "titulo": win.title(h), "z": z,
@@ -1431,10 +1481,91 @@ class Barra(QObject):
         """Fotogramas por segundo del visualizador; 0 si ahora no toca."""
         if not (self.ajustes["cava"] and self._cancion["sonando"] and self._animar):
             return 0
-        return {"completas": 30, "suaves": 20}.get(self.ajustes["animaciones"], 0)
+        return reposo.fps_cava(self.ajustes["animaciones"], self._oculto, self._luz)
 
     # ----- widgets y tiempo -----
     widgets = Property(bool, lambda self: self.ajustes["widgets"], notify=temaCambio)
+    medidores = Property("QVariantList", lambda self: self.ajustes["medidores"], notify=temaCambio)
+
+    def _set_widget(self, cual, diseno):
+        """Una fila de la pestaña Widgets: "no" lo apaga; si no, lo enciende con ese diseño."""
+        si = diseno != "no"
+        llave = {"clima": "widgets", "medidor": "sistema", "cava": "cava"}[cual]
+        self.ajustes[llave] = si
+        if si:
+            self.ajustes["disenos"][cual] = diseno
+        self._guardar()
+        self.temaCambio.emit()
+        self.musicaCambio.emit()
+        if cual == "clima":
+            self._pedir_tiempo()
+
+    def _set_claudito(self, si):
+        self.ajustes["claudito"] = si
+        self._guardar()
+        self.temaCambio.emit()
+
+    def _set_claudito_modo(self, modo):
+        self.ajustes["claudito"] = modo != "no"
+        if modo != "no":
+            self.ajustes["disenos"]["claudito"] = modo
+        self._guardar()
+        self.temaCambio.emit()
+
+    def _set_diseno(self, cual, k):
+        self.ajustes["disenos"][cual] = k
+        self._guardar()
+        self.temaCambio.emit()
+
+    def _set_con_oculto(self, cual, llave, k):
+        self.ajustes[llave] = k != "no"
+        if k != "no":
+            self.ajustes["disenos"][cual] = k
+        self._guardar()
+        self.temaCambio.emit()
+
+    def _set_medidor(self, m):
+        a = self.ajustes["medidores"]
+        quedan = [x for x in ("cpu", "ram", "gpu") if (x in a) != (x == m)]
+        if quedan:                       # al menos uno; para ninguno, «Oculto»
+            self.ajustes["medidores"] = quedan
+            self._guardar()
+            self.temaCambio.emit()
+
+    def _pestana_widgets(self):
+        a = self.ajustes
+
+        def fila(cual, encendido):
+            actual = a["disenos"].get(cual, "tema") if encendido else "no"
+            opciones = {"no": "Oculto", **temas.DISENOS[cual]}
+            return [{"texto": n, "elegido": k == actual, "hacer": lambda k=k: self._set_widget(cual, k)} for k, n in opciones.items()]
+
+        def eleccion(cual, por_defecto):
+            actual = a["disenos"].get(cual, por_defecto)
+            return [{"texto": n, "elegido": k == actual, "hacer": lambda k=k: self._set_diseno(cual, k)}
+                    for k, n in temas.DISENOS[cual].items()]
+
+        def con_oculto(cual, llave, por_defecto):
+            actual = a["disenos"].get(cual, por_defecto) if a[llave] else "no"
+            return [{"texto": n, "elegido": k == actual, "hacer": lambda k=k: self._set_con_oculto(cual, llave, k)}
+                    for k, n in {"no": "Oculto", **temas.DISENOS[cual]}.items()]
+
+        filas = [("Tiempo", fila("clima", a["widgets"])),
+                 ("CPU, RAM y GPU", fila("medidor", a["sistema"])),
+                 ("Música", fila("cava", a["cava"]))]
+        if self.claudito.disponible:
+            actual = a["disenos"].get("claudito", "tema") if a["claudito"] else "no"
+            filas.append(("Claudito", [{"texto": n, "elegido": k == actual, "hacer": lambda k=k: self._set_claudito_modo(k)}
+                                       for k, n in {"no": "Oculto", **temas.CLAUDITO}.items()]))
+        filas += [("Búsqueda", con_oculto("busqueda", "barra_busqueda", "auto")),
+                  ("Icono de búsqueda", eleccion("icono_busqueda", "lupa")),
+                  ("Vista de tareas", con_oculto("vista", "vista_tareas", "insignia")),
+                  ("Icono de vista", eleccion("icono_vista", "ventanas"))]
+        medir = [{"texto": n, "marcado": m in a["medidores"], "hacer": lambda m=m: self._set_medidor(m)}
+                 for m, n in (("cpu", "CPU"), ("ram", "RAM"), ("gpu", "GPU"))] if a["sistema"] else []
+        return {"titulo": "Widgets", "filas": filas, "interruptores": medir,
+                "botones": [{"texto": "Ciudad del tiempo: " + (a["ciudad"].get("nombre") or "elegir…"),
+                             "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)}]}
     tiempo = Property("QVariantMap", lambda self: {**self._clima, "ciudad": self.ajustes["ciudad"].get("nombre", "")},
                       notify=tiempoCambio)
 
@@ -1588,7 +1719,8 @@ class Barra(QObject):
             os.startfile("ms-settings:privacy-microphone")
             return
         teclas = {"inicio": (0x5B,), "buscar": (0x5B, 0x53), "rapidos": (0x5B, 0x41), "avisos": (0x5B, 0x4E), "widgets": (0x5B, 0x57),
-                  "menu_inicio": (0x5B, 0x58), "silencio": (0xAD,), "menos": (0xAE,), "mas": (0xAF,)}
+                  "menu_inicio": (0x5B, 0x58), "vista": (0x5B, 0x09),
+                  "escritorio_nuevo": (0x5B, 0x11, 0x44), "escritorio_sig": (0x5B, 0x11, 0x27), "escritorio_ant": (0x5B, 0x11, 0x25), "silencio": (0xAD,), "menos": (0xAE,), "mas": (0xAF,)}
         if que in teclas:
             win.press(*teclas[que])
             if que in ("silencio", "menos", "mas"):
@@ -1640,6 +1772,7 @@ class Barra(QObject):
                  *([("Opacidad", fila(temas.OPACIDADES, a["opacidad"], self._set_opacidad))] if t["translucida"] else []),
                  *([("Vidrio", fila(vidrio.NOMBRES, a["vidrio"], self._set_vidrio))] if t["vidrio"] else []),
                  ("Animaciones", fila(temas.ANIMACIONES, a["animaciones"], self._set_animaciones)),
+                 ("Menús", fila(temas.MENUS, a["menus"], self._set_menus)),
                  ("Esconderse", [{"texto": "Siempre a la vista", "elegido": not a["esconder"], "hacer": lambda: self._set_esconder(False)},
                                  {"texto": "Se esconde sola", "elegido": a["esconder"], "hacer": lambda: self._set_esconder(True)}]),
                  ("# Formato de " + t["nombre"], []),
@@ -1651,6 +1784,7 @@ class Barra(QObject):
                  ("Gama", fila(temas.VARIANTES, a["variantes"].get(self._elegido, "tema"), self._set_variante))]
         iconos_ = [("Estilo", fila(iconos.ESTILOS, a["iconos"], self._set_iconos)),
                    ("Alinear", fila(temas.ALINEACIONES, a["alineacion"], self._set_alineacion)),
+                   *([("Con varias pantallas", fila(temas.PANTALLAS, a["pantallas"], self._set_pantallas))] if len(self.paneles) > 1 else []),
                    ("Botón de inicio", fila(temas.ICONO, a["icono"], self._set_icono)),
                    *([("Bandeja (visibles)", self._fila_bandeja())] if self._tray else [])]
         return {
@@ -1661,26 +1795,23 @@ class Barra(QObject):
                             "mini": os.path.join(x["carpeta"], "miniatura.png")} for k, x in self.temas.items()],
                  "interruptores": [marca("Cambiar de tema según la hora", a["auto"], self._set_auto)]},
                 {"titulo": "Forma", "filas": forma,
+                 "interruptores": [marca("Como Windows (los temas, solo en el color y un paisaje suave)", a["integrado"], self._set_integrado)],
                  "botones": [{"texto": "Usar este formato en todos los temas", "cierra": False, "hacer": self._formato_para_todos},
                              {"texto": "Usar estos colores en todos los temas", "cierra": False, "hacer": self._variante_para_todos}]},
                 {"titulo": "Iconos", "filas": iconos_,
                  "interruptores": [marca("Agrupar ventanas del mismo programa", a["agrupar"], self._set_agrupar)],
                  "botones": [{"texto": "Restablecer el orden de los botones", "cierra": False, "hacer": self._olvidar_orden}] if a["orden"] else []},
+                self._pestana_widgets(),
                 {"titulo": "Funciones",
-                 "interruptores": [marca("Widgets (tiempo)", a["widgets"], self._set_widgets),
-                                   marca("Visualizador de música", a["cava"], self._poner_cava),
-                                   marca("Atajos (Win+1…, Win+T, Win+B)", a["atajos"], self._set_atajos),
+                 "interruptores": [marca("Atajos (Win+1…, Win+T, Win+B)", a["atajos"], self._set_atajos),
                                    marca("Modo juego", a["modo_juego"], self._set_juego),
                                    marca("Pincel en la barra", a["pincel"], self._set_pincel),
                                    marca("Isla dinámica (avisos junto a la barra)", a["isla"], self._set_isla),
-                                   marca("Buscador (Alt+Espacio o clic central en Inicio)", a["buscador"], self._set_buscador),
-                                   marca("Barra de búsqueda junto a Inicio", a["barra_busqueda"], self._set_barra_busqueda)],
-                 "botones": [{"texto": "Ciudad del tiempo: " + (a["ciudad"].get("nombre") or "elegir…"),
-                              "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)},
-                             {"texto": "Pomodoro: {} min + {} de descanso (cambiar…)".format(*a["pomodoro"]),
+                                   marca("Buscador (Alt+Espacio o clic central en Inicio)", a["buscador"], self._set_buscador)],
+                 "botones": [{"texto": "Pomodoro: {} min + {} de descanso (cambiar…)".format(*a["pomodoro"]),
                               "hacer": lambda: QTimer.singleShot(0, lambda: self.abrir_buscador("pomodoro "))}] + self._boton_conectar()},
                 {"titulo": "General",
-                 "interruptores": [{"texto": "Arrancar con Windows", "marcado": con_windows, "hacer": lambda: arranque.poner(not con_windows)},
+                 "interruptores": [{"texto": "Arrancar con Windows", "marcado": con_windows, "hacer": lambda: self._set_arranque(not con_windows)},
                                    *(self.novedades.interruptor() if self.novedades else [])],
                  "botones": (self.novedades.boton() if self.novedades else []) + [
                      {"texto": "Administrador de tareas", "hacer": lambda: win.press(0x11, 0x10, 0x1B)},
@@ -1754,6 +1885,26 @@ class Barra(QObject):
                 p.fuera_desde = ahora
             elif ahora - p.fuera_desde > 0.7:
                 p.esconder(True)
+
+    def _set_arranque(self, si):
+        arranque.poner(si)
+        self.ajustes["arranque"] = "si" if si else "no"
+        self._guardar()
+
+    def _vigilar_arranque(self):
+        """Si se quería arrancar con Windows y algo quitó la entrada, se vuelve a poner."""
+        try:
+            querido, puesta = arranque.revisar(self.ajustes["arranque"])
+        except OSError:
+            registrar("arranque")
+            return
+        if querido != self.ajustes["arranque"]:
+            self.ajustes["arranque"] = querido
+            self._guardar()
+        if puesta:
+            registrar("arranque: la entrada de Run había desaparecido; puesta otra vez")
+            self._avisar({"icono": "", "fuente_icono": "Segoe Fluent Icons", "titulo": "Arranque con Windows",
+                          "detalle": "Algo lo había quitado; ya está otra vez"})
 
     def _set_juego(self, si):
         self.ajustes["modo_juego"] = si
@@ -1884,6 +2035,8 @@ class Panel:
         if si != self.escondida:
             self.escondida = si
             self._ctx.setContextProperty("oculta", si)
+            if not self.barra.vista:
+                self.barra._ver_inactividad()
             if si:
                 self.barra._quitar_previa()
 
@@ -1903,16 +2056,33 @@ class Panel:
     def poner_ventanas(self, info, fijos):
         if self.barra.arrastrando():          # no tocar la lista que se está moviendo
             return
-        if not self.primaria and self.pantalla:
-            mia = self.pantalla_real()
-            info = [i for i in info if i["pantalla"] == mia]
-            fijos = []
+        if self.pantalla and len(self.barra.paneles) > 1:
+            info = temas.ventanas_de_pantalla(info, self.barra.ajustes["pantallas"], self.primaria, self.pantalla_real())
+            if not self.primaria:          # los anclados, solo en la principal
+                fijos = []
         fijos = [{**x, "icono": self.barra.almacen.url(self.barra.almacen.de_fijo(x))} for x in fijos]
         self.tareas.poner(programas.agrupar(info, fijos, self.barra.ajustes["agrupar"], self.barra._orden,
                                             self.barra.ajustes["orden"]))
 
 
 # ---------------------------------------------------------------------------
+
+class Esquinas(QObject):
+    """Cada ventanita de la barra (menú, calendario, vistas, buscador, menús de clic derecho) se
+    redondea al abrirse como pide «Menús»: con la forma de la barra o como las de Windows."""
+
+    def __init__(self, barra):
+        super().__init__(barra)
+        self.barra = barra
+
+    def eventFilter(self, obj, ev):
+        if ev.type() == QEvent.Type.Show and isinstance(obj, QWidget) and obj.isWindow():
+            try:
+                win.esquinas(int(obj.winId()), self.barra.esquinas_menus())
+            except Exception:
+                registrar("esquinas")
+        return False
+
 
 def lanzar(*args):
     # -I -S: sin paquetes externos, arrancan antes y ocupan menos.
@@ -2202,6 +2372,8 @@ def main():
     while not win.taskbars() and time.monotonic() < limite:      # recién iniciada la sesión
         time.sleep(0.5)
     barra = Barra(app)
+    esquinas = Esquinas(barra)
+    app.installEventFilter(esquinas)
     for s in app.screens():
         barra.paneles.append(Panel(barra, s, s == app.primaryScreen()))
     errores = [e for p in barra.paneles for e in p.errores]

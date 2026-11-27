@@ -97,7 +97,6 @@ Item {
     source: tarea.icono === "" ? "" : tarea.icono + tarea.tema.estiloIconos
     smooth: !tarea.tema.pixelado
     mipmap: !tarea.tema.pixelado
-    opacity: tarea.minimizada ? 0.55 : 1
     scale: tarea.tema.dock ? tarea.lupa * (raton.pressed ? 0.9 : 1)
            : raton.pressed ? 0.85 : raton.containsMouse || suelta.containsDrag ? 1.1 : 1
     Behavior on scale { NumberAnimation { duration: tarea.tema.dock ? 70 : 110 } }

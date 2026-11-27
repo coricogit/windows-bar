@@ -28,6 +28,7 @@ Row {
 
   onValorChanged: lienzo.requestPaint()
   onHistoriaChanged: if (estilo === "onda") lienzo.requestPaint()
+  onEstiloChanged: lienzo.requestPaint()      // al cambiar de diseño, sin esperar a datos nuevos
   onTemaChanged: lienzo.requestPaint()
   onTonoChanged: lienzo.requestPaint()
 
@@ -38,6 +39,7 @@ Row {
     height: med.alto
     renderStrategy: Canvas.Cooperative
     onWidthChanged: requestPaint()
+    onVisibleChanged: if (visible) requestPaint()     // oculto no pinta: al aparecer, sí
     onCanvasSizeChanged: requestPaint()
     onHeightChanged: requestPaint()
     onPaint: {

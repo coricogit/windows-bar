@@ -52,3 +52,24 @@ def poner(si, que=""):
             winreg.DeleteValue(k, NOMBRE)
     except OSError:
         pass
+
+
+def decidir(querido, guardado_, propia, apagada):
+    """Qué hacer con la entrada según lo que eligió el usuario ("si", "no" o "" si aún no se sabe).
+    Devuelve (querido, volver_a_ponerla)."""
+    if querido not in ("si", "no"):              # primera vez: se aprende de cómo está
+        return ("si" if guardado_ == propia and not apagada else "no"), False
+    if querido == "si":
+        if guardado_ is None:                    # algo la borró: se pone otra vez
+            return "si", True
+        if guardado_ == propia and apagada:      # la apagó el usuario en el Administrador de tareas
+            return "no", False
+    return querido, False
+
+
+def revisar(querido):
+    """Vuelve a poner la entrada si se quería y desapareció. Devuelve (querido, si se puso)."""
+    querido, poner_ = decidir(querido, guardado(), orden(), desactivada(_leer(APROBADAS, NOMBRE)))
+    if poner_:
+        poner(True)
+    return querido, poner_

@@ -5,6 +5,13 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 
 ## Novedades
 
+- **1.0.11**: modo *Como Windows* (*Menú → Forma*): la letra, la forma y el gris de Windows, con el tema en el color
+  y un paisaje suave. Pestaña **Widgets**: cada widget (tiempo, CPU/RAM/GPU, música, Claudito, búsqueda, vista de
+  tareas) se oculta o cambia de diseño, en cualquier formato; Claudito quieto o paseando. Botón de vista de tareas
+  con el escritorio en el que estás; cada pantalla con sus ventanas y las de otros escritorios, fuera. Menús con la
+  forma de la barra o como los de Windows. La barra descansa con la pantalla bloqueada o escondida y va más despacio
+  con batería; vuelve a ponerse en el arranque si algo la quita. Bandeja sin fondo, reloj centrado e iconos
+  minimizados enteros.
 - **1.0.10**: cada tema en cinco gamas de color (*Original, Pastel, Vivos, Suaves, Oscuro*), en *Menú → Forma → Colores*;
   la hora y la fecha, más grandes y legibles.
 - **1.0.9**: las ventanas encajadas se ajustan al hueco de esta barra; en pantallas verticales, soltar una ventana sobre

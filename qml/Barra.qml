@@ -7,7 +7,7 @@ Item {
   id: root
   readonly property var t: barra.tema
   // En la gama pastel el fondo es claro: el dibujo del tema (pensado para fondo oscuro) se ve tenue.
-  readonly property real tenueAdorno: t.variante === "pastel" ? 0.35 : 1
+  readonly property real tenueAdorno: (t.variante === "pastel" ? 0.35 : 1) * (t.adorno === undefined ? 1 : t.adorno)
   readonly property var c: t.colores
   readonly property bool v: t.vertical
   readonly property bool islas: t.forma === "islas"
@@ -260,9 +260,10 @@ Item {
   Paseo {
     activo: root.t.paseo && !root.v && barra.personaje !== ""
     // Con los iconos en el centro, pasea por la izquierda.
-    desde: (root.t.centrado ? izquierda.x + izquierda.width
+    // En una isla no hay hueco dentro: pasea por fuera, a su izquierda.
+    desde: root.unica ? 10 : (root.t.centrado ? izquierda.x + izquierda.width
             : Math.max(izquierda.x + izquierda.width, centro.width > 0 ? centro.x + centro.width : 0)) + 10
-    hasta: (root.t.centrado ? centro.x : derecha.x) - 10
+    hasta: root.unica ? isla.x - 10 : (root.t.centrado ? centro.x : derecha.x) - 10
     y: cuerpo.y + cuerpo.height - height
     height: 48
   }

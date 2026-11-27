@@ -11,7 +11,8 @@ Item {
   property int alineado: Text.AlignHCenter
   property string ayuda: ""
   property string glifo: ""          // iconos de Segoe Fluent delante del texto (red, batería)
-  property real ancho: fila.implicitWidth + (barra.tema.compacto ? 12 : 16)
+  readonly property real natural: fila.implicitWidth + (barra.tema.compacto ? 12 : 16)
+  property real ancho: natural
   readonly property alias encima: raton.containsMouse
   signal pulsado(int b)
   signal rueda(int paso)

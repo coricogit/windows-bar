@@ -17,7 +17,8 @@ BASE = {
     "corchetes": False, "dinamico": False, "icono": 24, "estiloIconos": "", "estiloBandeja": "", "vidrio": False,
     "compacto": False, "dock": False, "lupa": 0.38, "pegada": False, "esquinas": False, "burbujas": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
     "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "sombraReloj": False, "variante": "tema", "dentro": False,
-    "glifos": False, "acentoWindows": True, "fondoActiva": True, "pastillaSoloOriginales": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False,
+    "glifos": False, "acentoWindows": True, "fondoActiva": True, "pastillaSoloOriginales": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False, "adorno": 1,
+    "busqueda": "auto", "icono_busqueda": "lupa", "vista": "insignia", "icono_vista": "ventanas", "glifoBusqueda": "\uE721", "glifoVista": "\uE7C4",
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
@@ -265,6 +266,30 @@ def con_busqueda(t, si):
     return t
 
 
+def con_vista_tareas(t, si):
+    """El botón de Vista de tareas tras Inicio (y tras «Buscar», si está)."""
+    if not si:
+        return t
+    m = {lado: [list(g) for g in grupos] for lado, grupos in t["modulos"].items()}
+    for grupos in m.values():
+        for g in grupos:
+            if "inicio" in g and "vista" not in g:
+                g.insert(g.index("buscar" if "buscar" in g else "inicio") + 1, "vista")
+                return {**t, "modulos": m}
+    return t
+
+
+# Qué ventanas enseña cada barra cuando hay varias pantallas.
+PANTALLAS = {"suya": "Las de su pantalla", "principal": "Todas en la principal", "todas": "Todas en todas"}
+
+
+def ventanas_de_pantalla(info, modo, primaria, mia):
+    """Las ventanas que van en la barra de la pantalla `mia`."""
+    if modo == "todas" or (modo == "principal" and primaria):
+        return info
+    return [i for i in info if i["pantalla"] == mia]
+
+
 ICONO = {"tema": "Color del tema", "fondo": "Color del fondo"}
 VARIANTES = {"tema": "Original", "pastel": "Pastel", "vivos": "Vivos", "suaves": "Suaves", "oscuro": "Oscuro"}
 _FONDOS = ("fondo", "fondo2", "isla", "fondoBandeja")
@@ -287,6 +312,92 @@ def _de_hsl(h, s, l, a=1.0):
     if a >= 0.999:
         return "#%02X%02X%02X" % tuple(round(x * 255) for x in (r, g, b))
     return "#%02X%02X%02X%02X" % tuple(round(x * 255) for x in (a, r, g, b))
+
+
+_VIVOS = ("acento", "acento2", "medidor1", "medidor2", "medidor3", "cava1", "cava2")
+
+
+def _claro(c, luz=0.6):
+    """El color con al menos esa luz, para que se vea sobre el gris de Windows."""
+    x = _hsl(c)
+    if x is None or x[2] >= luz:
+        return c
+    return _de_hsl(x[0], x[1], luz, x[3])
+
+
+def con_integrado(t, si):
+    """«Como Windows»: la forma, la letra y el gris de la barra de Windows. Del tema quedan
+    sus colores de acento (logo, indicador, medidores, visualizador) y su paisaje, muy suave."""
+    if not si:
+        return t
+    col = dict(t["colores"])
+    r, g, b, _ = rgb(col["fondo"]) if col["fondo"].startswith("#") else (0.125, 0.125, 0.125, 1)
+    k = 0.18 if brillo((r, g, b)) < 0.5 else 0.1          # los temas de fondo claro, menos tinte
+    # Casi opaca, como la de Windows; en los temas con opacidad ajustable manda ese ajuste.
+    fondo = ("#FF" if t["translucida"] else "#EB") + "%02X%02X%02X" % tuple(round((k * x + (1 - k) * 0.125) * 255) for x in (r, g, b))
+    col.update(fondo=fondo, fondo2=fondo, isla=fondo, borde="#FF3A3A3A", texto="#FFFFFF", tenue="#A6A6A6",
+               encima="#1FFFFFFF", fondoBandeja="transparent")
+    for k in _VIVOS:
+        if col.get(k):
+            col[k] = _claro(col[k])
+    logo = {**t["logo"], "colores": [c if c in col else _claro(c, 0.5) for c in t["logo"]["colores"]]}
+    return {**t, "colores": col, "logo": logo, "coloresClaros": {}, "logoClaros": [], "claro": {},
+            "forma": "completa", "alto": 48, "margen": 0, "radio": 0, "borde": 0, "relleno": 6, "separacion": 4,
+            "radioBoton": 5, "fuente": "Segoe UI Variable Text", "tamano": 12, "negrita": False, "glifos": True,
+            "medidor": "linea", "indicador": "linea", "clima": "emoji", "cava": "barras", "relojDoble": True,
+            "fecha": "dd/MM/yyyy", "reloj": "HH:mm", "pixelado": False, "paseo": False, "sombraReloj": False,
+            "corchetes": False, "fondoActiva": True, "estiloIconos": "", "estiloBandeja": "",
+            "adorno": 0.3, "integrado": True}
+
+
+# Los diseños de cada widget: los que ya traen los temas, para cualquiera de ellos.
+DISENOS = {
+    "clima": {"tema": "Del tema", "emoji": "Emoji", "neon": "Neón", "flor": "Flor", "hoja": "Hoja", "pixel": "Píxel"},
+    "medidor": {"tema": "Del tema", "texto": "Texto", "linea": "Línea", "pildora": "Píldora", "onda": "Onda",
+                "anillo": "Anillo", "flor": "Flor", "corazones": "Corazones", "rama": "Rama"},
+    "cava": {"tema": "Del tema", "barras": "Barras", "neon": "Neón", "petalos": "Pétalos", "hojas": "Hojas",
+             "bloques": "Bloques"},
+    "busqueda": {"auto": "Automática", "campo": "Campo", "pastilla": "Pastilla", "subrayado": "Subrayado", "lupa": "Solo el icono"},
+    "icono_busqueda": {"lupa": "Lupa", "caja": "Lupa en caja", "bombilla": "Bombilla", "chispa": "Chispa",
+                       "globo": "Globo", "robot": "Robot"},
+    "vista": {"insignia": "Número en insignia", "texto": "Número al lado", "puntos": "Puntos", "nada": "Sin número"},
+    "icono_vista": {"ventanas": "Ventanas", "cuadricula": "Cuadrícula", "mosaico": "Mosaico", "copias": "Capas",
+                    "pantalla": "Pantalla", "paneles": "Paneles"},
+}
+# Los de Segoe Fluent Icons (comprobados a ojo: se ven en Windows 11).
+GLIFOS = {"lupa": "\uE721", "caja": "\uE773", "bombilla": "\uEA80", "chispa": "\uEA38", "globo": "\uE774",
+          "robot": "\uE99A", "ventanas": "\uE7C4", "cuadricula": "\uE8A9", "mosaico": "\uECA5", "copias": "\uE8C8",
+          "pantalla": "\uE7F4", "paneles": "\uF246"}
+CLAUDITO = {"tema": "Del tema", "quieto": "Quieto", "paseo": "Paseando"}
+MENUS = {"barra": "Con la forma de la barra", "windows": "Como los de Windows"}
+
+
+def forma_menus(t, modo):
+    """(esquinas de DWM, separación de la barra) para las ventanitas de la barra.
+    DWM: 1 sin redondear, 2 redondeadas (8 px, las de Windows 11), 3 un poco (4 px)."""
+    if modo == "windows":
+        return 2, 12
+    if t["pixelado"] or t["radio"] <= 1:
+        pref = 1
+    else:
+        pref = 3 if t["radio"] <= 6 else 2
+    return pref, max(4, t["margen"])
+
+
+def con_widgets(t, disenos, sistema=True, claudito=True):
+    """El diseño elegido para cada widget (si no, el del tema), y fuera los que se apagaron."""
+    t = {**t, **{k: v for k, v in disenos.items() if k in DISENOS and v in DISENOS[k] and v != "tema"}}
+    t["glifoBusqueda"], t["glifoVista"] = GLIFOS[t["icono_busqueda"]], GLIFOS[t["icono_vista"]]
+    modo = disenos.get("claudito", "tema")
+    if modo in ("quieto", "paseo"):
+        t["paseo"] = modo == "paseo" and not t["vertical"]
+    quitar = {m for m, si in (("sistema", sistema), ("claudito", claudito)) if not si}
+    if quitar:
+        t["modulos"] = {lado: [[m for m in g if m not in quitar] for g in grupos] for lado, grupos in t["modulos"].items()}
+        t["modulos"] = {lado: [g for g in grupos if g] for lado, grupos in t["modulos"].items()}
+        if "claudito" in quitar:
+            t["paseo"] = False
+    return t
 
 
 def con_variante(t, variante):
