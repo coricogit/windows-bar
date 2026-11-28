@@ -4,6 +4,7 @@ import QtQuick
 // tema.json): "barras", "neon", "petalos", "hojas" o "bloques".
 Item {
   id: cava
+  Accessible.ignored: true         // decoración: lo que suena ya lo dice el botón de la música
   property var tema
   property int cuantas: 16
   readonly property var c: tema.colores

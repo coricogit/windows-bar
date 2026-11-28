@@ -11,6 +11,13 @@ Item {
   property int alineado: Text.AlignHCenter
   property string ayuda: ""
   property string glifo: ""          // iconos de Segoe Fluent delante del texto (red, batería)
+  property string nombre: ""         // para el lector de pantalla; si no, lo primero de la ayuda
+  // Lector de pantalla (WCAG 4.1.2): un botón con nombre, que se pulsa también desde él.
+  Accessible.role: Accessible.Button
+  Accessible.name: nombre !== "" ? nombre : ayuda !== "" ? ayuda.split(" · ")[0] : et.text
+  Accessible.description: ayuda
+  Accessible.focusable: true
+  Accessible.onPressAction: boton.pulsado(Qt.LeftButton)
   readonly property real natural: fila.implicitWidth + (barra.tema.compacto ? 12 : 16)
   property real ancho: natural
   readonly property alias encima: raton.containsMouse

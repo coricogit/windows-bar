@@ -14,7 +14,7 @@ DEFECTO = {"tema": "tokyo", "formatos": {}, "auto": False, "tema_dia": "bosque",
            "cava": True, "iconos": "originales", "esconder": False, "isla": True,
            "buscador": True, "barra_busqueda": True, "pomodoro": [25, 5], "variantes": {}, "lanzados": {}, "arranque": "",
            "pantallas": "suya", "vista_tareas": True, "integrado": False,
-           "sistema": True, "claudito": True, "medidores": ["cpu", "ram", "gpu"], "medidores_mini": False, "concentrar_pomodoro": True, "disenos": {},
+           "sistema": True, "claudito": True, "medidores": ["cpu", "ram", "gpu"], "medidores_mini": False, "concentrar_pomodoro": True, "isla_duracion": "normal", "disenos": {},
            "menus": "barra"}
 
 

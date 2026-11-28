@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import paneles, reposo, actualizar, ajustes, apps, arranque, audio, encaje, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import paneles, reposo, actualizar, ajustes, apps, arranque, audio, encaje, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -242,21 +242,6 @@ class Icono(unittest.TestCase):
         self.assertTrue(h > 0.85 or h < 0.05)           # rosa
         h, _ = temas.predominante(temas.cargar()["tokyo"])
         self.assertTrue(0.55 < h < 0.75)                # azul
-
-
-class Menu(unittest.TestCase):
-    def test_nada_se_sale_ni_se_pisa(self):
-        o = [{"texto": "x" * n} for n in (4, 20, 12, 30, 9)]
-        seccion = {"temas": [{"texto": str(i)} for i in range(7)], "filas": [("A", o), ("# Bloque", []), ("B", o + o)],
-                   "interruptores": [{**x, "marcado": True} for x in o], "botones": o}
-        zonas, alto = selector.colocar(seccion, lambda t: len(t) * 7, ["Temas", "Forma", "Iconos"], 1)
-        self.assertEqual([d["elegido"] for r, t, d in zonas if t == "pestana"], [False, True, False])
-        self.assertEqual(sum(t == "encabezado" for _, t, _ in zonas), 1)
-        for i, (r, _, _) in enumerate(zonas):
-            self.assertLessEqual(r.right(), selector.ANCHO - selector.MARGEN + 1)
-            self.assertLess(r.bottom(), alto)
-            for r2, _, _ in zonas[:i]:
-                self.assertFalse(r.intersects(r2))
 
 
 class Arranque(unittest.TestCase):
@@ -1456,6 +1441,118 @@ class PanelesDeWindows(unittest.TestCase):
         self.assertEqual(paneles.destino("derecha", rect, self.PANT, (1860, 0, 1920, 1080)), (1860 - 384, 48))
         self.assertIsNone(paneles.destino("abajo", rect, self.PANT, (0, 1020, 1920, 1080)))
         self.assertIsNone(paneles.destino("arriba", rect, self.PANT, (0, 0, 1920, 60)))
+
+
+class TodoCarga(unittest.TestCase):
+    """Lo que el resto de pruebas no importa: barra.pyw (se ejecuta, no se importa) y el QML."""
+
+    def test_barra_pyw_compila(self):
+        import ast
+        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ast.parse(open(os.path.join(raiz, "barra.pyw"), encoding="utf-8").read(), "barra.pyw")
+        compile(open(os.path.join(raiz, "barra.pyw"), encoding="utf-8").read(), "barra.pyw", "exec")
+
+    def test_qml_compila(self):
+        import glob
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QGuiApplication
+        from PySide6.QtQml import QQmlComponent, QQmlEngine
+        app = QGuiApplication.instance() or QGuiApplication([])        # noqa: F841
+        vidrio.registrar_tipo()
+        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        motor = QQmlEngine()
+        malos = {}
+        archivos = sorted(glob.glob(os.path.join(raiz, "qml", "*.qml")))
+        self.assertGreater(len(archivos), 10)
+        for f in archivos:
+            c = QQmlComponent(motor, QUrl.fromLocalFile(f))
+            if c.isError():
+                malos[os.path.basename(f)] = [e.toString() for e in c.errors()]
+        self.assertEqual(malos, {})
+
+
+class MenuDeAjustes(unittest.TestCase):
+    def test_aplicar_no_toca_el_original(self):
+        from barra import menu
+        a = {"tema": "x", "disenos": {"hora": "tema"}}
+        b = menu.aplicar(a, [["disenos.hora", "agujas"], ["formatos.x", "dock"], ["tema", "y"]])
+        self.assertEqual(b, {"tema": "y", "disenos": {"hora": "agujas"}, "formatos": {"x": "dock"}})
+        self.assertEqual(a, {"tema": "x", "disenos": {"hora": "tema"}})
+
+    def test_clave_cambia_con_el_contexto(self):
+        from barra import menu
+        c = [["disenos.hora", "agujas"]]
+        self.assertEqual(menu.clave(c, ["original"]), menu.clave(c, ["original"]))
+        self.assertNotEqual(menu.clave(c, ["original"]), menu.clave(c, ["tokyo"]))
+
+    def test_datos_para_qml(self):
+        from barra import menu
+        hechos = []
+
+        class Estudio:
+            def __init__(self):
+                self.pedidos = []
+
+            def pedir(self, cambios, recorte, listo, urgente=False, etiqueta=""):
+                self.pedidos.append((cambios, recorte, etiqueta))
+
+        def datos():
+            return {"colores": {}, "categorias": [{"titulo": "Hora", "secciones": [
+                {"titulo": "Hora y fecha", "tipo": "imagenes", "opciones": [
+                    {"texto": "Agujas", "elegido": False, "hacer": lambda: hechos.append(1), "cambios": [["disenos.hora", "agujas"]], "recorte": "reloj"},
+                    {"texto": "Oculto", "elegido": True, "hacer": lambda: None, "cambios": [["x", 0]], "recorte": "", "sin_miniatura": True}]}]}],
+                "rapidos": [{"texto": "Atajos", "marcado": True, "hacer": lambda: hechos.append(2)}]}
+        d = tempfile.mkdtemp()
+        try:
+            e = Estudio()
+            m = menu.Menu(datos, e, d, None)
+            m.refrescar(["ctx"])
+            ops = m.datos["categorias"][0]["secciones"][0]["opciones"]
+            self.assertEqual([o["id"] for o in ops], ["0.0.0", "0.0.1"])
+            self.assertTrue(all("hacer" not in o and "cambios" not in o for o in ops))     # a QML, sin funciones
+            self.assertEqual(len(e.pedidos), 1)                     # «Oculto» no lleva miniatura
+            self.assertEqual(e.pedidos[0][1:], ("reloj", "0.0.0"))
+            m.refrescar(["ctx"])
+            self.assertEqual(len(e.pedidos), 1)                     # ya pedida: no se pide otra vez
+            m.pulsar("0.0.0")
+            m.pulsar("r.0")
+            self.assertEqual(hechos, [1, 2])
+        finally:
+            shutil.rmtree(d)
+
+
+class WCAG(unittest.TestCase):
+    """WCAG 2.1 AA en todos los temas, gamas, momentos y con «Como Windows»:
+    1.4.3 texto 4,5:1 y 1.4.11 gráficos e indicadores 3:1, contra el peor fondo."""
+
+    def test_todos_los_temas_cumplen(self):
+        import itertools
+        from barra.temas import rgb, contraste
+        fallos = []
+        for ident, t0 in temas.cargar().items():
+            for var, mom, integ in itertools.product(temas.VARIANTES, cielo.MOMENTOS, (False, True)):
+                t = temas.con_accesible(temas.con_integrado(temas.con_variante(temas.con_momento(t0, mom), var), integ))
+                c, fondos = t["colores"], temas.fondos_reales(t["colores"], t["forma"])
+                isla_ = [tuple(rgb(c["fondo"])[:3])]
+                reglas = [("texto", temas.TEXTO, fondos), ("tenue", temas.TEXTO, fondos), ("acento", temas.TEXTO, fondos),
+                          ("alerta", temas.GRAFICO, fondos), ("isla_texto", temas.TEXTO, isla_), ("isla_tenue", temas.TEXTO, isla_),
+                          ("isla_ok", temas.GRAFICO, isla_), ("isla_aviso", temas.GRAFICO, isla_), ("isla_acento", temas.GRAFICO, isla_),
+                          ("isla_alerta", temas.GRAFICO, isla_)]
+                reglas += [(k, temas.GRAFICO, fondos) for k in ("medidor1", "medidor2", "medidor3") if c.get(k)]
+                for k, minimo, f in reglas:
+                    if k in ("texto", "tenue") and t.get("contorno"):
+                        continue
+                    peor = min(contraste(rgb(c[k])[:3], x) for x in f)
+                    if peor < minimo:
+                        fallos.append((ident, var, mom, integ, k, c[k], round(peor, 2)))
+        self.assertEqual(fallos, [])
+
+    def test_ajustar(self):
+        negro = [(0.0, 0.0, 0.0)]
+        self.assertEqual(temas.ajustar("#FFFFFF", negro, 4.5), "#FFFFFF")       # si ya cumple, igual
+        oscuro = temas.ajustar("#333333", negro, 4.5)
+        self.assertGreaterEqual(temas.contraste(temas.rgb(oscuro)[:3], negro[0]), 4.5)
+        self.assertEqual(temas.ajustar("", negro, 4.5), "")
 
 
 class Widgets(unittest.TestCase):

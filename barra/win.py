@@ -57,6 +57,8 @@ _sig(user32, "AllowSetForegroundWindow", w.BOOL, w.DWORD)
 _sig(user32, "MonitorFromWindow", w.HANDLE, w.HWND, w.DWORD)
 _sig(user32, "GetMonitorInfoW", w.BOOL, w.HANDLE, _P(MONITORINFO))
 _sig(user32, "GetWindowRect", w.BOOL, w.HWND, _P(w.RECT))
+_sig(user32, "GetSysColor", w.DWORD, ctypes.c_int)
+_sig(user32, "GetAsyncKeyState", ctypes.c_short, ctypes.c_int)
 _sig(user32, "SystemParametersInfoW", w.BOOL, w.UINT, w.UINT, ctypes.c_void_p, w.UINT)
 _sig(user32, "IsZoomed", w.BOOL, w.HWND)
 _sig(user32, "SetWindowPos", w.BOOL, w.HWND, w.HWND, *[ctypes.c_int] * 4, w.UINT)
@@ -623,6 +625,42 @@ def sin_marco(hwnd):
         ctypes.windll.dwmapi.DwmSetWindowAttribute(w.HWND(hwnd), 34, ctypes.byref(v), 4)
     except OSError:
         pass
+
+
+# ----- accesibilidad de Windows ---------------------------------------------
+
+class _HIGHCONTRAST(ctypes.Structure):
+    _fields_ = [("cbSize", w.UINT), ("dwFlags", w.DWORD), ("lpszDefaultScheme", w.LPWSTR)]
+
+
+def alto_contraste():
+    """{"fondo", "texto", "acento", "texto_acento", "enlace", "gris"} de un tema de contraste de
+    Windows (Accesibilidad > Temas de contraste) si está puesto, o None."""
+    hc = _HIGHCONTRAST(ctypes.sizeof(_HIGHCONTRAST), 0, None)
+    if not user32.SystemParametersInfoW(0x0042, hc.cbSize, ctypes.byref(hc), 0) or not hc.dwFlags & 1:
+        return None
+    def color(i):
+        v = user32.GetSysColor(i)
+        return "#%02X%02X%02X" % (v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF)
+    # COLOR_WINDOW 5, WINDOWTEXT 8, HIGHLIGHT 13, HIGHLIGHTTEXT 14, GRAYTEXT 17, HOTLIGHT 26
+    return {"fondo": color(5), "texto": color(8), "acento": color(13), "texto_acento": color(14),
+            "gris": color(17), "enlace": color(26)}
+
+
+def animaciones_de_windows():
+    """False si en Accesibilidad > Efectos visuales están apagados los «Efectos de animación»."""
+    v = w.BOOL(1)
+    return not user32.SystemParametersInfoW(0x1042, 0, ctypes.byref(v), 0) or bool(v.value)   # SPI_GETCLIENTAREAANIMATION
+
+
+def escala_texto():
+    """El «Tamaño del texto» de Accesibilidad, de 1.0 a 2.25."""
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Accessibility") as k:
+            return max(1.0, min(2.25, winreg.QueryValueEx(k, "TextScaleFactor")[0] / 100))
+    except OSError:
+        return 1.0
 
 
 # ----- escritorios virtuales ------------------------------------------------

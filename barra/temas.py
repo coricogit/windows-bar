@@ -18,6 +18,7 @@ BASE = {
     "compacto": False, "dock": False, "lupa": 0.38, "pegada": False, "esquinas": False, "burbujas": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
     "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "sombraReloj": False, "variante": "tema", "dentro": False,
     "glifos": False, "acentoWindows": True, "fondoActiva": True, "pastillaSoloOriginales": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False, "adorno": 1,
+    "altoContraste": False,
     "busqueda": "auto", "icono_busqueda": "windows", "vista": "insignia", "icono_vista": "windows", "glifoBusqueda": "\uE721", "glifoVista": "\uE7C4",
     "hora": "tema", "lupaWindows": {},
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
@@ -521,6 +522,99 @@ def luz(c):
 def contraste(a, b):
     x, y = sorted((luz(a) + 0.05, luz(b) + 0.05))
     return y / x
+
+
+# ----- accesibilidad (WCAG 2.1 AA) -----
+# 1.4.3: texto 4,5:1. 1.4.11: lo que hace falta ver de un control o un gráfico
+# (indicadores, medidores, iconos de aviso) 3:1. Se mide contra el peor fondo
+# posible: el de la barra sobre un escritorio negro y sobre uno blanco.
+TEXTO, GRAFICO = 4.5, 3.0
+ISLA_FIJOS = {"ok": "#3DD68C", "aviso": "#FFB020"}
+
+
+def _hex(r, g, b, a=1.0):
+    v = [max(0, min(255, round(x * 255))) for x in (r, g, b)]
+    return ("#%02X%02X%02X" % tuple(v)) if a >= 1 else ("#%02X%02X%02X%02X" % (round(a * 255), *v))
+
+
+def fondos_reales(c, forma):
+    """Los fondos que se pueden ver detrás del texto: el de la barra (o la isla) sobre negro y sobre blanco."""
+    out = []
+    for f in ([c["isla"]] if forma == "islas" else [c["fondo"], c["fondo2"]]):
+        r = rgb(f)
+        out += [tuple(x * r[3] + d * (1 - r[3]) for x in r[:3]) for d in (0.0, 1.0)]
+    return out
+
+
+def ajustar(color, fondos, minimo):
+    """El mismo tono con la luz justa para llegar a `minimo` contra todos los `fondos`:
+    lo que menos se aleje del original, aclarando u oscureciendo. Si no se puede
+    (un fondo transparente sobre negro y blanco), el que más se acerque."""
+    if not color or not color.startswith("#") or not fondos:
+        return color
+    r = rgb(color)
+    peor = lambda c: min(contraste(c, f) for f in fondos)          # noqa: E731
+    if peor(r) >= minimo:
+        return color
+    h, l, s = colorsys.rgb_to_hls(*r[:3])
+    minimo += 0.05                      # margen: al redondear a #RRGGBB se pierde un poco
+    mejor, mejor_peor = None, -1.0
+    for sentido in (-1, 1):
+        for paso in range(1, 101):
+            nl = l + sentido * paso / 100
+            if not 0 <= nl <= 1:
+                break
+            c = colorsys.hls_to_rgb(h, nl, s)
+            p = peor(c)
+            if p >= minimo:
+                if mejor is None or mejor_peor < minimo or paso < mejor[1]:
+                    mejor, mejor_peor = (c, paso), p
+                break
+            if mejor_peor < minimo and p > mejor_peor:
+                mejor, mejor_peor = (c, paso), p
+    return _hex(*mejor[0], r[3]) if mejor else color
+
+
+def con_accesible(t):
+    """Los colores del tema con el contraste que pide WCAG 2.1 AA (ver arriba). El texto
+    con contorno (barra casi transparente) ya se lee por su contorno: ese no se toca."""
+    c = dict(t["colores"])
+    fondos = fondos_reales(c, t["forma"])
+    if not t.get("contorno"):
+        c["texto"] = ajustar(c["texto"], fondos, TEXTO)
+        c["tenue"] = ajustar(c["tenue"], fondos, TEXTO)
+    c["acento"] = ajustar(c["acento"], fondos, TEXTO)            # también va como texto (reloj digital, «+N»)
+    for k in ("acento2", "alerta", "medidor1", "medidor2", "medidor3"):
+        if c.get(k):
+            c[k] = ajustar(c[k], fondos, GRAFICO)
+    # La isla dinámica va sobre el fondo del tema, opaco.
+    isla = [tuple(rgb(c["fondo"])[:3])]
+    for k, v in ISLA_FIJOS.items():
+        c["isla_" + k] = ajustar(v, isla, GRAFICO)
+    for k in ("acento", "alerta"):
+        c["isla_" + k] = ajustar(c[k], isla, GRAFICO)
+    c["isla_texto"] = ajustar(c["texto"], isla, TEXTO)
+    c["isla_tenue"] = ajustar(c["tenue"], isla, TEXTO)
+    return {**t, "colores": c}
+
+
+def con_alto_contraste(t, hc):
+    """Con un tema de contraste de Windows puesto: sus colores, opacos, sin paisajes,
+    degradados ni transparencias (los elige la persona: no se ajustan)."""
+    if not hc:
+        return t
+    c = dict(t["colores"])
+    texto, fondo, acento = hc["texto"], hc["fondo"], hc["acento"]
+    for k in ("fondo", "fondo2", "fondoBandeja"):
+        c[k] = fondo
+    c.update({"isla": fondo if t["forma"] == "islas" else "transparent", "texto": texto, "tenue": texto, "borde": texto,
+              "acento": acento, "acento2": acento, "alerta": hc["enlace"], "encima": "#40" + acento[1:],
+              "medidor1": acento, "medidor2": acento, "medidor3": acento, "cava1": acento, "cava2": acento,
+              "isla_texto": texto, "isla_tenue": texto, "isla_ok": acento, "isla_aviso": acento, "isla_acento": acento,
+              "isla_alerta": hc["enlace"]})
+    return {**t, "colores": c, "coloresClaros": c, "fondoUrl": "", "fondo": "", "adorno": 0, "translucida": False,
+            "opacidad": 100, "vidrio": False, "adapta": False, "dinamico": False, "contorno": False, "sombraReloj": False,
+            "altoContraste": True, "borde": max(1, t.get("borde", 0))}
 
 
 def base_de(t):

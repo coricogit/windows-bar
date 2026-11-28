@@ -5,6 +5,12 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 
 ## Novedades
 
+- **1.0.14**: **menú de ajustes nuevo**: la barra en grande arriba prueba cada opción al pasar el ratón o el teclado, y
+  cada opción se ve en imagen (clic derecho en el reloj, o «ajustes» en el buscador). **Accesible (WCAG 2.1 AA)**:
+  contraste suficiente en todos los temas y gamas, todo con teclado y con foco visible, nombres para el lector de
+  pantalla, avisos de la isla que se anuncian y que pueden durar hasta que los cierres, globos que se cierran con Esc,
+  y respeta el alto contraste, las animaciones y el tamaño del texto de Windows. Mucho más ágil: cambiar algo ya no
+  congela la barra (antes, casi un segundo).
 - **1.0.13**: con la barra a la izquierda o a la derecha, los ajustes rápidos (sonido, wifi, música) y las
   notificaciones con el calendario de Windows se abren junto a ella, como en Windows 10 (el menú Inicio no se deja
   mover). En el dock, tus programas van primero: si falta sitio se esconden antes el tiempo, los medidores, Claudito y

@@ -96,6 +96,8 @@ _CONSTANTES = {"pi": math.pi, "e": math.e}
 
 _UNIDADES = {"h": 3600, "hora": 3600, "horas": 3600, "m": 60, "min": 60, "mins": 60, "minuto": 60,
              "minutos": 60, "s": 1, "seg": 1, "segs": 1, "segundo": 1, "segundos": 1}
+# El menú de ajustes también con teclado (WCAG 2.1.1): Alt+Espacio y «ajustes».
+_PALABRAS_AJUSTES = ("ajustes", "ajustes de la barra", "configurar la barra", "menu de la barra", "temas de la barra")
 _PALABRAS_CONCENTRAR = ("concentracion", "concentrarse", "concentrar", "foco", "focus", "no molestar")
 _PALABRAS_TEMPORIZADOR = ("temporizador", "timer", "alarma", "cuenta atras", "avisame en", "avisar en")
 
@@ -193,6 +195,8 @@ def resultados(texto, apps, usos=None, ventanas=(), pomodoro=(25, 5)):
         else:
             nombre = "Temporizador de " + duracion(tiempo["segundos"])
         out.append({"tipo": "temporizador", **tiempo, "detalle": "Intro: empezar", "nombre": nombre})
+    if len(consulta) >= 3 and any(p.startswith(consulta) or consulta.startswith(p) for p in _PALABRAS_AJUSTES):
+        out.append({"tipo": "ajustes_barra", "nombre": "Ajustes de la barra", "detalle": "Intro: abrir"})
     if consulta and any(p.startswith(consulta) or consulta.startswith(p) for p in _PALABRAS_CONCENTRAR) and len(consulta) >= 3:
         out.append({"tipo": "concentracion", "nombre": "Modo concentración", "detalle": "Intro: activar o quitar"})
     cuenta = calcular(texto)
@@ -314,13 +318,15 @@ class Buscador(QWidget):
         self.setMouseTracking(True)
 
     # ----- abrir y cerrar -----
-    def mostrar(self, poner, tema, apps, usos, ventanas=(), pomodoro=(25, 5), texto=""):
-        """`texto`: con qué empieza escrito (el menú abre «pomodoro » para cambiar sus minutos)."""
+    def mostrar(self, poner, tema, apps, usos, ventanas=(), pomodoro=(25, 5), texto="", escala=1.0):
+        """`texto`: con qué empieza escrito (el menú abre «pomodoro » para cambiar sus minutos).
+        `escala`: el «Tamaño del texto» de Windows; crece todo junto (WCAG 1.4.4)."""
         self.apps, self.usos, self.ventanas, self.pomodoro = apps, usos, list(ventanas), tuple(pomodoro)
         self._col, self._fuente = tema["colores"], tema["fuente"]
+        self._esc = max(1.0, min(2.0, escala))
         c = self._col
         f = QFont(self._fuente)
-        f.setPixelSize(17)
+        f.setPixelSize(round(17 * self._esc))
         self.entrada.setFont(f)
         self.entrada.setStyleSheet(f"QLineEdit {{ background: transparent; color: {c['texto']}; "
                                    f"selection-background-color: {c['acento']}; }}")
@@ -353,11 +359,12 @@ class Buscador(QWidget):
         if not texto.strip() and not self.apps:
             self._res = [{"tipo": "nada", "nombre": "Leyendo las aplicaciones…", "detalle": ""}]
         self._sel, self._encima = 0, -1
-        al = self._alto()
-        x, y = self._poner(ANCHO, al)
-        self.setGeometry(QRect(x, y, ANCHO, al))
+        esc = getattr(self, "_esc", 1.0)
+        an, al = round(ANCHO * esc), round(self._alto() * esc)
+        x, y = self._poner(an, al)
+        self.setGeometry(QRect(x, y, an, al))
         # QLineEdit deja 2 px por dentro antes del texto.
-        self.entrada.setGeometry(COL_TEXTO - 2, 0, ANCHO - COL_TEXTO - 16, CABEZA)
+        self.entrada.setGeometry(round((COL_TEXTO - 2) * esc), 0, round((ANCHO - COL_TEXTO - 16) * esc), round(CABEZA * esc))
         self.update()
 
     def _usar(self, i):
@@ -395,7 +402,7 @@ class Buscador(QWidget):
             self.update()
 
     def _fila(self, pos):
-        y = pos.y() - CABEZA
+        y = pos.y() / getattr(self, "_esc", 1.0) - CABEZA
         i = int(y // FILA) if y >= 0 else -1
         return i if 0 <= i < len(self._res) else -1
 
@@ -427,12 +434,15 @@ class Buscador(QWidget):
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        esc = getattr(self, "_esc", 1.0)
+        p.scale(esc, esc)
+        todo = QRect(0, 0, ANCHO, self._alto())
         c = {k: QColor(v) for k, v in self._col.items() if v}
         fondo = QColor(c.get("fondo", QColor("#202020")))
         fondo.setAlpha(255)
-        p.fillRect(self.rect(), fondo)
+        p.fillRect(todo, fondo)
         p.setPen(QPen(c["acento"]))
-        p.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        p.drawRect(todo.adjusted(0, 0, -1, -1))
         # La lupa, a la izquierda de lo que se escribe.
         lupa = QFont("Segoe Fluent Icons")
         lupa.setPixelSize(16)
@@ -466,7 +476,7 @@ class Buscador(QWidget):
                 p.setFont(g)
                 p.setPen(c["acento"])
                 p.drawText(icono, Qt.AlignmentFlag.AlignCenter,
-                           {"temporizador": "", "cuenta": "", "ajuste": "", "archivos": "", "ventana": ""}.get(r["tipo"], "" if r["tipo"] == "concentracion" else ""))
+                           {"temporizador": "", "cuenta": "", "ajuste": "", "archivos": "", "ventana": ""}.get(r["tipo"], {"concentracion": "", "ajustes_barra": ""}.get(r["tipo"], "")))
             texto = QRectF(COL_TEXTO, caja.top(), caja.right() - 140 - COL_TEXTO, caja.height())
             p.setFont(f)
             p.setPen(c["texto"])

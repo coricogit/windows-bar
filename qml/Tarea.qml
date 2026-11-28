@@ -14,6 +14,12 @@ Item {
   property bool atencion: false        // el programa pide atención (el naranja de Windows)
   property int cuenta: 0
   property int indice: 0
+  // Lector de pantalla: el programa y cómo está (WCAG 4.1.2).
+  Accessible.role: Accessible.Button
+  Accessible.name: titulo + (cuenta > 1 ? ", " + cuenta + " ventanas" : "") + (activa ? ", activa" : "")
+                   + (minimizada ? ", minimizada" : "") + (atencion ? ", pide atención" : "") + (!abierta ? ", anclado" : "")
+  Accessible.focusable: true
+  Accessible.onPressAction: barra.pulsar_tarea(tarea.clave, false)
   property var lista
   // Arrastre: el botón sigue al ratón y los demás se apartan.
   property bool arrastrando: false

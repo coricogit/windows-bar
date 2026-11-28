@@ -108,6 +108,11 @@ Loader {
     id: buscarC
     Item {
       id: campo
+      Accessible.role: Accessible.Button
+      Accessible.name: "Buscar"
+      Accessible.description: "Buscar aplicaciones, configuración y archivos (Alt+Espacio)"
+      Accessible.focusable: true
+      Accessible.onPressAction: barra.accion("buscador")
       // Automática: en barras estrechas (compacta, dock, burbujas) solo la lupa, como hace Windows.
       // Una forma elegida se respeta en cualquier formato; en vertical no cabe más que la lupa.
       readonly property string elegida: mod.tema.busqueda || "auto"
@@ -303,6 +308,11 @@ Loader {
   Component {
     id: musicaC
     Item {             // solo las barras; con el ratón se maneja la música
+      Accessible.role: Accessible.Button
+      Accessible.name: "Música: " + barra.cancion.titulo + (barra.cancion.artista ? ", de " + barra.cancion.artista : "")
+                       + (barra.cancion.sonando ? ", sonando" : ", en pausa")
+      Accessible.description: "Pulsar: pausar o seguir"
+      Accessible.onPressAction: barra.accion("pausa")
       // No `visible`: dentro de un grupo oculto siempre sería falso.
       // En pausa se queda 8 s (para seguir con un clic) y luego se recoge.
       readonly property bool sonando: barra.cancion.sonando === true
@@ -340,6 +350,8 @@ Loader {
     // completos al pasar el ratón o cuando alguno pasa del 75 % (se cierran bajo 60).
     Item {
       id: sis
+      Accessible.role: Accessible.StaticText
+      Accessible.name: "CPU " + barra.datos.cpu + " %, RAM " + barra.datos.ram + " %" + (barra.datos.gpu >= 0 ? ", GPU " + barra.datos.gpu + " %" : "")
       readonly property var lista: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]].filter(function(m) {
         return barra.medidores.indexOf(m[1]) >= 0 })
       readonly property bool mini: barra.medidoresMini
@@ -503,6 +515,10 @@ Loader {
       Repeater {
         model: bandeja
         Item {
+          Accessible.role: Accessible.Button
+          Accessible.name: model.tip
+          Accessible.focusable: true
+          Accessible.onPressAction: barra.pulsar_bandeja(model.key, false)
           width: rejilla.celda
           height: mod.v ? width : mod.alto
           Rectangle {
@@ -573,6 +589,9 @@ Loader {
     horizontalItemAlignment: Grid.AlignHCenter
     Item {             // modo concentración: una luna; clic para salir
       id: foco
+      Accessible.role: Accessible.Button
+      Accessible.name: "Modo concentración activo. Pulsar para salir"
+      Accessible.onPressAction: barra.concentrarse(false)
       visible: barra.concentrado
       width: visible ? (mod.v ? mod.alto : 30) : 0
       height: visible ? (mod.v ? 30 : mod.alto) : 0
@@ -597,6 +616,9 @@ Loader {
     }
     Item {             // el temporizador en marcha: clic para quitarlo
       id: crono
+      Accessible.role: Accessible.Button
+      Accessible.name: (crono.c.fase === "descanso" ? "Descanso: " : "Temporizador: ") + (crono.c.texto || "") + ". Pulsar para quitarlo"
+      Accessible.onPressAction: barra.parar_cuenta()
       readonly property var c: barra.cuenta
       visible: !!c.texto
       width: visible ? (mod.v ? mod.alto : cronoFila.implicitWidth + 22) : 0
@@ -636,6 +658,7 @@ Loader {
       colores: mod.c
       id: hora
       property date ahora: new Date()
+      nombre: Qt.formatTime(ahora, "H:mm") + ", " + ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat)
       // El estilo de la hora (Menú → Widgets → Hora y fecha); «tema» deja el de cada tema.
       readonly property string estilo: mod.tema.hora || "tema"
       readonly property bool doble: estilo === "windows" || estilo === "digital"
@@ -762,6 +785,9 @@ Clic: calendario · Clic central: notificaciones"
     id: widgetsC
     Item {
       id: wid
+      Accessible.role: Accessible.Button
+      Accessible.name: barra.tiempo.hay ? "Tiempo en " + barra.tiempo.ciudad + ": " + barra.tiempo.grados + ", " + barra.tiempo.texto : "Widgets"
+      Accessible.onPressAction: barra.accion("widgets")
       readonly property real ancho: mod.tema.clima === "emoji" ? icono.implicitWidth : dibujo.width
       width: mod.v ? mod.alto : ancho + (barra.tiempo.hay ? datos.width + 5 : 0) + 14
       height: mod.v ? 40 : mod.alto
@@ -827,6 +853,10 @@ Clic: calendario · Clic central: notificaciones"
   Component {
     id: clauditoC
     Item {
+      Accessible.role: Accessible.Button
+      Accessible.name: "Claudito: " + (({ waiting: "Claude te espera", working: "Claude está trabajando", idle: "sin tareas" })[barra.claude.modo] || "Claude")
+      Accessible.description: barra.claude.texto || ""
+      Accessible.onPressAction: barra.ir_a_claude()
       width: mod.v ? mod.alto : 60
       height: mod.v ? 50 : mod.alto
       clip: true

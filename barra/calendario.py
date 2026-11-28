@@ -2,7 +2,7 @@
 import datetime
 import time
 
-from PySide6.QtCore import QLocale, QRect, QRectF, Qt
+from PySide6.QtCore import QLocale, QPoint, QRect, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
@@ -42,12 +42,21 @@ class Calendario(QWidget):
         self.cerrado = time.monotonic()
         super().hideEvent(e)
 
-    def mostrar(self, poner, tema):
+    def mostrar(self, poner, tema, escala=1.0):
+        """`escala`: el «Tamaño del texto» de Windows; crece todo junto (WCAG 1.4.4)."""
         hoy = datetime.date.today()
         self._anio, self._mes = hoy.year, hoy.month
         self._col, self._fuente = tema["colores"], tema["fuente"]
-        self.setGeometry(QRect(*poner(ANCHO, ALTO), ANCHO, ALTO))
+        self._esc = max(1.0, min(2.0, escala))
+        an, al = round(ANCHO * self._esc), round(ALTO * self._esc)
+        self.setGeometry(QRect(*poner(an, al), an, al))
         self.show()
+
+    def _punto(self, e):
+        """Dónde está el ratón en el dibujo sin escalar."""
+        esc = getattr(self, "_esc", 1.0)
+        p = e.position()
+        return QPoint(round(p.x() / esc), round(p.y() / esc))
 
     # ----- zonas -----
     @staticmethod
@@ -63,7 +72,7 @@ class Calendario(QWidget):
         return None
 
     def mouseMoveEvent(self, e):
-        z = self._flecha(e.position().toPoint())
+        z = self._flecha(self._punto(e))
         if z != self._encima:
             self._encima = z
             self.update()
@@ -76,7 +85,7 @@ class Calendario(QWidget):
         if not self.rect().contains(e.position().toPoint()):
             self.hide()
             return
-        z = self._flecha(e.position().toPoint())
+        z = self._flecha(self._punto(e))
         if z in ("ant", "sig"):
             self._anio, self._mes = mover(self._anio, self._mes, -1 if z == "ant" else 1)
         elif z == "hoy":
@@ -104,12 +113,14 @@ class Calendario(QWidget):
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.scale(getattr(self, "_esc", 1.0), getattr(self, "_esc", 1.0))
+        todo = QRect(0, 0, ANCHO, ALTO)
         c = {k: QColor(v) for k, v in self._col.items()}
         fondo = QColor(c.get("fondo", QColor("#202020")))
         fondo.setAlpha(255)
-        p.fillRect(self.rect(), fondo)
+        p.fillRect(todo, fondo)
         p.setPen(QPen(c["acento"]))
-        p.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        p.drawRect(todo.adjusted(0, 0, -1, -1))
         f = QFont(self._fuente)
         f.setPixelSize(13)
         negrita = QFont(f)

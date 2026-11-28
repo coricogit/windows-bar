@@ -10,7 +10,7 @@ import math
 import time
 
 from PySide6.QtCore import QEasingCurve, QRect, QRectF, Qt, QTimer, QVariantAnimation
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QAccessible, QAccessibleEvent, QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
 from . import win
@@ -31,7 +31,11 @@ def ancho_para(titulo, detalle, medir):
 
 
 def color_de(tipo, colores):
-    """El color de un tipo de aviso con los colores del tema."""
+    """El color de un tipo de aviso con los colores del tema. Con el tema ya ajustado
+    (temas.con_accesible) trae los suyos, con contraste 3:1 sobre el fondo."""
+    propio = colores.get({"ok": "isla_ok", "aviso": "isla_aviso", "error": "isla_alerta"}.get(tipo, "isla_acento"))
+    if propio:
+        return QColor(propio)
     fijo = COLORES.get(tipo, "")
     if fijo:
         return QColor(fijo)
@@ -68,19 +72,33 @@ class Isla(QWidget):
         """`aviso`: {"icono", "titulo", "detalle", "tipo", "imagen", "fuente_icono", "hacer", "dura"};
         `poner(an, al)` da la esquina."""
         self._aviso, self._col, self._fuente = aviso, tema["colores"], tema["fuente"]
+        self._escala = max(1.0, min(1.6, aviso.get("escala", 1.0)))     # el «Tamaño del texto» de Windows
         f = QFontMetrics(self._f(13, True)), QFontMetrics(self._f(11))
         extra = 3 * BOTON + 6 if aviso.get("controles") else 22 if aviso.get("hacer") or aviso.get("tipo") == "musica" else 0
         self._ancho = min(MAX, ancho_para(aviso["titulo"], aviso.get("detalle", ""),
                                           lambda t, b: (f[0] if b else f[1]).horizontalAdvance(t)) + extra)
-        an, al = self._ancho + 2 * SOMBRA, ALTO + 2 * SOMBRA
+        self._alto = round(ALTO * (1 + (self._escala - 1) * 0.6))
+        an, al = self._ancho + 2 * SOMBRA, self._alto + 2 * SOMBRA
         self.setGeometry(QRect(*poner(an, al), an, al))
         if not self.isVisible() or self._anim.endValue() == 0.0:
             self._ir(1.0)
         self._dura, self._desde = aviso.get("dura", DURA), time.monotonic()
         self.update()
         self.show()
-        self._quitar.start(self._dura)
-        self._latido.start()
+        if self._dura > 0:                       # 0: se queda hasta que la cierres (WCAG 2.2.1)
+            self._quitar.start(self._dura)
+        else:
+            self._quitar.stop()
+        if self._dura > 0 or aviso.get("tipo") == "musica":   # la rayita o las barras de la música
+            self._latido.start()
+        else:
+            self._latido.stop()
+        # Para el lector de pantalla, como mensaje de estado (WCAG 4.1.3).
+        self.setAccessibleName(aviso["titulo"] + (". " + aviso["detalle"] if aviso.get("detalle") else ""))
+        try:
+            QAccessible.updateAccessibility(QAccessibleEvent(self, QAccessible.Event.Alert))
+        except Exception:
+            pass
 
     def recoger(self):
         if self.isVisible():
@@ -105,7 +123,7 @@ class Isla(QWidget):
 
     def _f(self, px, negrita=False, familia=None):
         f = QFont(familia or self._fuente)
-        f.setPixelSize(px)
+        f.setPixelSize(round(px * getattr(self, "_escala", 1.0)))
         if negrita:
             f.setWeight(QFont.Weight.DemiBold)
         return f
@@ -117,8 +135,9 @@ class Isla(QWidget):
 
     def leaveEvent(self, e):
         self._encima, self._sobre = False, None
-        self._dura, self._desde = 1500, time.monotonic()
-        self._quitar.start(1500)
+        if self._dura > 0:
+            self._dura, self._desde = 1500, time.monotonic()
+            self._quitar.start(1500)
         self.update()
 
     def mouseMoveEvent(self, e):
@@ -154,8 +173,9 @@ class Isla(QWidget):
         fondo = QColor(c.get("fondo", QColor("#202020")))
         fondo.setAlpha(250)
         # Crece desde una pastilla del centro.
-        an = ALTO + (self._ancho - ALTO) * min(1.0, a)
-        caja = QRectF(SOMBRA + (self._ancho - an) / 2, SOMBRA + 1, an, ALTO - 2)
+        alto = getattr(self, "_alto", ALTO)
+        an = alto + (self._ancho - alto) * min(1.0, a)
+        caja = QRectF(SOMBRA + (self._ancho - an) / 2, SOMBRA + 1, an, alto - 2)
         r = caja.height() / 2
         self._sombra(p, caja, r, a)
         # Sin contorno: la separa del fondo la sombra; al pasar el ratón, un filo de su color.
@@ -207,26 +227,26 @@ class Isla(QWidget):
         elif self._aviso.get("hacer"):
             derecha = 20
             p.setFont(self._f(10, False, "Segoe Fluent Icons"))
-            p.setPen(c.get("tenue", QColor("#A0A0A0")))
+            p.setPen(c.get("isla_tenue", c.get("tenue", QColor("#A0A0A0"))))
             p.drawText(QRectF(caja.right() - 30, caja.top(), 16, caja.height()), Qt.AlignmentFlag.AlignCenter, CHEVRON)
 
         texto = QRectF(baldosa.right() + 10, caja.top(), caja.right() - baldosa.right() - 26 - derecha, caja.height())
         detalle = self._aviso.get("detalle", "")
         medida = QFontMetrics(self._f(13, True))
         p.setFont(self._f(13, True))
-        p.setPen(c.get("texto", QColor("#FFFFFF")))
+        p.setPen(c.get("isla_texto", c.get("texto", QColor("#FFFFFF"))))
         arriba = QRectF(texto.left(), texto.top() + (5 if detalle else 0), texto.width(), texto.height() / 2 if detalle else texto.height())
         p.drawText(arriba, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
                    medida.elidedText(self._aviso["titulo"], Qt.TextElideMode.ElideRight, int(texto.width())))
         if detalle:
             p.setFont(self._f(11))
-            p.setPen(c.get("tenue", QColor("#A0A0A0")))
+            p.setPen(c.get("isla_tenue", c.get("tenue", QColor("#A0A0A0"))))
             abajo = QRectF(texto.left(), texto.center().y() - 1, texto.width(), texto.height() / 2 - 4)
             p.drawText(abajo, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
                        QFontMetrics(self._f(11)).elidedText(detalle, Qt.TextElideMode.ElideRight, int(texto.width())))
 
         # Lo que le queda, como una rayita abajo (quieta mientras la miras).
-        if not self._encima and self._dura > 0:
+        if not self._encima and self._dura > 0 and self._quitar.isActive():
             queda = max(0.0, 1 - (time.monotonic() - self._desde) * 1000 / self._dura)
             raya = QColor(tono)
             raya.setAlphaF(0.55)
@@ -252,13 +272,13 @@ class Isla(QWidget):
                 p.setBrush(tono.lighter(115) if self._sobre == orden else tono)
                 p.drawEllipse(r.adjusted(1, 1, -1, -1))
             elif self._sobre == orden:
-                encima = QColor(c.get("texto", QColor("#FFFFFF")))
+                encima = QColor(c.get("isla_texto", c.get("texto", QColor("#FFFFFF"))))
                 encima.setAlphaF(0.12)
                 p.setBrush(encima)
                 p.drawEllipse(r.adjusted(1, 1, -1, -1))
             fondo = QColor(c.get("fondo", QColor("#202020")))
             fondo.setAlpha(255)
-            p.setPen(fondo if orden == "pausa" else c.get("texto", QColor("#FFFFFF")))
+            p.setPen(fondo if orden == "pausa" else c.get("isla_texto", c.get("texto", QColor("#FFFFFF"))))
             p.setFont(self._f(10 if orden == "pausa" else 11, False, "Segoe Fluent Icons"))
             p.drawText(r, Qt.AlignmentFlag.AlignCenter, glifo)
         p.restore()
