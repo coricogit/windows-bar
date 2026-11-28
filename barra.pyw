@@ -306,6 +306,7 @@ class Barra(QObject):
     temaCambio = Signal()
     datosCambio = Signal()
     cuentaCambio = Signal()
+    concentracionCambio = Signal()
     claudeCambio = Signal()
     musicaCambio = Signal()
     animarCambio = Signal()
@@ -334,6 +335,8 @@ class Barra(QObject):
         self.almacen = Almacen()
         self.temas = temas.cargar()
         self.ajustes = cfg.normalizar(cfg.leer(RUTA_AJUSTES), self.temas, temas.FORMATOS)
+        if not vista and cfg.reparar_fijados(self.ajustes, apps_inicio.leer):
+            cfg.guardar(RUTA_AJUSTES, self.ajustes)
         self.paneles = []
         self.escritorios = win.Escritorios()
         self._escritorio = (1, 1)
@@ -364,6 +367,8 @@ class Barra(QObject):
         self._calendario = None
         # Isla dinámica: lo último visto de cada cosa, para avisar solo de cambios.
         self._isla = self._ult_cancion = self._modo_claude = self._red_antes = self._bat_antes = None
+        self._portada_cruda, self._aviso_cancion = b"", None
+        self._concentrado, self._concentrado_por_pomodoro = False, False
         self.atencion = self.encaje = None
         # Buscador (barra/buscador.py): las apps del menú Inicio se leen en un hilo y se guardan un rato.
         self._buscador = self.atajo_buscar = None
@@ -518,6 +523,7 @@ class Barra(QObject):
         t = temas.con_posicion(t, self.ajustes["posicion"])
         # Lo elegido en Widgets manda sobre el formato y la posición.
         t = temas.con_widgets(t, self.ajustes["disenos"], self.ajustes["sistema"], self.ajustes["claudito"])
+        t = temas.con_concentracion(t, self._concentrado)
         t = iconos.con_iconos(t, self.ajustes["iconos"])
         t = temas.con_icono(t, self._tono_fondo if self.ajustes["icono"] == "fondo" or t["vidrio"] or t["adapta"] else None)
         t = temas.con_busqueda(t, self.ajustes["barra_busqueda"] and not self.vista)
@@ -668,7 +674,7 @@ class Barra(QObject):
         quien = list(dict.fromkeys(quien))
         for n in quien:
             if n not in self._mic_antes:
-                self._avisar({"icono": "🎙️", "titulo": "Micrófono en uso", "detalle": n,
+                self._avisar({"icono": "", "tipo": "aviso", "importante": True, "titulo": "Micrófono en uso", "detalle": n,
                               "hacer": lambda: os.startfile("ms-settings:privacy-microphone")})
         self._mic_antes = quien
         return quien
@@ -689,6 +695,12 @@ class Barra(QObject):
 
     # ----- temporizador (se pone desde el buscador: «10 min», «pomodoro») -----
     def _empezar_cuenta(self, segundos, pomodoro=False, fase="trabajo", descanso=0):
+        if pomodoro and self.ajustes["concentrar_pomodoro"]:
+            if fase == "trabajo" and not self._concentrado:
+                self._concentrado_por_pomodoro = True
+                self.concentrarse(True)
+            elif fase != "trabajo" and self._concentrado_por_pomodoro:
+                self.concentrarse(False, avisar=False)        # ya sale «Pomodoro hecho»
         self._cuenta = {"fin": time.monotonic() + segundos, "total": segundos, "pomodoro": pomodoro, "fase": fase,
                         "descanso": descanso, "hecho": 0.0}
         if self._t_cuenta is None:
@@ -719,16 +731,20 @@ class Barra(QObject):
         except Exception:
             pass
         if c["pomodoro"] and c["fase"] == "trabajo" and c["descanso"]:
-            self._avisar({"icono": "🍅", "titulo": "Pomodoro hecho", "detalle": buscador.duracion(c["descanso"]) + " de descanso"})
+            self._avisar({"icono": "", "tipo": "ok", "importante": True, "titulo": "Pomodoro hecho", "detalle": buscador.duracion(c["descanso"]) + " de descanso"})
             self._empezar_cuenta(c["descanso"], True, "descanso")
             return
+        if self._concentrado_por_pomodoro:
+            self.concentrarse(False, avisar=False)            # ya sale el del temporizador
         titulo = "Descanso terminado" if c["fase"] == "descanso" else "Temporizador"
-        self._avisar({"icono": "⏰", "titulo": titulo, "detalle": buscador.duracion(c["total"]) + " cumplidos"})
+        self._avisar({"icono": "", "tipo": "ok", "importante": True, "titulo": titulo, "detalle": buscador.duracion(c["total"]) + " cumplidos"})
         c["hecho"] = ahora
         self.cuentaCambio.emit()
 
     @Slot()
     def parar_cuenta(self):
+        if self._concentrado_por_pomodoro:
+            self.concentrarse(False)
         self._cuenta = None
         if self._t_cuenta:
             self._t_cuenta.stop()
@@ -748,14 +764,58 @@ class Barra(QObject):
 
     cuenta = Property("QVariantMap", _get_cuenta, notify=cuentaCambio)
 
+    # ----- modo concentración -----
+    @Slot(bool)
+    def concentrarse(self, si, avisar=True):
+        """Esconde lo que distrae (temas.con_concentracion) y la isla solo avisa de lo importante.
+        `avisar`: False cuando ya sale otro aviso (el del pomodoro) que no hay que tapar."""
+        if si == self._concentrado:
+            return
+        if not si:
+            self._concentrado_por_pomodoro = False
+        if avisar:
+            self._avisar({"icono": "", "tipo": "info", "importante": True,
+                          "titulo": "Concentración" if si else "Fin de la concentración",
+                          "detalle": "Solo avisos importantes" if si else "Todo vuelve a la barra"})
+        self._concentrado = si
+        self.concentracionCambio.emit()
+        self.temaCambio.emit()
+
+    concentrado = Property(bool, lambda self: self._concentrado, notify=concentracionCambio)
+
+    def _set_concentrar_pomodoro(self, si):
+        self.ajustes["concentrar_pomodoro"] = si
+        self._guardar()
+
     def _set_musica(self, d):
+        d = dict(d)
+        crudo = d.pop("portada", b"")
+        if crudo != self._portada_cruda:          # la carátula, una vez por canción
+            self._portada_cruda = crudo
+            img = QImage.fromData(crudo) if crudo else QImage()
+            if img.isNull():
+                self.almacen.imagenes.pop("portada", None)
+            else:
+                self.almacen.poner("portada", img.scaled(128, 128, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                                         Qt.TransformationMode.SmoothTransformation))
+        d["portada"] = self.almacen.url("portada")
         self._cancion = d
         self.musicaCambio.emit()
         if d.get("titulo") and d.get("sonando"):
             clave = (d["titulo"], d.get("artista", ""))
             if self._ult_cancion is not None and clave != self._ult_cancion:
-                self._avisar({"icono": "🎵", "titulo": d["titulo"], "detalle": d.get("artista", "")})
+                self._aviso_cancion = clave
+                self._avisar(self._aviso_musica(d))
             self._ult_cancion = clave
+        # Si la carátula llega después del aviso (Spotify), la isla la recoge.
+        if crudo and self._isla and self._isla.isVisible() and self._aviso_cancion == (d["titulo"], d.get("artista", "")):
+            self._avisar(self._aviso_musica(d))
+
+    def _aviso_musica(self, d):
+        """El de una canción: con su carátula y, al pasar el ratón, anterior, pausa y siguiente."""
+        return {"icono": "", "tipo": "musica", "titulo": d["titulo"], "detalle": d.get("artista", ""),
+                "imagen": self.almacen.get("portada"), "sonando": d.get("sonando", False),
+                "controles": self.musica.orden}
 
     # ----- ventanas que piden atención (barra/atencion.py) -----
     def _pide_atencion(self, h):
@@ -764,7 +824,11 @@ class Barra(QObject):
             return
         exe = programas.principal(win.app_exe(h))
         nombre, titulo = self._nombre(h, exe), win.title(h)
-        self._avisar({"icono": "🔔", "titulo": nombre or titulo or "Un programa te llama",
+        try:
+            imagen = self.almacen.get(self.almacen.de_ventana(h, win.app_exe(h)))
+        except Exception:
+            imagen = None
+        self._avisar({"icono": "", "tipo": "aviso", "imagen": imagen, "titulo": nombre or titulo or "Un programa te llama",
                       "detalle": titulo if titulo != nombre else "", "hacer": lambda: win.activate(h)})
 
     # ----- buscador (barra/buscador.py) -----
@@ -830,6 +894,9 @@ class Barra(QObject):
         return self._iconos_apps[r["id"]]
 
     def _usado(self, r):
+        if r["tipo"] == "concentracion":
+            self.concentrarse(not self._concentrado)
+            return
         if r["tipo"] == "temporizador":
             if r["pomodoro"]:                    # sus minutos se quedan para la próxima vez
                 self.ajustes["pomodoro"] = [r["segundos"] // 60, r["descanso"] // 60]
@@ -867,6 +934,8 @@ class Barra(QObject):
     def _avisar(self, aviso):
         if not self.ajustes["isla"] or self.vista or self._plena or not self._animar or not self.paneles:
             return
+        if self._concentrado and not aviso.get("importante"):
+            return
         try:
             p = next((x for x in self.paneles if x.primaria), self.paneles[0])
             x, y, an, al = p.zona_real()
@@ -886,18 +955,18 @@ class Barra(QObject):
         antes, self._red_antes = self._red_antes, (r["tipo"], r["internet"], r["nombre"])
         if antes is not None and antes != self._red_antes:
             if r["internet"]:
-                self._avisar({"icono": red.glifo_red(r), "fuente_icono": "Segoe Fluent Icons",
+                self._avisar({"icono": red.glifo_red(r), "tipo": "ok",
                               "titulo": "Conectado", "detalle": r["nombre"]})
             else:
-                self._avisar({"icono": red.glifo_red(r), "fuente_icono": "Segoe Fluent Icons",
+                self._avisar({"icono": red.glifo_red(r), "tipo": "error",
                               "titulo": "Sin internet" if r["tipo"] != "no" else "Sin conexión", "detalle": r["nombre"]})
         bat, self._bat_antes = self._bat_antes, b
         if b and bat:
             if b[1] and not bat[1]:
-                self._avisar({"icono": red.glifo_bateria(*b), "fuente_icono": "Segoe Fluent Icons",
+                self._avisar({"icono": red.glifo_bateria(*b), "tipo": "ok",
                               "titulo": "Cargando", "detalle": f"{b[0]} %"})
             elif not b[1] and b[0] <= 20 < bat[0]:
-                self._avisar({"icono": red.glifo_bateria(*b), "fuente_icono": "Segoe Fluent Icons",
+                self._avisar({"icono": red.glifo_bateria(*b), "tipo": "error", "importante": True,
                               "titulo": "Batería baja", "detalle": f"Queda un {b[0]} %"})
 
     cancion = Property("QVariantMap", lambda self: self._cancion, notify=musicaCambio)
@@ -913,7 +982,7 @@ class Barra(QObject):
             if d:
                 modo, self._modo_claude = self._modo_claude, d.get("modo")
                 if modo is not None and d.get("modo") == "waiting" and modo != "waiting":
-                    self._avisar({"icono": "💬", "titulo": "Claude te espera", "detalle": d.get("texto", ""),
+                    self._avisar({"icono": "", "tipo": "info", "importante": True, "titulo": "Claude te espera", "detalle": d.get("texto", ""),
                                   "hacer": lambda: self.ir_a_claude()})
 
     def _leer_ropa(self):
@@ -1129,7 +1198,9 @@ class Barra(QObject):
     def _id_tienda(self, h, exe):
         """El identificador de app de la ventana, si es de la Tienda."""
         if h not in self._ids:
-            i = win.app_id(h) if win.de_la_tienda(h, exe) else ""
+            i = ""
+            if win.de_la_tienda(h, exe):      # Windows Terminal no lo pone en la ventana: el del proceso
+                i = win.app_id(h) or win.app_id_proceso(win.pid_of(h))
             self._ids[h] = i if "!" in i else ""
         return self._ids[h]
 
@@ -1486,6 +1557,12 @@ class Barra(QObject):
     # ----- widgets y tiempo -----
     widgets = Property(bool, lambda self: self.ajustes["widgets"], notify=temaCambio)
     medidores = Property("QVariantList", lambda self: self.ajustes["medidores"], notify=temaCambio)
+    medidoresMini = Property(bool, lambda self: self.ajustes["medidores_mini"], notify=temaCambio)
+
+    def _set_medidores_mini(self):
+        self.ajustes["medidores_mini"] = not self.ajustes["medidores_mini"]
+        self._guardar()
+        self.temaCambio.emit()
 
     def _set_widget(self, cual, diseno):
         """Una fila de la pestaña Widgets: "no" lo apaga; si no, lo enciende con ese diseño."""
@@ -1558,11 +1635,15 @@ class Barra(QObject):
             filas.append(("Claudito", [{"texto": n, "elegido": k == actual, "hacer": lambda k=k: self._set_claudito_modo(k)}
                                        for k, n in {"no": "Oculto", **temas.CLAUDITO}.items()]))
         filas += [("Búsqueda", con_oculto("busqueda", "barra_busqueda", "auto")),
-                  ("Icono de búsqueda", eleccion("icono_busqueda", "lupa")),
+                  ("Icono de búsqueda", eleccion("icono_busqueda", "windows")),
                   ("Vista de tareas", con_oculto("vista", "vista_tareas", "insignia")),
-                  ("Icono de vista", eleccion("icono_vista", "ventanas"))]
+                  ("Icono de vista", eleccion("icono_vista", "windows")),
+                  ("Hora y fecha", eleccion("hora", "tema"))]
         medir = [{"texto": n, "marcado": m in a["medidores"], "hacer": lambda m=m: self._set_medidor(m)}
                  for m, n in (("cpu", "CPU"), ("ram", "RAM"), ("gpu", "GPU"))] if a["sistema"] else []
+        if medir:
+            medir.append({"texto": "Pequeños hasta que pasan del 75 %", "marcado": a["medidores_mini"],
+                          "hacer": self._set_medidores_mini})
         return {"titulo": "Widgets", "filas": filas, "interruptores": medir,
                 "botones": [{"texto": "Ciudad del tiempo: " + (a["ciudad"].get("nombre") or "elegir…"),
                              "hacer": lambda: QTimer.singleShot(0, self._pedir_ciudad)}]}
@@ -1807,8 +1888,11 @@ class Barra(QObject):
                                    marca("Modo juego", a["modo_juego"], self._set_juego),
                                    marca("Pincel en la barra", a["pincel"], self._set_pincel),
                                    marca("Isla dinámica (avisos junto a la barra)", a["isla"], self._set_isla),
-                                   marca("Buscador (Alt+Espacio o clic central en Inicio)", a["buscador"], self._set_buscador)],
-                 "botones": [{"texto": "Pomodoro: {} min + {} de descanso (cambiar…)".format(*a["pomodoro"]),
+                                   marca("Buscador (Alt+Espacio o clic central en Inicio)", a["buscador"], self._set_buscador),
+                                   marca("Concentrarse durante el pomodoro", a["concentrar_pomodoro"], self._set_concentrar_pomodoro)],
+                 "botones": [{"texto": "Dejar de concentrarse" if self._concentrado else "Concentrarse ahora (esconde lo que distrae)",
+                              "hacer": lambda: self.concentrarse(not self._concentrado)},
+                             {"texto": "Pomodoro: {} min + {} de descanso (cambiar…)".format(*a["pomodoro"]),
                               "hacer": lambda: QTimer.singleShot(0, lambda: self.abrir_buscador("pomodoro "))}] + self._boton_conectar()},
                 {"titulo": "General",
                  "interruptores": [{"texto": "Arrancar con Windows", "marcado": con_windows, "hacer": lambda: self._set_arranque(not con_windows)},
@@ -1903,7 +1987,7 @@ class Barra(QObject):
             self._guardar()
         if puesta:
             registrar("arranque: la entrada de Run había desaparecido; puesta otra vez")
-            self._avisar({"icono": "", "fuente_icono": "Segoe Fluent Icons", "titulo": "Arranque con Windows",
+            self._avisar({"icono": "", "tipo": "info", "titulo": "Arranque con Windows",
                           "detalle": "Algo lo había quitado; ya está otra vez"})
 
     def _set_juego(self, si):
@@ -2076,7 +2160,7 @@ class Esquinas(QObject):
         self.barra = barra
 
     def eventFilter(self, obj, ev):
-        if ev.type() == QEvent.Type.Show and isinstance(obj, QWidget) and obj.isWindow():
+        if ev.type() == QEvent.Type.Show and isinstance(obj, QWidget) and obj.isWindow() and not obj.property("sinMarco"):
             try:
                 win.esquinas(int(obj.winId()), self.barra.esquinas_menus())
             except Exception:

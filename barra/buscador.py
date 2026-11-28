@@ -96,6 +96,7 @@ _CONSTANTES = {"pi": math.pi, "e": math.e}
 
 _UNIDADES = {"h": 3600, "hora": 3600, "horas": 3600, "m": 60, "min": 60, "mins": 60, "minuto": 60,
              "minutos": 60, "s": 1, "seg": 1, "segs": 1, "segundo": 1, "segundos": 1}
+_PALABRAS_CONCENTRAR = ("concentracion", "concentrarse", "concentrar", "foco", "focus", "no molestar")
 _PALABRAS_TEMPORIZADOR = ("temporizador", "timer", "alarma", "cuenta atras", "avisame en", "avisar en")
 
 
@@ -192,6 +193,8 @@ def resultados(texto, apps, usos=None, ventanas=(), pomodoro=(25, 5)):
         else:
             nombre = "Temporizador de " + duracion(tiempo["segundos"])
         out.append({"tipo": "temporizador", **tiempo, "detalle": "Intro: empezar", "nombre": nombre})
+    if consulta and any(p.startswith(consulta) or consulta.startswith(p) for p in _PALABRAS_CONCENTRAR) and len(consulta) >= 3:
+        out.append({"tipo": "concentracion", "nombre": "Modo concentración", "detalle": "Intro: activar o quitar"})
     cuenta = calcular(texto)
     if cuenta is not None:
         out.append({"tipo": "cuenta", "nombre": "= " + cuenta, "detalle": "Intro: copiar", "valor": cuenta.replace(" ", "")})
@@ -463,7 +466,7 @@ class Buscador(QWidget):
                 p.setFont(g)
                 p.setPen(c["acento"])
                 p.drawText(icono, Qt.AlignmentFlag.AlignCenter,
-                           {"temporizador": "", "cuenta": "", "ajuste": "", "archivos": "", "ventana": ""}.get(r["tipo"], ""))
+                           {"temporizador": "", "cuenta": "", "ajuste": "", "archivos": "", "ventana": ""}.get(r["tipo"], "" if r["tipo"] == "concentracion" else ""))
             texto = QRectF(COL_TEXTO, caja.top(), caja.right() - 140 - COL_TEXTO, caja.height())
             p.setFont(f)
             p.setPen(c["texto"])

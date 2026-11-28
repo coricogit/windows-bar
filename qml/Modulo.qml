@@ -45,11 +45,13 @@ Loader {
       colores: mod.c
       readonly property string numero: mod.tema.vista || "insignia"
       readonly property bool varios: barra.escritorio.total > 1
+      // El de Windows 11 se dibuja (IconoVista); con el número al lado, el glifo de reserva.
+      readonly property bool win11: mod.tema.icono_vista === "windows" && !(numero === "texto" && varios)
       ancho: numero === "texto" && varios ? natural : mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38
       fuente: numero === "texto" && varios ? mod.tema.fuente : "Segoe Fluent Icons"
       tam: numero === "texto" && varios ? mod.tema.tamano : 16
       glifo: numero === "texto" && varios ? (mod.tema.glifoVista || "\uE7C4") : ""
-      texto: numero === "texto" && varios ? barra.escritorio.n : (mod.tema.glifoVista || "\uE7C4")
+      texto: numero === "texto" && varios ? barra.escritorio.n : win11 ? "" : (mod.tema.glifoVista || "\uE7C4")
       ayuda: "Vista de tareas" + (barra.escritorio.total > 1 ? " · Escritorio " + barra.escritorio.n + " de " + barra.escritorio.total : "")
              + " · Rueda: cambiar de escritorio · Clic central: escritorio nuevo"
       onPulsado: function(b) { barra.accion(b === Qt.MiddleButton ? "escritorio_nuevo" : "vista") }
@@ -63,6 +65,13 @@ Loader {
         color: botonVista.encima ? Qt.lighter(mod.c.isla, 1.25) : mod.c.isla
         border.width: 1
         border.color: mod.c.borde
+      }
+      IconoVista {
+        visible: botonVista.win11
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: botonVista.numero === "puntos" && botonVista.varios && !mod.v ? -2 : 0
+        lado: Math.round(Math.min(20, mod.alto * 0.42))
+        tinta: mod.c.texto
       }
       Row {              // Puntos: uno por escritorio, el tuyo encendido
         visible: botonVista.numero === "puntos" && botonVista.varios
@@ -99,40 +108,66 @@ Loader {
     id: buscarC
     Item {
       id: campo
-      // En barras estrechas (compacta, vertical, dock, burbujas) solo la lupa, como hace Windows.
       // Automática: en barras estrechas (compacta, dock, burbujas) solo la lupa, como hace Windows.
       // Una forma elegida se respeta en cualquier formato; en vertical no cabe más que la lupa.
       readonly property string elegida: mod.tema.busqueda || "auto"
       readonly property bool corto: mod.v || elegida === "lupa"
                                     || (elegida === "auto" && (mod.tema.compacto || mod.tema.dock || mod.tema.burbujas))
       readonly property string forma: elegida === "auto" ? "campo" : elegida
+      readonly property bool win11: forma === "windows"
       readonly property real f: Math.max(0.8, Math.min(1.4, mod.alto / 46))
-      width: mod.v ? mod.alto : corto ? (mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38) : Math.round(200 * f)
+      // Fondo oscuro si el texto del tema es claro: con eso se eligen la lupa y los colores de Windows.
+      // (los colores del tema llegan como texto: pasan por una propiedad `color` para leer su luz)
+      readonly property color colorTexto: mod.c.texto
+      readonly property bool oscuro: colorTexto.hslLightness > 0.5
+      readonly property string lupa: mod.tema.lupaWindows ? (mod.tema.lupaWindows[oscuro ? "oscuro" : "claro"] || "") : ""
+      width: mod.v ? mod.alto : corto ? (mod.tema.burbujas ? mod.alto : mod.tema.compacto ? 30 : 38)
+             : Math.round((win11 ? 214 : 200) * f)
       height: mod.v ? 38 : mod.alto
       Rectangle {
+        id: caja
         anchors.centerIn: parent
         width: campo.corto ? Math.min(parent.width, parent.height) - (mod.tema.burbujas ? 2 : 8) : parent.width - 6
-        height: campo.corto ? width : Math.round(mod.alto * 0.66)
-        radius: mod.tema.pixelado ? 0 : campo.corto ? (mod.tema.burbujas ? width / 2 : Math.min(Math.max(mod.tema.radio, mod.tema.radioBoton), 8))
-                : campo.forma === "pastilla" ? height / 2 : Math.min(height / 2, Math.max(mod.tema.radio, 6))
-        color: raton.containsMouse ? mod.c.encima : campo.corto || campo.forma === "subrayado" ? "transparent"
+        height: campo.corto ? width : campo.win11 ? Math.round(Math.min(36, mod.alto * 0.72)) : Math.round(mod.alto * 0.66)
+        radius: mod.tema.pixelado && !campo.win11 ? 0
+                : campo.corto ? (mod.tema.burbujas ? width / 2 : Math.min(Math.max(mod.tema.radio, mod.tema.radioBoton), 8))
+                : campo.forma === "pastilla" || campo.win11 ? height / 2 : Math.min(height / 2, Math.max(mod.tema.radio, 6))
+        // Como Windows 11: los rellenos y bordes de sus controles (Fluent), en claro y en oscuro.
+        color: campo.win11 && !campo.corto
+               ? (campo.oscuro ? (raton.pressed ? "#08FFFFFF" : raton.containsMouse ? "#15FFFFFF" : "#0FFFFFFF")
+                               : (raton.pressed ? "#4DF9F9F9" : raton.containsMouse ? "#80F9F9F9" : "#B3FFFFFF"))
+               : raton.containsMouse ? mod.c.encima : campo.corto || campo.forma === "subrayado" ? "transparent"
                : Qt.rgba(mod.c.texto.r, mod.c.texto.g, mod.c.texto.b, campo.forma === "pastilla" ? 0.13 : 0.07)
-        border.width: campo.corto || campo.forma !== "campo" ? 0 : 1
+        border.width: campo.corto ? 0 : campo.win11 ? 1 : campo.forma !== "campo" ? 0 : 1
+        border.color: campo.win11 ? (campo.oscuro ? "#17FFFFFF" : "#0F000000")
+                      : raton.containsMouse ? mod.c.acento : mod.c.borde
+        Behavior on color { ColorAnimation { duration: 120 } }
         Rectangle {          // Subrayado: solo una raya debajo
           visible: campo.forma === "subrayado" && !campo.corto
           anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 6; rightMargin: 6 }
           height: raton.containsMouse ? 2 : 1
           color: raton.containsMouse ? mod.c.acento : mod.c.tenue
         }
-        border.color: raton.containsMouse ? mod.c.acento : mod.c.borde
-        Behavior on color { ColorAnimation { duration: 120 } }
         Row {
           anchors.verticalCenter: parent.verticalCenter
           anchors.horizontalCenter: campo.corto ? parent.horizontalCenter : undefined
-          x: campo.corto ? 0 : Math.round(12 * campo.f)
-          spacing: Math.round(9 * campo.f)
+          x: campo.corto ? 0 : Math.round((campo.win11 ? 10 : 12) * campo.f)
+          spacing: Math.round((campo.win11 ? 8 : 9) * campo.f)
+          Image {            // la lupa de Windows 11, del propio sistema
+            visible: campo.lupa !== ""
+            anchors.verticalCenter: parent.verticalCenter
+            source: campo.lupa
+            width: Math.round((campo.corto ? 24 : 20) * campo.f); height: width
+            // Se carga ya a su tamaño en pantalla: el dibujo por software no hace mipmaps y,
+            // reduciendo 64 px al pintar, se salta píxeles y el aro sale dentado.
+            sourceSize: Qt.size(Math.round(width * Screen.devicePixelRatio), Math.round(height * Screen.devicePixelRatio))
+            smooth: true
+            scale: raton.pressed ? 0.9 : 1
+            Behavior on scale { NumberAnimation { duration: 90 } }
+          }
           Texto {
-            text: mod.tema.glifoBusqueda || "\uE721"
+            visible: campo.lupa === ""
+            text: mod.tema.glifoBusqueda || ""
             font.family: "Segoe Fluent Icons"
             font.pixelSize: Math.round(15 * campo.f)
             font.bold: false
@@ -140,9 +175,11 @@ Loader {
           }
           Texto {
             visible: !campo.corto
+            anchors.verticalCenter: parent.verticalCenter
             text: "Buscar"
-            color: mod.c.tenue
-            font.pixelSize: Math.round(mod.tema.tamano * campo.f)
+            color: campo.win11 ? (campo.oscuro ? "#C5FFFFFF" : "#9E000000") : mod.c.tenue
+            font.family: campo.win11 ? "Segoe UI Variable Text" : mod.tema.fuente
+            font.pixelSize: Math.round((campo.win11 ? 14 : mod.tema.tamano) * campo.f)
             font.bold: false
           }
         }
@@ -237,9 +274,16 @@ Loader {
     id: musicaC
     Item {             // solo las barras; con el ratón se maneja la música
       // No `visible`: dentro de un grupo oculto siempre sería falso.
-      readonly property bool hay: barra.cancion.titulo !== "" && barra.conCava
+      // En pausa se queda 8 s (para seguir con un clic) y luego se recoge.
+      readonly property bool sonando: barra.cancion.sonando === true
+      property bool reciente: sonando
+      onSonandoChanged: if (sonando) reciente = true; else recoger.restart()
+      Timer { id: recoger; interval: 8000; onTriggered: if (!parent.sonando) parent.reciente = false }
+      readonly property bool hay: barra.cancion.titulo !== "" && barra.conCava && (sonando || reciente)
       width: mod.v ? mod.alto : hay ? 122 : 0
       height: mod.v ? (hay ? 40 : 0) : mod.alto
+      clip: true
+      Behavior on width { enabled: barra.mover; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
       Cava {
         anchors.centerIn: parent
         tema: mod.tema
@@ -262,25 +306,87 @@ Loader {
 
   Component {
     id: sistemaC
-    Grid {
-      columns: mod.v ? 1 : 3
-      spacing: mod.v ? 6 : (mod.tema.compacto ? 8 : 10) + mod.tema.aire / 2
-      leftPadding: mod.v ? 0 : 4
-      rightPadding: mod.v ? 0 : 4
-      topPadding: mod.v ? 4 : 0
-      bottomPadding: mod.v ? 4 : 0
-      Repeater {
-        model: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]].filter(function(m) { return barra.medidores.indexOf(m[1]) >= 0 })
-        Medidor {
-          tema: mod.tema
-          alto: mod.alto
-          nombre: modelData[0]
-          orden: index
-          valor: barra.datos[modelData[1]]
-          historia: barra.datos.historia ? barra.datos.historia[modelData[1]] : []
-          visible: valor >= 0
+    // Con «pequeños», tres barritas finas sin texto; se abren en los medidores
+    // completos al pasar el ratón o cuando alguno pasa del 75 % (se cierran bajo 60).
+    Item {
+      id: sis
+      readonly property var lista: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]].filter(function(m) {
+        return barra.medidores.indexOf(m[1]) >= 0 })
+      readonly property bool mini: barra.medidoresMini && !mod.v
+      property bool subido: false
+      function revisar() {
+        var m = 0
+        for (var i = 0; i < lista.length; i++) m = Math.max(m, barra.datos[lista[i][1]])
+        subido = m >= 75 || (subido && m >= 60)
+      }
+      Connections { target: barra; function onDatosChanged() { sis.revisar() } }
+      Component.onCompleted: revisar()
+      readonly property bool abierto: !mini || subido || zm.containsMouse
+      width: abierto ? rejilla.width : barritas.width + 8
+      height: mod.v ? rejilla.height : mod.alto
+      clip: true
+      Behavior on width {
+        enabled: barra.mover
+        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+      }
+
+      Grid {
+        id: rejilla
+        anchors.verticalCenter: mod.v ? undefined : parent.verticalCenter
+        columns: mod.v ? 1 : 3
+        spacing: mod.v ? 6 : (mod.tema.compacto ? 8 : 10) + mod.tema.aire / 2
+        leftPadding: mod.v ? 0 : 4
+        rightPadding: mod.v ? 0 : 4
+        topPadding: mod.v ? 4 : 0
+        bottomPadding: mod.v ? 4 : 0
+        opacity: sis.abierto ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { enabled: barra.mover; NumberAnimation { duration: 180 } }
+        Repeater {
+          model: sis.lista
+          Medidor {
+            tema: mod.tema
+            alto: mod.alto
+            nombre: modelData[0]
+            orden: index
+            valor: barra.datos[modelData[1]]
+            historia: barra.datos.historia ? barra.datos.historia[modelData[1]] : []
+            visible: valor >= 0
+          }
         }
       }
+
+      Row {
+        id: barritas
+        x: 4
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 3
+        visible: sis.mini && opacity > 0
+        opacity: sis.abierto ? 0 : 1
+        Behavior on opacity { enabled: barra.mover; NumberAnimation { duration: 180 } }
+        Repeater {
+          model: sis.lista
+          Rectangle {
+            readonly property int valor: barra.datos[modelData[1]]
+            readonly property color tono: valor >= 85 ? mod.c.alerta
+                : ([mod.c.medidor1, mod.c.medidor2, mod.c.medidor3][index] || mod.c.acento)
+            visible: valor >= 0         // sin GPU medible, no sale
+            width: 4
+            height: Math.round(mod.alto * 0.5)
+            radius: mod.tema.pixelado ? 0 : 2
+            color: Qt.rgba(tono.r, tono.g, tono.b, 0.22)
+            Rectangle {
+              anchors.bottom: parent.bottom
+              width: parent.width
+              height: Math.max(2, parent.height * Math.min(100, parent.valor) / 100)
+              radius: parent.radius
+              color: parent.tono
+              Behavior on height { enabled: barra.mover; NumberAnimation { duration: 300 } }
+            }
+          }
+        }
+      }
+
       Item {
         parent: mod
         anchors.fill: parent
@@ -424,9 +530,34 @@ Loader {
   Component {
     id: reloj
     Grid {
-    columns: mod.v ? 1 : 2
+    // Columnas justas: con alguna de más, Grid deja un hueco al final.
+    columns: mod.v ? 1 : 1 + (foco.visible ? 1 : 0) + (crono.visible ? 1 : 0)
     verticalItemAlignment: Grid.AlignVCenter
     horizontalItemAlignment: Grid.AlignHCenter
+    Item {             // modo concentración: una luna; clic para salir
+      id: foco
+      visible: barra.concentrado
+      width: visible ? (mod.v ? mod.alto : 30) : 0
+      height: visible ? (mod.v ? 30 : mod.alto) : 0
+      Rectangle {
+        anchors.centerIn: parent
+        width: 26; height: 26
+        radius: mod.tema.pixelado ? 0 : 13
+        color: zf.containsMouse ? mod.c.encima : Qt.rgba(0, 0, 0, 0)
+        border.width: 1
+        border.color: mod.c.acento
+        Texto {
+          anchors.centerIn: parent
+          text: ""
+          font.family: "Segoe Fluent Icons"
+          font.pixelSize: 13
+          font.bold: false
+          color: mod.c.acento
+        }
+      }
+      Aviso { texto: "Concentración: tiempo, medidores y música escondidos; solo avisos importantes · Clic: salir"; fuente: zf }
+      MouseArea { id: zf; anchors.fill: parent; hoverEnabled: true; onClicked: barra.concentrarse(false) }
+    }
     Item {             // el temporizador en marcha: clic para quitarlo
       id: crono
       readonly property var c: barra.cuenta
@@ -468,43 +599,115 @@ Loader {
       colores: mod.c
       id: hora
       property date ahora: new Date()
-      readonly property bool doble: mod.tema.relojDoble && !mod.tema.compacto
+      // El estilo de la hora (Menú → Widgets → Hora y fecha); «tema» deja el de cada tema.
+      readonly property string estilo: mod.tema.hora || "tema"
+      readonly property bool doble: estilo === "windows" || estilo === "digital"
+                                    || ((estilo === "tema" || estilo === "segundos") && mod.tema.relojDoble && !mod.tema.compacto)
+      readonly property bool conFecha: !!mod.tema.fecha && estilo !== "grande"
+      readonly property string formatoHora: estilo === "windows" ? "H:mm"
+                                            : estilo === "segundos" ? mod.tema.reloj.replace(/mm$/, "mm:ss") : mod.tema.reloj
+      readonly property string formatoFecha: ({ windows: "dd/MM/yyyy", una_linea: "ddd d MMM", pastilla: "ddd d",
+                                                digital: "ddd dd.MM", agujas: "ddd d" })[estilo] || mod.tema.fecha
+      readonly property string letra: estilo === "windows" ? "Segoe UI Variable Text"
+                                      : estilo === "digital" ? "Cascadia Mono" : mod.tema.fuente
+      readonly property color acento: mod.c.acento
+      readonly property color tinta: estilo === "digital" ? mod.c.acento
+                                     : estilo === "pastilla" ? (acento.hslLightness > 0.6 ? "#000000" : "#FFFFFF") : mod.c.texto
       // En vertical, un texto de dos líneas; en horizontal, la hora grande y en negrita
       // y la fecha debajo (o al lado), las dos a la medida del alto de la barra.
       readonly property real f: Math.max(0.8, Math.min(1.4, mod.alto / 46))
       alineado: Text.AlignHCenter
       texto: !mod.v ? "" : Qt.formatTime(ahora, "HH:mm") + (!mod.tema.fecha ? ""
-             : "\n" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM"))
+             : "
+" + ahora.toLocaleDateString(Qt.locale(), mod.tema.compacto || mod.tema.pixelado || mod.alto < 56 ? "d/M" : "d MMM"))
       tam: Math.min(mod.tema.tamano, 13)
-      ancho: mod.v ? mod.alto : esfera.implicitWidth + (mod.tema.compacto ? 14 : 20)
-      Grid {
-        id: esfera
+      ancho: mod.v ? mod.alto : cara.implicitWidth + (estilo === "pastilla" ? 28 : mod.tema.compacto ? 14 : 20)
+      Rectangle {        // En pastilla: la hora sobre el color de acento
+        visible: hora.estilo === "pastilla" && !mod.v
+        anchors.centerIn: parent
+        width: parent.width - 8; height: Math.min(parent.height - 12, Math.round(30 * hora.f))
+        radius: mod.tema.pixelado ? 0 : height / 2
+        color: hora.encima ? Qt.lighter(mod.c.acento, 1.12) : mod.c.acento
+        Behavior on color { ColorAnimation { duration: 120 } }
+      }
+      Row {              // la esfera (si es de agujas) y la hora con la fecha, centradas
+        id: cara
         visible: !mod.v
         anchors.centerIn: parent
+        spacing: esferaAgujas.visible ? 8 : 0
+      Canvas {           // De agujas: una esfera pequeña; se repinta al cambiar el minuto
+        id: esferaAgujas
+        visible: hora.estilo === "agujas" && !mod.v
+        width: visible ? Math.round(Math.min(30, mod.alto * 0.62)) : 0
+        height: width
+        anchors.verticalCenter: parent.verticalCenter
+        renderStrategy: Canvas.Cooperative
+        property int minuto: hora.ahora.getHours() * 60 + hora.ahora.getMinutes()
+        onMinutoChanged: requestPaint()
+        onVisibleChanged: requestPaint()
+        onPaint: {
+          var x = getContext("2d"), r = width / 2, h = hora.ahora.getHours() % 12, m = hora.ahora.getMinutes()
+          x.reset()
+          if (r < 6) return
+          x.translate(r, r)
+          x.lineCap = "round"
+          x.strokeStyle = mod.c.texto
+          x.globalAlpha = 0.9
+          x.lineWidth = 1.2
+          x.beginPath(); x.arc(0, 0, r - 1, 0, 2 * Math.PI); x.stroke()
+          x.globalAlpha = 0.5
+          for (var i = 0; i < 12; i += 3) {
+            var a = i / 12 * 2 * Math.PI
+            x.beginPath(); x.moveTo(Math.sin(a) * (r - 3), -Math.cos(a) * (r - 3)); x.lineTo(Math.sin(a) * (r - 5), -Math.cos(a) * (r - 5)); x.stroke()
+          }
+          x.globalAlpha = 1
+          var ah = (h + m / 60) / 12 * 2 * Math.PI, am = m / 60 * 2 * Math.PI
+          x.lineWidth = 2
+          x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.sin(ah) * r * 0.5, -Math.cos(ah) * r * 0.5); x.stroke()
+          x.strokeStyle = mod.c.acento
+          x.lineWidth = 1.5
+          x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.sin(am) * r * 0.75, -Math.cos(am) * r * 0.75); x.stroke()
+          x.fillStyle = mod.c.acento
+          x.beginPath(); x.arc(0, 0, 1.6, 0, 2 * Math.PI); x.fill()
+        }
+      }
+      Grid {
+        id: esfera
+        anchors.verticalCenter: parent.verticalCenter
         columns: hora.doble ? 1 : 2
-        columnSpacing: Math.round(8 * hora.f)
-        rowSpacing: Math.round(-3 * hora.f)
-        horizontalItemAlignment: hora.doble ? Grid.AlignHCenter : Grid.AlignLeft
+        columnSpacing: Math.round((hora.estilo === "una_linea" ? 6 : 8) * hora.f)
+        rowSpacing: hora.estilo === "windows" ? 0 : Math.round(-3 * hora.f)
+        horizontalItemAlignment: hora.estilo === "windows" ? Grid.AlignRight : hora.doble ? Grid.AlignHCenter : Grid.AlignLeft
         verticalItemAlignment: Grid.AlignVCenter
         Texto {
-          text: Qt.formatTime(hora.ahora, mod.tema.reloj)
-          color: mod.c.texto
-          font.bold: true
+          text: Qt.formatTime(hora.ahora, hora.formatoHora)
+          color: hora.tinta
+          font.family: hora.letra
+          font.bold: hora.estilo !== "windows"
+          font.letterSpacing: hora.estilo === "digital" ? 1 : 0
           // En temas con un fondo muy dibujado (bosque), una sombra suave para que se lea.
-          style: mod.tema.sombraReloj ? Text.Raised : Text.Normal
+          style: mod.tema.sombraReloj && hora.estilo !== "pastilla" ? Text.Raised : Text.Normal
           styleColor: "#B0000000"
-          font.pixelSize: Math.round((hora.doble ? Math.max(16, mod.tema.tamano + 3) : Math.max(15, mod.tema.tamano + 2)) * hora.f)
+          font.pixelSize: Math.round((hora.estilo === "windows" ? 12
+                                      : hora.estilo === "grande" ? Math.max(20, mod.tema.tamano + 8)
+                                      : hora.estilo === "una_linea" || hora.estilo === "pastilla" ? Math.max(14, mod.tema.tamano + 1)
+                                      : hora.doble ? Math.max(16, mod.tema.tamano + 3) : Math.max(15, mod.tema.tamano + 2)) * hora.f)
         }
         Texto {
-          visible: !!mod.tema.fecha
-          text: hora.ahora.toLocaleDateString(Qt.locale(), mod.tema.fecha)
-          color: mod.c.texto
-          opacity: mod.tema.sombraReloj ? 1 : 0.88
-          style: mod.tema.sombraReloj ? Text.Raised : Text.Normal
+          visible: hora.conFecha
+          text: (hora.estilo === "una_linea" ? "·  " : "")
+                + (hora.estilo === "digital" ? hora.ahora.toLocaleDateString(Qt.locale(), hora.formatoFecha).toUpperCase()
+                                             : hora.ahora.toLocaleDateString(Qt.locale(), hora.formatoFecha))
+          color: hora.estilo === "una_linea" || hora.estilo === "digital" ? mod.c.tenue : hora.tinta
+          opacity: mod.tema.sombraReloj || hora.estilo === "windows" || hora.estilo === "pastilla" ? 1 : 0.88
+          style: mod.tema.sombraReloj && hora.estilo !== "pastilla" ? Text.Raised : Text.Normal
           styleColor: "#B0000000"
+          font.family: hora.letra
           font.bold: false
-          font.pixelSize: Math.round(Math.max(13, mod.tema.tamano) * hora.f)
+          font.pixelSize: Math.round((hora.estilo === "windows" ? 12 : hora.estilo === "digital" ? 10
+                                      : Math.max(13, mod.tema.tamano)) * hora.f)
         }
+      }
       }
       ayuda: ahora.toLocaleDateString(Qt.locale(), Locale.LongFormat) + "
 Clic: calendario · Clic central: notificaciones"
@@ -522,7 +725,6 @@ Clic: calendario · Clic central: notificaciones"
     id: widgetsC
     Item {
       id: wid
-      readonly property bool conTexto: barra.tiempo.hay && !mod.v && !mod.tema.compacto
       readonly property real ancho: mod.tema.clima === "emoji" ? icono.implicitWidth : dibujo.width
       width: mod.v ? mod.alto : ancho + (barra.tiempo.hay ? datos.width + 5 : 0) + 14
       height: mod.v ? 40 : mod.alto
@@ -556,11 +758,8 @@ Clic: calendario · Clic central: notificaciones"
         visible: barra.tiempo.hay
         x: mod.v ? (parent.width - width) / 2 : 12 + wid.ancho
         y: mod.v ? parent.height - height - 1 : (parent.height - height) / 2
-        width: Math.max(gr.implicitWidth, wid.conTexto ? Math.min(80, Math.ceil(dm.advanceWidth) + 2) : 0)
-        spacing: -2
-        TextMetrics { id: dm; text: barra.tiempo.texto; font.family: mod.tema.fuente; font.pixelSize: 9 }
-        Texto { id: gr; text: barra.tiempo.grados; color: mod.c.texto; font.pixelSize: mod.v ? 10 : 12 }
-        Texto { id: des; visible: wid.conTexto; width: parent.width; elide: Text.ElideRight; text: barra.tiempo.texto; color: mod.c.tenue; font.pixelSize: 9; font.bold: false }
+        // Solo los grados: la descripción («Nublado») a 9 px no se leía; va en el aviso.
+        Texto { text: barra.tiempo.grados; color: mod.c.texto; font.pixelSize: mod.v ? 10 : 14 }
       }
       Aviso { texto: "Widgets" + (barra.tiempo.hay ? " · " + barra.tiempo.ciudad + ": " + barra.tiempo.grados + ", " + barra.tiempo.texto : " · La ciudad del tiempo se elige en el menú"); fuente: zw }
       MouseArea {

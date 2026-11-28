@@ -18,7 +18,8 @@ BASE = {
     "compacto": False, "dock": False, "lupa": 0.38, "pegada": False, "esquinas": False, "burbujas": False, "centrado": False, "vertical": False, "lado": "abajo", "coloresClaros": {}, "adapta": False,
     "medidor": "texto", "momentos": {}, "logoClaros": [], "unica": False, "radioBoton": 0, "relojDoble": True, "sombraReloj": False, "variante": "tema", "dentro": False,
     "glifos": False, "acentoWindows": True, "fondoActiva": True, "pastillaSoloOriginales": False, "translucida": False, "opacidad": 100, "aire": 0, "cava": "barras", "clima": "emoji", "windows": False, "claro": {}, "clara": False, "contorno": False, "adorno": 1,
-    "busqueda": "auto", "icono_busqueda": "lupa", "vista": "insignia", "icono_vista": "ventanas", "glifoBusqueda": "\uE721", "glifoVista": "\uE7C4",
+    "busqueda": "auto", "icono_busqueda": "windows", "vista": "insignia", "icono_vista": "windows", "glifoBusqueda": "\uE721", "glifoVista": "\uE7C4",
+    "hora": "tema", "lupaWindows": {},
     "logo": {"colores": ["acento"], "fuera": 0, "dentro": 0, "lados": 0, "hueco": 2, "opacidad": 1, "contorno": False,
              "filo": "", "bisel": False},
     "colores": {"fondo": "#E6202020", "fondo2": "#E6202020", "isla": "transparent", "borde": "#40FFFFFF",
@@ -279,6 +280,18 @@ def con_vista_tareas(t, si):
     return t
 
 
+# Lo que se esconde en el modo concentración.
+DISTRAEN = ("widgets", "sistema", "musica")
+
+
+def con_concentracion(t, si):
+    """Sin tiempo, medidores ni música, y Claudito quieto."""
+    if not si:
+        return t
+    m = {lado: [[x for x in g if x not in DISTRAEN] for g in grupos] for lado, grupos in t["modulos"].items()}
+    return {**t, "modulos": {lado: [g for g in grupos if g] for lado, grupos in m.items()}, "paseo": False}
+
+
 # Qué ventanas enseña cada barra cuando hay varias pantallas.
 PANTALLAS = {"suya": "Las de su pantalla", "principal": "Todas en la principal", "todas": "Todas en todas"}
 
@@ -357,17 +370,43 @@ DISENOS = {
                 "anillo": "Anillo", "flor": "Flor", "corazones": "Corazones", "rama": "Rama"},
     "cava": {"tema": "Del tema", "barras": "Barras", "neon": "Neón", "petalos": "Pétalos", "hojas": "Hojas",
              "bloques": "Bloques"},
-    "busqueda": {"auto": "Automática", "campo": "Campo", "pastilla": "Pastilla", "subrayado": "Subrayado", "lupa": "Solo el icono"},
-    "icono_busqueda": {"lupa": "Lupa", "caja": "Lupa en caja", "bombilla": "Bombilla", "chispa": "Chispa",
-                       "globo": "Globo", "robot": "Robot"},
+    "busqueda": {"auto": "Automática", "windows": "Como Windows 11", "campo": "Campo", "pastilla": "Pastilla",
+                 "subrayado": "Subrayado", "lupa": "Solo el icono"},
+    "icono_busqueda": {"windows": "Windows 11", "windows_mono": "Windows 11 sin color", "lupa": "Lupa",
+                       "caja": "Lupa en caja", "bombilla": "Bombilla", "chispa": "Chispa", "globo": "Globo", "robot": "Robot"},
     "vista": {"insignia": "Número en insignia", "texto": "Número al lado", "puntos": "Puntos", "nada": "Sin número"},
-    "icono_vista": {"ventanas": "Ventanas", "cuadricula": "Cuadrícula", "mosaico": "Mosaico", "copias": "Capas",
-                    "pantalla": "Pantalla", "paneles": "Paneles"},
+    "icono_vista": {"windows": "Windows 11", "ventanas": "Ventanas", "cuadricula": "Cuadrícula", "mosaico": "Mosaico",
+                    "copias": "Capas", "pantalla": "Pantalla", "paneles": "Paneles"},
+    # La hora y la fecha (qml/Modulo.qml, componente reloj).
+    "hora": {"tema": "Del tema", "windows": "Como Windows 11", "una_linea": "En una línea", "grande": "Solo la hora, grande",
+             "segundos": "Con segundos", "pastilla": "En pastilla", "digital": "Digital", "agujas": "De agujas"},
 }
 # Los de Segoe Fluent Icons (comprobados a ojo: se ven en Windows 11).
-GLIFOS = {"lupa": "\uE721", "caja": "\uE773", "bombilla": "\uEA80", "chispa": "\uEA38", "globo": "\uE774",
-          "robot": "\uE99A", "ventanas": "\uE7C4", "cuadricula": "\uE8A9", "mosaico": "\uECA5", "copias": "\uE8C8",
-          "pantalla": "\uE7F4", "paneles": "\uF246"}
+# Los \u00ABwindows\u00BB se dibujan (vista) o se cargan del sistema (lupa); el glifo es su reserva.
+GLIFOS = {"windows": "\uE721", "windows_mono": "\uE721", "lupa": "\uE721", "caja": "\uE773", "bombilla": "\uEA80",
+          "chispa": "\uEA38", "globo": "\uE774", "robot": "\uE99A", "ventanas": "\uE7C4", "cuadricula": "\uE8A9",
+          "mosaico": "\uECA5", "copias": "\uE8C8", "pantalla": "\uE7F4", "paneles": "\uF246"}
+GLIFOS_VISTA = {**GLIFOS, "windows": "\uE7C4"}
+
+# Las lupas de la barra de Windows 11, tal como vienen en el sistema (no se copian).
+LUPAS = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "SystemApps",
+                     "MicrosoftWindows.Client.Core_cw5n1h2txyewy", "StartMenu", "Assets", "SearchIcons")
+
+
+def imagenes_lupa(modo, carpeta=LUPAS):
+    """{"oscuro", "claro"}: URL de la lupa de Windows 11 para fondo oscuro y para claro,
+    o {} si este Windows no las trae (entonces se usa el glifo).
+    `modo`: "windows" (en color, la de la barra) o "windows_mono"."""
+    if modo not in ("windows", "windows_mono"):
+        return {}
+    tono = "On" if modo == "windows" else "Off"
+    out = {}
+    for clave, sufijo in (("oscuro", "Dark"), ("claro", "Light")):
+        ruta = os.path.join(carpeta, f"SearchIcon{tono}{sufijo}.scale-400.png")
+        if not os.path.exists(ruta):
+            return {}
+        out[clave] = "file:///" + ruta.replace(os.sep, "/")
+    return out
 CLAUDITO = {"tema": "Del tema", "quieto": "Quieto", "paseo": "Paseando"}
 MENUS = {"barra": "Con la forma de la barra", "windows": "Como los de Windows"}
 
@@ -387,7 +426,8 @@ def forma_menus(t, modo):
 def con_widgets(t, disenos, sistema=True, claudito=True):
     """El diseño elegido para cada widget (si no, el del tema), y fuera los que se apagaron."""
     t = {**t, **{k: v for k, v in disenos.items() if k in DISENOS and v in DISENOS[k] and v != "tema"}}
-    t["glifoBusqueda"], t["glifoVista"] = GLIFOS[t["icono_busqueda"]], GLIFOS[t["icono_vista"]]
+    t["glifoBusqueda"], t["glifoVista"] = GLIFOS[t["icono_busqueda"]], GLIFOS_VISTA[t["icono_vista"]]
+    t["lupaWindows"] = imagenes_lupa(t["icono_busqueda"])
     modo = disenos.get("claudito", "tema")
     if modo in ("quieto", "paseo"):
         t["paseo"] = modo == "paseo" and not t["vertical"]

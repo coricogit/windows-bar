@@ -41,19 +41,20 @@ Item {
   readonly property real sep: unica ? t.separacion : 12
   readonly property real total: largo - 2 * margen      // sitio para todo
 
-  // En una isla con los iconos al principio va todo seguido; con ellos en el
-  // centro, la isla es simétrica y cada lado se pega a su borde.
+  // En una isla va todo seguido y la isla entera se centra, aunque así los
+  // iconos se desvíen un poco del centro exacto: hacerla simétrica dejaba un
+  // hueco grande en el lado más corto.
   readonly property real seguido: izquierda.mio + (centro.mio > 0 ? sep + centro.mio : 0) + (derecha.mio > 0 ? sep + derecha.mio : 0)
-  readonly property real mitad: centro.mio / 2 + sep + Math.max(izquierda.mio, derecha.mio)
-  readonly property real anchoIsla: t.centrado ? 2 * mitad : seguido
+  readonly property real anchoIsla: seguido
   readonly property real inicio: (largo - anchoIsla) / 2
   readonly property real pIzq: unica ? inicio : (v ? cuerpo.y : cuerpo.x) + t.relleno
   readonly property real pDer: !unica ? (v ? cuerpo.y + cuerpo.height : cuerpo.x + cuerpo.width) - derecha.mio - t.relleno
                                : inicio + anchoIsla - derecha.mio
   readonly property real pCen: {
+    if (unica) return pIzq + izquierda.mio + (izquierda.mio > 0 ? sep : 0)
     if (t.centrado) return (largo - centro.mio) / 2
     var antes = pIzq + izquierda.mio + sep
-    return unica ? antes : Math.max(antes, Math.min((largo - centro.mio) / 2, pDer - centro.mio - sep))
+    return Math.max(antes, Math.min((largo - centro.mio) / 2, pDer - centro.mio - sep))
   }
 
   // ---------- Escondida ----------

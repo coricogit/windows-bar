@@ -1,6 +1,7 @@
 """Las llamadas a Windows que necesita la barra (solo ctypes)."""
 import ctypes
 import os
+import re
 import uuid
 from ctypes import wintypes as w
 
@@ -67,6 +68,7 @@ _sig(kernel32, "CloseHandle", w.BOOL, w.HANDLE)
 _sig(kernel32, "TerminateProcess", w.BOOL, w.HANDLE, w.UINT)
 _sig(kernel32, "WaitForSingleObject", w.DWORD, w.HANDLE, w.DWORD)
 _sig(kernel32, "GetExitCodeProcess", w.BOOL, w.HANDLE, _P(w.DWORD))
+_sig(kernel32, "GetApplicationUserModelId", w.LONG, w.HANDLE, _P(w.UINT), w.LPWSTR)
 _sig(kernel32, "QueryFullProcessImageNameW", w.BOOL, w.HANDLE, w.DWORD, w.LPWSTR, _P(w.DWORD))
 _sig(dwmapi, "DwmGetWindowAttribute", ctypes.c_long, w.HWND, w.DWORD, ctypes.c_void_p, w.DWORD)
 _sig(gdi32, "DeleteObject", w.BOOL, w.HGDIOBJ)
@@ -147,11 +149,23 @@ def app_exe(hwnd):
     return exe_of(pid)
 
 
+_VERSION_SQUIRREL = re.compile(r"\\app-\d+(?:\.\d+)*\\")
+
+
+def sin_version(ruta):
+    """Quita la carpeta de versión de las apps que se actualizan con Squirrel."""
+    return _VERSION_SQUIRREL.sub(lambda _: "\\", ruta)
+
+
 def clave_exe(exe):
     """Identifica un programa. Las apps de la Tienda cambian de carpeta al
-    actualizarse: de ellas solo cuenta el nombre."""
+    actualizarse: de ellas solo cuenta el nombre. Las que se actualizan con
+    Squirrel (Discord, Slack...) llevan la versión en la ruta
+    (...\\app-1.0.9270\\discord.exe): se quita."""
     exe = exe.lower()
-    return "tienda:" + os.path.basename(exe) if "\\windowsapps\\" in exe else exe
+    if "\\windowsapps\\" in exe:
+        return "tienda:" + os.path.basename(exe)
+    return sin_version(exe)
 
 
 def de_la_tienda(hwnd, exe):
@@ -494,6 +508,20 @@ def method(obj, index, *types):
     return lambda *a: ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, *types)(table[index])(obj, *a)
 
 
+def app_id_proceso(pid):
+    """El AppUserModelID de un proceso empaquetado (Tienda), o "". Sirve para
+    las apps que no lo ponen en su ventana, como Windows Terminal."""
+    h = kernel32.OpenProcess(0x1000, False, pid)   # QUERY_LIMITED_INFORMATION
+    if not h:
+        return ""
+    try:
+        n = w.UINT(512)
+        buf = ctypes.create_unicode_buffer(n.value)
+        return buf.value if kernel32.GetApplicationUserModelId(h, ctypes.byref(n), buf) == 0 else ""
+    finally:
+        kernel32.CloseHandle(h)
+
+
 def app_id(hwnd):
     """El AppUserModelID de una ventana, o ""."""
     store = ctypes.c_void_p()
@@ -582,6 +610,17 @@ def esquinas(hwnd, pref):
     try:
         v = ctypes.c_int(pref)
         ctypes.windll.dwmapi.DwmSetWindowAttribute(w.HWND(hwnd), 33, ctypes.byref(v), 4)
+    except OSError:
+        pass
+
+
+def sin_marco(hwnd):
+    """Sin el borde gris ni el redondeo que Windows 11 pone a las ventanas (para las que
+    dibujan su propia forma, como la isla). DWMWA_BORDER_COLOR (34) = DWMWA_COLOR_NONE."""
+    esquinas(hwnd, 1)
+    try:
+        v = ctypes.c_uint(0xFFFFFFFE)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(w.HWND(hwnd), 34, ctypes.byref(v), 4)
     except OSError:
         pass
 

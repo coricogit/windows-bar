@@ -5,6 +5,13 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 
 ## Novedades
 
+- **1.0.12**: búsqueda *Como Windows 11*, con las lupas originales del sistema, e icono de vista de tareas de Windows 11.
+  Ocho estilos para la hora y la fecha (*Menú → Widgets*). Isla dinámica rediseñada: color por tipo de aviso, iconos de
+  Windows, el icono del programa que te llama, la carátula de lo que suena y, al pasar el ratón, anterior, pausa y
+  siguiente. **Modo concentración** (*Funciones*, «foco» en el buscador o durante el pomodoro): esconde el tiempo, los
+  medidores y la música, y la isla solo avisa de lo importante. Medidores pequeños hasta que la carga sube, el dock
+  compacto con los iconos centrados y transiciones suaves. Arreglos: los programas anclados de la Tienda (Windows
+  Terminal) y los que llevan la versión en la carpeta (Discord) ya no se pierden al actualizarse.
 - **1.0.11**: modo *Como Windows* (*Menú → Forma*): la letra, la forma y el gris de Windows, con el tema en el color
   y un paisaje suave. Pestaña **Widgets**: cada widget (tiempo, CPU/RAM/GPU, música, Claudito, búsqueda, vista de
   tareas) se oculta o cambia de diseño, en cualquier formato; Claudito quieto o paseando. Botón de vista de tareas
@@ -198,7 +205,7 @@ En `barra.log` queda cada cierre con su motivo: el código de salida y qué suel
 cerró otro programa, no respondía…). Si cayó de golpe, debajo va dónde estaba cada hilo (lo deja `faulthandler` en
 `barra-fallo.log`). Los errores de Python que no la tiran también se anotan, cada uno como mucho una vez por minuto.
 
-Para probar código nuevo sin que cuente como caída: `py barraigilante.py --recargar` la cierra y la vuelve a abrir.
+Para probar código nuevo sin que cuente como caída: `py -m barra.vigilante --recargar` la cierra y la vuelve a abrir.
 
 ## Crear un tema
 

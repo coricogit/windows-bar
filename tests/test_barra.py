@@ -1009,6 +1009,29 @@ class Ajustes(unittest.TestCase):
         self.assertEqual(win.clave_exe(v % 1), win.clave_exe(v % 2))
         self.assertEqual(win.clave_exe("C:\\A.EXE"), "c:\\a.exe")
 
+    def test_clave_sin_version_de_squirrel(self):
+        v = "C:\\Users\\x\\AppData\\Local\\Discord\\app-1.0.%d\\Discord.exe"
+        self.assertEqual(win.clave_exe(v % 9269), win.clave_exe(v % 9270))
+        self.assertEqual(win.clave_exe(v % 1), "c:\\users\\x\\appdata\\local\\discord\\discord.exe")
+        self.assertEqual(win.clave_exe("C:\\apps\\app-store\\x.exe"), "c:\\apps\\app-store\\x.exe")
+        # Las claves viejas, con versión, se juntan al leer los ajustes.
+        viejo = "c:\\u\\discord\\app-1.0.%d\\discord.exe"
+        a = ajustes.normalizar({"orden": ["zen", viejo % 1, viejo % 2], "quitados": [viejo % 1]}, {"tokyo": {}}, [])
+        self.assertEqual(a["orden"], ["zen", "c:\\u\\discord\\discord.exe"])
+        self.assertEqual(a["quitados"], ["c:\\u\\discord\\discord.exe"])
+
+    def test_fijado_de_la_tienda_sin_identificador(self):
+        exe = "C:\\Program Files\\WindowsApps\\Microsoft.WindowsTerminal_1.25.3131.0_x64__8wekyb3d8bbwe\\WindowsTerminal.exe"
+        self.assertEqual(ajustes.familia_paquete(exe), "Microsoft.WindowsTerminal_8wekyb3d8bbwe")
+        self.assertEqual(ajustes.familia_paquete("C:\\A.EXE"), "")
+        a = {"fijados": [{"clave": "tienda:windowsterminal.exe", "exe": exe, "ruta": ""},
+                         {"clave": "c:\\a.exe", "exe": "C:\\A.EXE", "ruta": ""}]}
+        apps_ = [{"id": "Otra_123!App"}, {"id": "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"}]
+        self.assertTrue(ajustes.reparar_fijados(a, lambda: apps_))
+        self.assertEqual(a["fijados"][0]["ruta"], "shell:AppsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App")
+        self.assertEqual(a["fijados"][1]["ruta"], "")
+        self.assertFalse(ajustes.reparar_fijados(a, lambda: self.fail("no hacía falta leer")))
+
 
 class Previa(unittest.TestCase):
     def test_encajar(self):
@@ -1365,6 +1388,54 @@ class ComoWindows2(unittest.TestCase):
             c = temas.con_integrado(t, True)["colores"]
             self.assertLess(temas.brillo(temas.rgb(c["fondo"])), 0.25, k)
             self.assertEqual(c["texto"], "#FFFFFF")
+
+
+class Concentracion(unittest.TestCase):
+    def test_esconde_lo_que_distrae(self):
+        t = {**temas.BASE, "paseo": True}
+        c = temas.con_concentracion(t, True)
+        todos = [m for grupos in c["modulos"].values() for g in grupos for m in g]
+        for m in temas.DISTRAEN:
+            self.assertNotIn(m, todos)
+        self.assertIn("reloj", todos)
+        self.assertFalse(c["paseo"])
+        self.assertTrue(all(g for grupos in c["modulos"].values() for g in grupos))     # sin grupos vacíos
+        self.assertIs(temas.con_concentracion(t, False), t)
+
+    def test_buscador(self):
+        for texto in ("concentr", "foco", "no molestar", "Concentración"):
+            self.assertEqual(buscador.resultados(texto, [])[0]["tipo"], "concentracion", texto)
+        self.assertFalse(any(r["tipo"] == "concentracion" for r in buscador.resultados("co", [])))
+
+
+class LupaDeWindows(unittest.TestCase):
+    def test_lupas(self):
+        d = tempfile.mkdtemp()
+        try:
+            self.assertEqual(temas.imagenes_lupa("windows", d), {})         # sin las imágenes: el glifo
+            for n in ("SearchIconOnDark", "SearchIconOnLight"):
+                open(os.path.join(d, n + ".scale-400.png"), "wb").close()
+            l = temas.imagenes_lupa("windows", d)
+            self.assertTrue(l["oscuro"].startswith("file:///") and l["oscuro"].endswith("SearchIconOnDark.scale-400.png"))
+            self.assertEqual(temas.imagenes_lupa("windows_mono", d), {})
+            self.assertEqual(temas.imagenes_lupa("lupa", d), {})
+        finally:
+            shutil.rmtree(d)
+
+    def test_todos_los_iconos_tienen_glifo(self):
+        for k in temas.DISENOS["icono_busqueda"]:
+            self.assertIn(k, temas.GLIFOS)
+        for k in temas.DISENOS["icono_vista"]:
+            self.assertIn(k, temas.GLIFOS_VISTA)
+
+
+class IslaColores(unittest.TestCase):
+    def test_color_por_tipo(self):
+        col = {"acento": "#112233", "alerta": "#FF0000"}
+        self.assertEqual(isla.color_de("musica", col).name(), "#112233")
+        self.assertEqual(isla.color_de("error", col).name(), "#ff0000")
+        self.assertEqual(isla.color_de("ok", col).name(), isla.COLORES["ok"].lower())
+        self.assertEqual(isla.color_de("raro", col).name(), "#112233")
 
 
 class Widgets(unittest.TestCase):
