@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from barra import reposo, actualizar, ajustes, apps, arranque, audio, encaje, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
+from barra import paneles, reposo, actualizar, ajustes, apps, arranque, audio, encaje, atajos, atencion, buscador, calendario, cava, conectar, iconos, tiempo, bandeja, cielo, claudito, instalado, isla, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, vidrio, vigilante, vista, win  # noqa: E402
 
 
 def aviso(msg, hwnd=0x1234, uid=7, flags=7, tip="Hola", version=0, estado=0, mascara=0):
@@ -1436,6 +1436,26 @@ class IslaColores(unittest.TestCase):
         self.assertEqual(isla.color_de("error", col).name(), "#ff0000")
         self.assertEqual(isla.color_de("ok", col).name(), isla.COLORES["ok"].lower())
         self.assertEqual(isla.color_de("raro", col).name(), "#112233")
+
+
+class PanelesDeWindows(unittest.TestCase):
+    PANT = (0, 0, 1920, 1080)
+
+    def test_reconoce_los_paneles(self):
+        rapidos = (1536, 0, 1920, 1032)
+        self.assertTrue(paneles.es_panel(r"C:\Windows\SystemApps\ShellHost.exe", rapidos, self.PANT))
+        self.assertTrue(paneles.es_panel("ShellExperienceHost.exe", (1560, 0, 1920, 1032), self.PANT))
+        self.assertFalse(paneles.es_panel("notepad.exe", rapidos, self.PANT))
+        self.assertFalse(paneles.es_panel("ShellHost.exe", (100, 0, 484, 1032), self.PANT))      # fuera de su esquina
+        self.assertFalse(paneles.es_panel("ShellHost.exe", (1536, 900, 1920, 1032), self.PANT))  # bajito: otra cosa
+        self.assertFalse(paneles.es_panel("ShellHost.exe", self.PANT, self.PANT))                # pantalla entera
+
+    def test_destino(self):
+        rect = (1536, 0, 1920, 1032)
+        self.assertEqual(paneles.destino("izquierda", rect, self.PANT, (0, 0, 60, 1080)), (60, 48))
+        self.assertEqual(paneles.destino("derecha", rect, self.PANT, (1860, 0, 1920, 1080)), (1860 - 384, 48))
+        self.assertIsNone(paneles.destino("abajo", rect, self.PANT, (0, 1020, 1920, 1080)))
+        self.assertIsNone(paneles.destino("arriba", rect, self.PANT, (0, 0, 1920, 60)))
 
 
 class Widgets(unittest.TestCase):

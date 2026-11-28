@@ -229,7 +229,10 @@ Item {
     alto: root.altoUtil
     // Con las ventanas aquí, todas las que dejen sitio a lo imprescindible.
     limite: Math.max(80, root.total - derecha.esencial - otros - 2 * root.sep)
-    hueco: root.t.centrado ? (root.total - centro.mio) / 2 - root.sep : 100000
+    // En una isla (dock...) no hay simetría: lo que dejen las ventanas y el otro lado.
+    // Si ni así caben las ventanas, fuera todo lo prescindible (desborda: hay «+N»).
+    hueco: root.unica && root.t.centrado ? (centro.desborda ? 0 : root.total - centro.mio - derecha.mio - 2 * root.sep)
+           : root.t.centrado ? (root.total - centro.mio) / 2 - root.sep : 100000
     total: root.largo
     grupos: root.visibles(root.t.modulos.izquierda)
     x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : root.pIzq
@@ -239,7 +242,10 @@ Item {
     id: derecha
     tema: root.t
     alto: root.altoUtil
-    hueco: root.t.centrado ? (root.total - centro.mio) / 2 - root.sep : root.total - izquierda.mio - root.sep
+    // En una isla, el final (bandeja, reloj) va antes que lo de arriba/izquierda: cuenta solo
+    // lo imprescindible de ese lado, y así no se pisan.
+    hueco: root.unica && root.t.centrado ? (centro.desborda ? 0 : root.total - centro.mio - izquierda.esencial - 2 * root.sep)
+           : root.t.centrado ? (root.total - centro.mio) / 2 - root.sep : root.total - izquierda.mio - root.sep
     total: root.largo
     grupos: root.visibles(root.t.modulos.derecha)
     x: root.v ? cuerpo.x + (cuerpo.width - width) / 2 : root.pDer
@@ -249,7 +255,10 @@ Item {
     id: centro
     tema: root.t
     alto: root.altoUtil
-    limite: Math.max(80, root.total - 2 * (Math.max(izquierda.esencial, derecha.esencial) + root.sep) - otros)
+    // Las ventanas pueden usar el sitio de todo lo que se esconde (tiempo, medidores, Claudito...):
+    // en una isla, todo menos lo imprescindible de los dos lados; con simetría, el doble del mayor.
+    limite: Math.max(80, root.unica ? root.total - izquierda.esencial - derecha.esencial - 2 * root.sep - otros
+                                    : root.total - 2 * (Math.max(izquierda.esencial, derecha.esencial) + root.sep) - otros)
     hueco: root.t.centrado ? 100000 : root.total - izquierda.mio - derecha.mio - 2 * root.sep
     total: root.largo
     grupos: root.visibles(root.t.modulos.centro)

@@ -27,7 +27,7 @@ from PySide6.QtQuick import QQuickImageProvider, QQuickView, QQuickWindow, QSGRe
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileIconProvider, QInputDialog, QMenu, QMessageBox, QWidget  # noqa: E402
 
-from barra import (reposo, actualizar, ajustes as cfg, apps as apps_inicio, arranque, audio, atencion, buscador, encaje, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
+from barra import (reposo, actualizar, ajustes as cfg, apps as apps_inicio, arranque, audio, atencion, buscador, encaje, bandeja, calendario, cielo, claudito, conectar, iconos, isla, musica, panel_claude, paneles, programas, red, saltos, selector, sesiones, sistema, sitio, temas, tiempo,  # noqa: E402
                    vidrio, vista as previa, win)
 
 DATOS = os.path.join(os.environ["LOCALAPPDATA"], "barra-temas")
@@ -429,6 +429,9 @@ class Barra(QObject):
                 self.encaje = encaje.EncajeAbajo(lambda: self._get_tema()["colores"]["acento"])
                 if not self.encaje.ok:
                     registrar("sin encaje abajo en pantallas verticales (SetWinEventHook)")
+                self.paneles_windows = paneles.Paneles(self._donde_panel)
+                if not self.paneles_windows.ok:
+                    registrar("sin paneles de Windows junto a la barra (SetWinEventHook)")
                 self.atencion = atencion.Atencion(self._pide_atencion, self._t_pronto.start)
                 if not self.atencion.ok:
                     registrar("sin aviso de ventanas que piden atención (RegisterShellHookWindow)")
@@ -575,6 +578,23 @@ class Barra(QObject):
         t = self._get_tema()
         hueco = temas.forma_menus(t, self.ajustes["menus"])[1]
         return lambda an, al: sitio.colocar(t["lado"], (x, y), an, al, g, self.alto(), hueco)
+
+    def _donde_panel(self, hwnd, rect):
+        """Para barra/paneles.py: (lado, pantalla, barra) en píxeles físicos de la pantalla
+        de ese panel de Windows, o None si allí la barra no está a un lado."""
+        lado = self.ajustes["posicion"]
+        if lado not in ("izquierda", "derecha"):
+            return None
+        cx, cy = (rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2
+        for p in self.paneles:
+            s = p.pantalla
+            f = s.devicePixelRatio()
+            g = s.geometry()
+            pant = (round(g.x() * f), round(g.y() * f), round((g.x() + g.width()) * f), round((g.y() + g.height()) * f))
+            if pant[0] <= cx < pant[2] and pant[1] <= cy < pant[3]:
+                x, y, an, al = p.zona_real()
+                return lado, pant, (round(x * f), round(y * f), round((x + an) * f), round((y + al) * f))
+        return None
 
     def esquinas_menus(self):
         return temas.forma_menus(self._get_tema(), self.ajustes["menus"])[0]
@@ -1551,6 +1571,9 @@ class Barra(QObject):
     def fps_cava(self):
         """Fotogramas por segundo del visualizador; 0 si ahora no toca."""
         if not (self.ajustes["cava"] and self._cancion["sonando"] and self._animar):
+            return 0
+        # Sin el visualizador en la barra (concentración, o un tema sin música), ni capturar ni calcular.
+        if self._concentrado or not any("musica" in g for grupos in self._get_tema()["modulos"].values() for g in grupos):
             return 0
         return reposo.fps_cava(self.ajustes["animaciones"], self._oculto, self._luz)
 

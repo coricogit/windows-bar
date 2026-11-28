@@ -14,6 +14,10 @@ Item {
   readonly property real gruesa: Math.max(2, Math.floor(paso) - (paso >= 4 ? 2 : 1))
   readonly property bool tallos: forma === "petalos" || forma === "hojas"
   readonly property real punta: Math.min(7, gruesa + 2)
+  // Una sola lectura por fotograma: leer `barra.cava` desde cada barra pedía la
+  // lista entera a Python 16 veces.
+  readonly property var datos: barra.cava
+  function valor(i) { return datos[Math.floor(i * 16 / cuantas)] || 0 }
 
   function mezcla(a, b, m) { return Qt.rgba(a.r + (b.r - a.r) * m, a.g + (b.g - a.g) * m, a.b + (b.b - a.b) * m, 1) }
 
@@ -21,7 +25,7 @@ Item {
     model: cava.forma === "bloques" ? 0 : cava.cuantas
     Item {
       id: una
-      readonly property real valor: barra.cava[Math.floor(index * 16 / cava.cuantas)] || 0
+      readonly property real valor: cava.valor(index)
       readonly property color tono: cava.mezcla(cava.uno, cava.dos, index / Math.max(1, cava.cuantas - 1))
       x: Math.round(index * cava.paso)
       width: cava.gruesa
@@ -64,21 +68,28 @@ Item {
 
   // Bloques: cada barra, una pila de ladrillos; los de arriba, del color de aviso.
   readonly property int filas: cava.forma === "bloques" ? Math.max(3, Math.floor((height + 1) / 5)) : 0
+  // Cada pila es una columna fija de ladrillos dentro de un recorte que crece desde
+  // abajo: por fotograma cambia un alto, no la visibilidad de cada ladrillo.
   Repeater {
     model: cava.filas > 0 ? cava.cuantas : 0
     Item {
       id: pila
-      readonly property int llenos: Math.max(1, Math.round((barra.cava[Math.floor(index * 16 / cava.cuantas)] || 0) / 100 * cava.filas))
+      readonly property int llenos: Math.max(1, Math.round(cava.valor(index) / 100 * cava.filas))
       x: Math.round(index * cava.paso)
+      y: cava.height - height
       width: cava.gruesa
-      height: cava.height
-      Repeater {
-        model: cava.filas
-        Rectangle {
-          visible: index < pila.llenos
-          width: pila.width; height: 4
-          y: cava.height - 4 - index * 5
-          color: index >= cava.filas - 1 ? cava.c.alerta : cava.mezcla(cava.uno, cava.dos, index / Math.max(1, cava.filas - 2))
+      height: llenos * 5
+      clip: true
+      Item {
+        y: pila.height - cava.height
+        width: pila.width; height: cava.height
+        Repeater {
+          model: cava.filas
+          Rectangle {
+            width: pila.width; height: 4
+            y: cava.height - 4 - index * 5
+            color: index >= cava.filas - 1 ? cava.c.alerta : cava.mezcla(cava.uno, cava.dos, index / Math.max(1, cava.filas - 2))
+          }
         }
       }
     }

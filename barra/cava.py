@@ -25,6 +25,7 @@ BARRAS = 16
 DESDE, HASTA = 50, 9000          # Hz
 MAX_MUESTRAS = 2048
 SUELO = 0.0015                   # por debajo es silencio: no se amplifica
+CAMBIO = 2                       # de 100: lo que se nota (un píxel en una barra de 40-50 px)
 
 producto = getattr(math, "sumprod", None) or (lambda a, b: sum(map(operator.mul, a, b)))
 
@@ -235,7 +236,7 @@ def correr(fps):
                 break
             continue
         f = esp.fotograma(dt)
-        if f != ultimo:
+        if ultimo is None or any(abs(a - b) >= CAMBIO for a, b in zip(f, ultimo)) or (max(f) == 0) != (max(ultimo) == 0):
             ultimo = f
             print(json.dumps(f), flush=True)
     if cap:

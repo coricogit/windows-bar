@@ -18,6 +18,12 @@ Rectangle {
     for (var i = 0; i < rep.count; i++) { var m = rep.itemAt(i); if (m && m.width > 0) n++ }
     return n
   }
+  // Sus ventanas no caben todas (Modulo.qml, tareasC: «+N»).
+  readonly property bool desborda: {
+    var n = piezas * 0
+    for (var i = 0; i < rep.count; i++) { var m = rep.itemAt(i); if (m && m.item && m.item.sobran > 0) return true }
+    return false
+  }
   // Lo que ocupa todo menos las ventanas, para saber cuánto les queda.
   property int piezas: 0
   readonly property real otros: {

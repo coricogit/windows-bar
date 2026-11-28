@@ -5,6 +5,11 @@ sistema ni inyectar código: solo la oculta mientras está abierta.
 
 ## Novedades
 
+- **1.0.13**: con la barra a la izquierda o a la derecha, los ajustes rápidos (sonido, wifi, música) y las
+  notificaciones con el calendario de Windows se abren junto a ella, como en Windows 10 (el menú Inicio no se deja
+  mover). En el dock, tus programas van primero: si falta sitio se esconden antes el tiempo, los medidores, Claudito y
+  la música, y si aun así no caben, una insignia «+N» dice cuántos faltan. Medidores pequeños también en vertical.
+  El visualizador hace menos trabajo y no captura el sonido cuando no se ve (modo concentración).
 - **1.0.12**: búsqueda *Como Windows 11*, con las lupas originales del sistema, e icono de vista de tareas de Windows 11.
   Ocho estilos para la hora y la fecha (*Menú → Widgets*). Isla dinámica rediseñada: color por tipo de aviso, iconos de
   Windows, el icono del programa que te llama, la carátula de lo que suena y, al pasar el ratón, anterior, pausa y

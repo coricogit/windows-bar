@@ -198,13 +198,43 @@ Loader {
   Component {
     id: tareasC
     ListView {
+      id: lista
       orientation: mod.v ? ListView.Vertical : ListView.Horizontal
-      width: mod.v ? mod.alto : Math.min(contentWidth, mod.limite)
-      height: mod.v ? Math.min(contentHeight, mod.limite) : mod.alto
+      // Si no caben todos, se corta entre iconos enteros (no a medio icono) y una
+      // insignia «+N» en el último dice cuántos faltan.
+      readonly property real largoTodo: mod.v ? contentHeight : contentWidth
+      readonly property real paso: count > 0 ? (largoTodo + spacing) / count : 1
+      readonly property int caben: Math.max(1, Math.floor((mod.limite + spacing) / paso))
+      readonly property int sobran: largoTodo > mod.limite ? Math.max(0, count - caben) : 0
+      readonly property real largo: sobran > 0 ? caben * paso - spacing : largoTodo
+      width: mod.v ? mod.alto : largo
+      height: mod.v ? largo : mod.alto
       clip: true
       interactive: mod.v ? contentHeight > height : contentWidth > width
       spacing: 2 + mod.tema.aire / 2
       model: tareas
+      Rectangle {          // «+N»: los que no caben; clic, ir al final (y otra vez, volver)
+        visible: lista.sobran > 0
+        parent: lista
+        z: 10
+        anchors { right: parent.right; bottom: parent.bottom; rightMargin: 1; bottomMargin: mod.v ? 2 : 4 }
+        width: Math.max(18, mas.implicitWidth + 8); height: 15
+        radius: mod.tema.pixelado ? 0 : 7.5
+        color: mod.c.acento
+        Texto {
+          id: mas
+          anchors.centerIn: parent
+          text: (lista.alFinal ? "−" : "+") + lista.sobran
+          font.pixelSize: 10
+          font.bold: true
+          color: "#000000"
+        }
+        MouseArea {
+          anchors.fill: parent
+          onClicked: { lista.alFinal = !lista.alFinal; if (lista.alFinal) lista.positionViewAtEnd(); else lista.positionViewAtBeginning() }
+        }
+      }
+      property bool alFinal: false
       // La gota: sus dos bordes van a distinta velocidad, así se estira al moverse.
       property Item activaItem: null
       property real ratonX: -1000          // en el dock: dónde está el ratón, para la lupa
@@ -312,7 +342,7 @@ Loader {
       id: sis
       readonly property var lista: [["CPU", "cpu"], ["RAM", "ram"], ["GPU", "gpu"]].filter(function(m) {
         return barra.medidores.indexOf(m[1]) >= 0 })
-      readonly property bool mini: barra.medidoresMini && !mod.v
+      readonly property bool mini: barra.medidoresMini
       property bool subido: false
       function revisar() {
         var m = 0
@@ -321,10 +351,16 @@ Loader {
       }
       Connections { target: barra; function onDatosChanged() { sis.revisar() } }
       Component.onCompleted: revisar()
-      readonly property bool abierto: !mini || subido || zm.containsMouse
-      width: abierto ? rejilla.width : barritas.width + 8
-      height: mod.v ? rejilla.height : mod.alto
+      // En vertical, abrirse al pasar el ratón movería toda la barra: ahí, solo si la carga sube
+      // (con el ratón encima sale el aviso con los tres valores).
+      readonly property bool abierto: !mini || subido || (zm.containsMouse && !mod.v)
+      width: mod.v ? mod.alto : abierto ? rejilla.width : barritas.width + 8
+      height: mod.v ? (abierto ? rejilla.height : barritas.height + 12) : mod.alto
       clip: true
+      Behavior on height {
+        enabled: barra.mover && mod.v
+        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+      }
       Behavior on width {
         enabled: barra.mover
         NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
@@ -333,6 +369,7 @@ Loader {
       Grid {
         id: rejilla
         anchors.verticalCenter: mod.v ? undefined : parent.verticalCenter
+        x: mod.v ? (sis.width - width) / 2 : 0
         columns: mod.v ? 1 : 3
         spacing: mod.v ? 6 : (mod.tema.compacto ? 8 : 10) + mod.tema.aire / 2
         leftPadding: mod.v ? 0 : 4
@@ -358,7 +395,7 @@ Loader {
 
       Row {
         id: barritas
-        x: 4
+        x: mod.v ? (sis.width - width) / 2 : 4
         anchors.verticalCenter: parent.verticalCenter
         spacing: 3
         visible: sis.mini && opacity > 0

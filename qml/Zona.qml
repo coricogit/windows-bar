@@ -33,6 +33,7 @@ Grid {
     for (var j = 0; j < l.length && total > hueco; j++) { out.push(l[j].i); total -= l[j].n }
     return out
   }
+  readonly property bool desborda: suma(function(g) { return g.desborda ? 1 : 0 }) > 0
   // Columnas justas: si sobran, Grid deja un hueco de más al final.
   readonly property int llenos: suma(function(g) { return g.width > 0 ? 1 : 0 })
   columns: v ? 1 : Math.max(1, llenos)
